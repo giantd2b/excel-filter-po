@@ -1,0 +1,251 @@
+//kbank
+>  โอนเงินสําเร็จ
+>  20 ธ.ค. 65 16:50 น.
+>  นาย ภูมิ II
+>  ธ.กสิกรไทย
+>  xxx-x-x8271-x
+>  นาย ภูมิ แก้วอ่อน
+>  5 ธ.เกียรตินาคินภัทร
+>  xxx-x-x4003-x
+>  เลขที่รายการ:
+>  จำนวน:
+>  012354165036AOR06952 OA
+>  ค่าธรรมเนียม:
+>  200.00 บาท
+>  I+
+>  0.00 บาท
+>  สแกนตรวจสอบสลิป
+
+//scb
+>  จาก
+>  20
+>  ไปยัง
+>  จํานวนเงิน
+>  SCB+
+>  11
+>  โอนเงินสําเร็จ
+>  05 H.A. 2566 - 12:04
+>  รหัสอ้างอิง: 202301055JNWsmaGPYPF2QkIB
+>  ผู้รับเงินสามารถสแกนคิวอาร์โค้ดนี้เพื่อ
+>  ตรวจสอบสถานะการโอนเงิน
+>  0 นาย ภูมิ แก้วอ่อน
+>  xxx-xxx259-0
+>  0 นางสาว ดาราพร ศรีลาบัว
+>  xxx-xxx-8096
+>  50.00
+
+//bbl
+>  From
+>  To
+>  Fee
+>  THE
+>  O
+>  Transaction successful
+>  Y
+>  Bangkok Bank
+>  04 Jan 23, 08:51
+>  Amount
+>  Bank reference no.
+>  441867
+>  4,800.00 THB
+>  HAPPY
+>  NEW YEAR!
+>  20
+>  23
+>  นาย ภูมิ
+>  0000099 693-0-xxx775
+>  Bangkok Bank
+>  0.00 THB
+>  นาย ภูมิ แก้วอ่อน
+>  694-7-xxx907
+>  Bangkok Bank
+>  Transaction reference
+>  2023010408512923009128808
+
+//ktb
+>  205
+>  Krungthai
+>  กรุงไทย
+>  โอนเงินสําเร็จ
+>  CAMILLA
+>  รหัสอ้างอิง 2023010272114889
+>  นายภูมิ แก้วอ่อน
+>  กรุงไทย
+>  XXX-X-XX538-4
+>  นาย ภูมิ แก้วอ่อน
+>  พร้อมเพย์
+>  XXX XXX 8437
+>  จํานวนเงิน
+>  ค่าธรรมเนียม
+>  วันที่ทํารายการ
+>  5,990.00 บาท
+>  0.00 บาท
+>  02 J.A. 2566 - 09:16
+
+//gsb
+>  รายการโอนเงินสำเร็จ
+>  จำนวนเงิน
+>  3,000.00
+>  ญ
+>  0.00 ค่าธรรมเนียม
+>  รหัสอ้างอิง: 2348095015761000008B9790
+>  14 S.A. 2565 09:56
+>  กา
+>  างอิง
+>  ma
+>  การ
+>  B
+>  CO
+>  ธนากร
+>  บ
+>  กา
+>  ก
+>  ญก
+>  10
+>  m
+>  yno
+>  จาก
+>  นาย สาโรจน์ เจริญรัตน์
+>  ธนาคารออมสิน
+>  0203xxxx2028
+>  () ร้านเติมบุญ บาย
+>  โดย นางสาว ศิริ เก
+>  ธนาคารไทยพาณิชย์
+>  93xxxx3559
+>  ถึง
+>  2,000
+>  ไอร
+>  QR Code
+>  สแกน QR เพื่อตรวจสอบ
+>  รายละเอียดของรายการ
+>  nnym
+>  mỏ
+>  mo
+>  bm
+>  by GSB
+
+//KKP
+  NAKIN
+>  TRA
+>  NAKIN
+>  TRA
+>  TRA
+>  NAKIN
+>  TRA
+>  KIATNAKIN
+>  PHATRA
+>  5
+>  ˇ
+>  8
+>  KIATNAKIN
+>  PHATRA
+>  KIATNAKIN
+>  PHATRA
+>  TRA
+>  PHATRA
+>  KIATNAKIN
+>  PHATRA
+>  KIATNAKIN
+>  PHATRA
+>  ธ.เกียรตินาคินภัทร
+>  นาย ภูมิ แก้วอ่อน 5
+>  XXXXXX0039
+>  จ่ายบิลสําเร็จ
+>  06 J.A. 66 11:26 u.
+>  PHATRA
+>  PHATRA
+>  THATNA
+>  Hire Purchase
+>  7130221273
+>  1001821018
+>  จํานวนเงิน
+>  FUC
+>  NAKIN KIATNAKIN
+>  PHATRA
+>  G
+>  PHATRA BANK KIATNAKIN
+>  PHATRA
+>  010753600098600
+>  บันทึกช่วยจํา:
+>  KIATNAKIN
+>  KIATNAKIN
+>  KIATNAKIN
+>  PHATRA
+>  E
+>  KIATNAH
+>  - KIATNAKIN GA
+>  PHATRA
+>  6
+>  KIATNAL
+>  HINNAKING HINNAKIN GMINNA
+>  PHATRA
+>  PHATRA
+>  PHATRA
+>  BANK
+>  G KAINAKING KAINAKIN GMINNAKING HINNAKIN E
+>  PHATRA
+>  PHATRA
+>  PHATRA
+>  KIATNAKIN
+>  KIATNAKIN
+>  PHATRA
+>  ATRA
+>  G
+>  BANK
+>  GKATNAKING KIAINAKIN
+>  PHATRA
+>  PHATRA
+>  KIATNAKIN
+>  G
+>  PHATRA
+>  13,698.05 THE HAN 6
+>  KIATNAKIN
+>  PHATRA
+>  G
+>  PHATRA
+>  KIATNAKIN
+>  PHATRA
+>  KIATNAK
+>  PHATRA
+>  KIATNAKIN
+>  PHATRA
+>  ค่าธรรมเนียม
+>  0.00 THB
+>  วันที่รายการมีผล 06 ม.ค. 66
+>  TRA
+>  เลขอ้างอิง
+>  TR1230106115148803
+>  KIATNAK
+>  KIATNAKIN
+>  PHATRA
+>  PHATRA
+
+//KMA
+>  http://localhost:9199/excel-filter-po.appspot.com/before%2F17427772989371-before.jpg
+>  krungsri
+>  กรุงศรี
+>  A member of O MUFG
+>  a global financial group
+>  0
+>  Amount
+>  fee
+>  Ref No.
+>  al
+>  P
+>  gh
+>  Fund Transfer Successful
+>  07 Jan 2023 06:10:18
+>  g
+>  BAYM1729542332
+>  gy
+>  ex
+>  POOM KAEWON
+>  XXX-4-00586-X
+>  MR POOM KAEWON
+>  XXX-XXX-8437
+>  2
+>  2.00 THB
+>  0.00 THB
+>  Scan For
+>  Verification
+>  gu
