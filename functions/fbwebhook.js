@@ -388,7 +388,7 @@ async function getConttent(msglink, senderid, mid, FBTOKEN, botname) {
 
             return Promise.all([promise1, promise2, promise3]).then(
               ([value1, value2, value3]) => {
-                linemsg.notic(
+                linemsg.pushgroup(
                   `มีสลิปส่งมา ${url} \n จำนวน: ${
                     value1 !== undefined ? value1 : "ไม่มีข้อมูล"
                   }\nจากคุณ: ${value2.first_name} ${

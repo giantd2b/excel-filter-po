@@ -200,7 +200,7 @@ exports.LineWebhook2 = functions.https //.region(REGION)
 
                       return Promise.all([promise1, promise2]).then(
                         ([value1, value2]) => {
-                          linemsg.notic(
+                          linemsg.pushgroup(
                             `มีสลิปส่งมา ${url} \n จำนวน: ${
                               value1 !== undefined ? value1 : "ไม่มีข้อมูล"
                             }\n จากคุณ: ${value2.displayName}\n รูปโปร์ไฟล์: ${

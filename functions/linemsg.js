@@ -91,6 +91,28 @@ exports.push= (userid,payload) => {
         console.log(error)
     })
    }
+   exports.pushgroup= (payload) => {
+    const userid = "C65701e283ed16aa48fd407edc5e6374f"
+    const accessToken = "4j/KYSt0WBxQpJSk+NWE6WSyEzgDOuEMY8mBtLISNDUK055KHfaC1IR7hFLg8Z714kMEratWSgaiZl5qBtu6WdnswJ/98Ido4wHDc84iFgbauuhH5wDkUnL3JxqZ+70q8hAVHcSKp2WrpeoHQMQTmAdB04t89/1O/w1cDnyilFU="
+    const params = {
+        to:userid,
+        messages:[{
+            "type": "text",
+            "text": payload
+        }]
+    }
+     axios({
+        url:"https://api.line.me/v2/bot/message/push",
+        method:"POST",
+        headers:{
+            "Content-Type" : "application/json",
+            "Authorization" : `Bearer ${accessToken}`
+        },
+        data:params
+    }).catch((error) =>{
+        console.log(error)
+    })
+   }
 exports.reply = (replyToken, payload,token) =>{
 
     const params = {
