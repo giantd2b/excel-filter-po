@@ -131,9 +131,13 @@ async function receivedMessage(event) {
     const promise2 = Promise.resolve(proFile);
     const promise3 = Promise.resolve(profileImg);
 
+    const messagePreview = messageText.substring(0, 100);
+
     return Promise.all([promise2, promise3]).then(async ([value1, value2]) => {
       console.log(value1); // 1 2
-      let userLast = await admin.firestore().doc(`user/${value1.id}`).get();
+      const userRef = admin.firestore().doc(`user/${value1.id}`);
+      let userLast = await userRef.get();
+
       if (!userLast.exists || userLast.data().id !== value1.id) {
         value1.userId = value1.id;
         value1.displayName = `${value1.first_name} ${value1.last_name}`;
@@ -147,27 +151,46 @@ async function receivedMessage(event) {
           timesent: timeOfMessage,
         });
         value1.lastmessagetime = timeOfMessage;
-        await admin.firestore().doc(`user/${value1.id}`).set(value1);
-        console.log("user...saved");
+        value1.unreadCount = 1;
+        value1.lastMessagePreview = messagePreview;
+        await userRef.set(value1);
+
+        // บันทึกลง messages subcollection
+        await userRef.collection("messages").doc(messageId).set({
+          id: messageId,
+          text: messageText,
+          type: "incoming",
+          sender: "user",
+          timestamp: timeOfMessage,
+        });
+
+        console.log("user...saved with message subcollection");
 
         return;
       } else {
         console.log(value1.id);
 
-        const ref = admin.firestore().doc(`user/${value1.id}`);
-        const myRef = await ref.update({
+        await userRef.update({
           lastmessage: admin.firestore.FieldValue.arrayUnion({
             id: messageId,
             text: messageText,
             timesent: timeOfMessage,
           }),
+          lastmessagetime: timeOfMessage,
+          unreadCount: admin.firestore.FieldValue.increment(1),
+          lastMessagePreview: messagePreview,
         });
 
-        
+        // บันทึกลง messages subcollection
+        await userRef.collection("messages").doc(messageId).set({
+          id: messageId,
+          text: messageText,
+          type: "incoming",
+          sender: "user",
+          timestamp: timeOfMessage,
+        });
 
-        const updatedtime = await ref.update({lastmessagetime:timeOfMessage})
-
-        console.log("Added last Chat");
+        console.log("Added last Chat with message subcollection");
         console.log("มีผู้ใช้นะในระบบ");
         return;
       }

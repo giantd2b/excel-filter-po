@@ -15,6 +15,9 @@ const client = new vision.ImageAnnotatorClient();
 //   keyFilename: "./excel-filter-po-firebase-adminsdk-ab2ud-48647f8e6f.json",
 // });
 exports.fbwebhook = require("./fbwebhook");
+const sendMessageModule = require("./sendMessage");
+exports.sendMessage = sendMessageModule.sendMessage;
+exports.sendMessageHttp = sendMessageModule.sendMessageHttp;
 const REGION = "asia-southeast1";
 const linemsg = require("./linemsg");
 const accessToken =
@@ -290,6 +293,10 @@ exports.LineWebhook2 = functions.https //.region(REGION)
                 .firestore()
                 .doc(`user/${value1.userId}`)
                 .get();
+              const userRef = admin.firestore().doc(`user/${value1.userId}`);
+              const messageText = message.text || "";
+              const messagePreview = messageText.substring(0, 100);
+
               if (
                 !userLast.exists ||
                 userLast.data().userId !== value1.userId
@@ -302,31 +309,50 @@ exports.LineWebhook2 = functions.https //.region(REGION)
                 value1.lastmessage = [];
                 value1.lastmessage.push(message)
                 value1.lastmessagetime = messageTime;
-                await admin
-                  .firestore()
-                  .doc(`user/${value1.userId}`)
-                  .set(value1);
-                console.log("user...saved");
+                value1.unreadCount = 1;
+                value1.lastMessagePreview = messagePreview;
+                await userRef.set(value1);
+
+                // บันทึกลง messages subcollection
+                await userRef.collection("messages").doc(messageID).set({
+                  id: messageID,
+                  text: messageText,
+                  type: "incoming",
+                  sender: "user",
+                  timestamp: messageTime,
+                });
+
+                console.log("user...saved with message subcollection");
 
                 return res.end();
               } else {
                 console.log(message.text)
-                const ref = admin.firestore().doc(`user/${value1.userId}`);
 
                 // อัพเดตรูปโปรไฟล์ทุกครั้ง (กรณี user เปลี่ยนรูป)
-                await ref.update({
+                await userRef.update({
                   pictureUrl: value2,
                   profile_pic: value1.pictureUrl,
                   displayName: value1.displayName,
                   lastmessage: admin.firestore.FieldValue.arrayUnion({
                     id: messageID,
-                    text: message.text,
+                    text: messageText,
                     timesent: messageTime,
                   }),
-                  lastmessagetime: messageTime
+                  lastmessagetime: messageTime,
+                  unreadCount: admin.firestore.FieldValue.increment(1),
+                  lastMessagePreview: messagePreview,
                 });
 
-                console.log("Updated profile picture and last chat");
+                // บันทึกลง messages subcollection
+                await userRef.collection("messages").doc(messageID).set({
+                  id: messageID,
+                  text: messageText,
+                  type: "incoming",
+                  sender: "user",
+                  timestamp: messageTime,
+                });
+
+                console.log("Updated profile picture and last chat with message subcollection");
                 console.log("มีผู้ใช้นะในระบบ");
                 return res.end();
               }
