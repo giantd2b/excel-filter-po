@@ -312,19 +312,21 @@ exports.LineWebhook2 = functions.https //.region(REGION)
               } else {
                 console.log(message.text)
                 const ref = admin.firestore().doc(`user/${value1.userId}`);
-                const myRef = await ref.update({
+
+                // อัพเดตรูปโปรไฟล์ทุกครั้ง (กรณี user เปลี่ยนรูป)
+                await ref.update({
+                  pictureUrl: value2,
+                  profile_pic: value1.pictureUrl,
+                  displayName: value1.displayName,
                   lastmessage: admin.firestore.FieldValue.arrayUnion({
                     id: messageID,
                     text: message.text,
                     timesent: messageTime,
                   }),
+                  lastmessagetime: messageTime
                 });
-        
-                
-        
-                const updatedtime = await ref.update({lastmessagetime:messageTime})
-              console.log("Added last Chat");
 
+                console.log("Updated profile picture and last chat");
                 console.log("มีผู้ใช้นะในระบบ");
                 return res.end();
               }
