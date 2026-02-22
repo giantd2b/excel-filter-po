@@ -280,59 +280,55 @@ exports.LineWebhook2 = functions.https //.region(REGION)
         } else if (event.message.type === "text") {
           console.log(event);
           const messageID = message.id;
-          let messageTime = event.timestamp
+          let messageTime = event.timestamp;
           let userId = source.userId;
-          let proFile = await getuserProfile(userId);
-          let profileImg = await getshareLink(proFile.pictureUrl, userId);
-          const promise2 = Promise.resolve(proFile);
-          const promise3 = Promise.resolve(profileImg);
-          return Promise.all([promise2, promise3]).then(
-            async ([value1, value2]) => {
-              console.log(value1); // 1 2
-              let userLast = await admin
-                .firestore()
-                .doc(`user/${value1.userId}`)
-                .get();
-              const userRef = admin.firestore().doc(`user/${value1.userId}`);
-              const messageText = message.text || "";
-              const messagePreview = messageText.substring(0, 100);
 
-              if (
-                !userLast.exists ||
-                userLast.data().userId !== value1.userId
-              ) {
-                console.log(value2)
-                value1.profile_pic = value1.pictureUrl
-                value1.pictureUrl = value2;
-                value1.timestamp = messageTime;
-                value1.channel = lineBot;
-                value1.lastmessage = [];
-                value1.lastmessage.push(message)
-                value1.lastmessagetime = messageTime;
-                value1.unreadCount = 1;
-                value1.lastMessagePreview = messagePreview;
-                await userRef.set(value1);
+          try {
+            // Fetch user profile from LINE API
+            let proFile = await getuserProfile(userId);
+            if (!proFile || !proFile.userId) {
+              console.error(`Failed to get LINE profile for userId: ${userId}`);
+              return res.end();
+            }
 
-                // บันทึกลง messages subcollection
-                await userRef.collection("messages").doc(messageID).set({
-                  id: messageID,
-                  text: messageText,
-                  type: "incoming",
-                  sender: "user",
+            // Download profile picture (non-blocking - continue even if this fails)
+            let profileImg = null;
+            try {
+              if (proFile.pictureUrl) {
+                profileImg = await getshareLink(proFile.pictureUrl, userId);
+              }
+            } catch (imgError) {
+              console.error(`Failed to download profile picture for ${userId}:`, imgError.message);
+            }
+
+            const userRef = admin.firestore().doc(`user/${proFile.userId}`);
+            const messageText = message.text || "";
+            const messagePreview = messageText.substring(0, 100);
+
+            // Use transaction to prevent race conditions on concurrent messages
+            await admin.firestore().runTransaction(async (transaction) => {
+              const userDoc = await transaction.get(userRef);
+
+              if (!userDoc.exists) {
+                // New user - create profile + save message atomically
+                const userData = {
+                  userId: proFile.userId,
+                  displayName: proFile.displayName,
+                  statusMessage: proFile.statusMessage || "",
+                  profile_pic: proFile.pictureUrl,
+                  pictureUrl: profileImg || proFile.pictureUrl,
                   timestamp: messageTime,
-                });
-
-                console.log("user...saved with message subcollection");
-
-                return res.end();
+                  channel: lineBot,
+                  lastmessage: [message],
+                  lastmessagetime: messageTime,
+                  unreadCount: 1,
+                  lastMessagePreview: messagePreview,
+                };
+                transaction.set(userRef, userData);
               } else {
-                console.log(message.text)
-
-                // อัพเดตรูปโปรไฟล์ทุกครั้ง (กรณี user เปลี่ยนรูป)
-                await userRef.update({
-                  pictureUrl: value2,
-                  profile_pic: value1.pictureUrl,
-                  displayName: value1.displayName,
+                // Existing user - update fields
+                const updateData = {
+                  displayName: proFile.displayName,
                   lastmessage: admin.firestore.FieldValue.arrayUnion({
                     id: messageID,
                     text: messageText,
@@ -341,30 +337,31 @@ exports.LineWebhook2 = functions.https //.region(REGION)
                   lastmessagetime: messageTime,
                   unreadCount: admin.firestore.FieldValue.increment(1),
                   lastMessagePreview: messagePreview,
-                });
-
-                // บันทึกลง messages subcollection
-                await userRef.collection("messages").doc(messageID).set({
-                  id: messageID,
-                  text: messageText,
-                  type: "incoming",
-                  sender: "user",
-                  timestamp: messageTime,
-                });
-
-                console.log("Updated profile picture and last chat with message subcollection");
-                console.log("มีผู้ใช้นะในระบบ");
-                return res.end();
+                };
+                if (profileImg) {
+                  updateData.pictureUrl = profileImg;
+                  updateData.profile_pic = proFile.pictureUrl;
+                }
+                transaction.update(userRef, updateData);
               }
-            }
-          );
-          // let priceLast = await admin.firestore().doc("line/user").get();
-          // if (!priceLast.exists || priceLast.data().price !== priceCurrent) {
-          //   await admin
-          //     .firestore()
-          //     .doc("line/gold")
-          //     .set({ price: priceCurrent });
-          // }
+
+              // Save message to subcollection within the same transaction
+              const messageRef = userRef.collection("messages").doc(messageID);
+              transaction.set(messageRef, {
+                id: messageID,
+                text: messageText,
+                type: "incoming",
+                sender: "user",
+                timestamp: messageTime,
+              });
+            });
+
+            console.log(`Successfully saved profile and message for user ${userId}`);
+          } catch (error) {
+            console.error(`Failed to process text message for user ${userId}:`, error);
+          }
+
+          return res.end();
         }
       }
     }

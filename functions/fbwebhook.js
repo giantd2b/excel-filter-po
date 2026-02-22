@@ -126,75 +126,90 @@ async function receivedMessage(event) {
   let msg = "";
 
   if (messageText) {
-    let proFile = await getProfile(senderID, FACEBOOK_PAGETOKEN);
-    let profileImg = await getshareLink(proFile.profile_pic, messageId);
-    const promise2 = Promise.resolve(proFile);
-    const promise3 = Promise.resolve(profileImg);
-
     const messagePreview = messageText.substring(0, 100);
 
-    return Promise.all([promise2, promise3]).then(async ([value1, value2]) => {
-      console.log(value1); // 1 2
-      const userRef = admin.firestore().doc(`user/${value1.id}`);
-      let userLast = await userRef.get();
-
-      if (!userLast.exists || userLast.data().id !== value1.id) {
-        value1.userId = value1.id;
-        value1.displayName = `${value1.first_name} ${value1.last_name}`;
-        value1.pictureUrl = value2;
-        value1.timestamp = Date.now();
-        value1.channel = fbbot;
-        value1.lastmessage = [];
-        value1.lastmessage.push({
-          id: messageId,
-          text: messageText,
-          timesent: timeOfMessage,
-        });
-        value1.lastmessagetime = timeOfMessage;
-        value1.unreadCount = 1;
-        value1.lastMessagePreview = messagePreview;
-        await userRef.set(value1);
-
-        // บันทึกลง messages subcollection
-        await userRef.collection("messages").doc(messageId).set({
-          id: messageId,
-          text: messageText,
-          type: "incoming",
-          sender: "user",
-          timestamp: timeOfMessage,
-        });
-
-        console.log("user...saved with message subcollection");
-
-        return;
-      } else {
-        console.log(value1.id);
-
-        await userRef.update({
-          lastmessage: admin.firestore.FieldValue.arrayUnion({
-            id: messageId,
-            text: messageText,
-            timesent: timeOfMessage,
-          }),
-          lastmessagetime: timeOfMessage,
-          unreadCount: admin.firestore.FieldValue.increment(1),
-          lastMessagePreview: messagePreview,
-        });
-
-        // บันทึกลง messages subcollection
-        await userRef.collection("messages").doc(messageId).set({
-          id: messageId,
-          text: messageText,
-          type: "incoming",
-          sender: "user",
-          timestamp: timeOfMessage,
-        });
-
-        console.log("Added last Chat with message subcollection");
-        console.log("มีผู้ใช้นะในระบบ");
+    try {
+      // Fetch user profile from Facebook API
+      let proFile = await getProfile(senderID, FACEBOOK_PAGETOKEN);
+      if (!proFile || !proFile.id) {
+        console.error(`Failed to get Facebook profile for senderID: ${senderID}`);
         return;
       }
-    });
+
+      // Download profile picture (non-blocking - continue even if this fails)
+      let profileImg = null;
+      try {
+        if (proFile.profile_pic) {
+          profileImg = await getshareLink(proFile.profile_pic, messageId);
+        }
+      } catch (imgError) {
+        console.error(`Failed to download profile picture for ${senderID}:`, imgError.message);
+      }
+
+      const userRef = admin.firestore().doc(`user/${proFile.id}`);
+
+      // Use transaction to prevent race conditions on concurrent messages
+      await admin.firestore().runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+
+        if (!userDoc.exists) {
+          // New user - create profile + save message atomically
+          const userData = {
+            id: proFile.id,
+            userId: proFile.id,
+            first_name: proFile.first_name,
+            last_name: proFile.last_name,
+            displayName: `${proFile.first_name} ${proFile.last_name}`,
+            profile_pic: proFile.profile_pic,
+            pictureUrl: profileImg || proFile.profile_pic,
+            timestamp: Date.now(),
+            channel: fbbot,
+            lastmessage: [{
+              id: messageId,
+              text: messageText,
+              timesent: timeOfMessage,
+            }],
+            lastmessagetime: timeOfMessage,
+            unreadCount: 1,
+            lastMessagePreview: messagePreview,
+          };
+          transaction.set(userRef, userData);
+        } else {
+          // Existing user - update fields
+          const updateData = {
+            lastmessage: admin.firestore.FieldValue.arrayUnion({
+              id: messageId,
+              text: messageText,
+              timesent: timeOfMessage,
+            }),
+            lastmessagetime: timeOfMessage,
+            unreadCount: admin.firestore.FieldValue.increment(1),
+            lastMessagePreview: messagePreview,
+          };
+          if (profileImg) {
+            updateData.pictureUrl = profileImg;
+            updateData.profile_pic = proFile.profile_pic;
+          }
+          transaction.update(userRef, updateData);
+        }
+
+        // Save message to subcollection within the same transaction
+        const messageRef = userRef.collection("messages").doc(messageId);
+        transaction.set(messageRef, {
+          id: messageId,
+          text: messageText,
+          type: "incoming",
+          sender: "user",
+          timestamp: timeOfMessage,
+        });
+      });
+
+      console.log(`Successfully saved profile and message for user ${senderID}`);
+    } catch (error) {
+      console.error(`Failed to process text message for user ${senderID}:`, error);
+    }
+
+    return;
   } else if (messageAttachments) {
     let attachment_url = message.attachments[0].payload.url;
 

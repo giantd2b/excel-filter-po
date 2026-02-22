@@ -140,7 +140,9 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
     const firestore = admin.firestore();
 
     const userRef = firestore.collection("user").doc(docId);
-    await userRef.collection("messages").doc(messageId).set({
+    const batch = firestore.batch();
+
+    batch.set(userRef.collection("messages").doc(messageId), {
       id: messageId,
       text,
       type: "outgoing",
@@ -150,11 +152,12 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
       adminId: adminId || null,
     });
 
-    // Update last message preview
-    await userRef.update({
+    batch.update(userRef, {
       lastmessagetime: timestamp,
       lastMessagePreview: `[You] ${text.substring(0, 80)}`,
     });
+
+    await batch.commit();
 
     console.log(`Message sent successfully to ${channel}:${oduserId}`);
 
@@ -216,7 +219,9 @@ exports.sendMessageHttp = functions.https.onRequest(async (req, res) => {
     const firestore = admin.firestore();
 
     const userRef = firestore.collection("user").doc(docId);
-    await userRef.collection("messages").doc(messageId).set({
+    const batch = firestore.batch();
+
+    batch.set(userRef.collection("messages").doc(messageId), {
       id: messageId,
       text,
       type: "outgoing",
@@ -226,11 +231,12 @@ exports.sendMessageHttp = functions.https.onRequest(async (req, res) => {
       adminId: adminId || null,
     });
 
-    // Update last message preview
-    await userRef.update({
+    batch.update(userRef, {
       lastmessagetime: timestamp,
       lastMessagePreview: `[You] ${text.substring(0, 80)}`,
     });
+
+    await batch.commit();
 
     console.log(`Message sent successfully to ${channel}:${oduserId}`);
 
