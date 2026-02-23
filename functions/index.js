@@ -14,6 +14,7 @@ const client = new vision.ImageAnnotatorClient();
 // const client = new vision.ImageAnnotatorClient({
 //   keyFilename: "./excel-filter-po-firebase-adminsdk-ab2ud-48647f8e6f.json",
 // });
+const { findThaiPhones, formatThaiPhone } = require("./phone-utils");
 exports.fbwebhook = require("./fbwebhook");
 const sendMessageModule = require("./sendMessage");
 exports.sendMessage = sendMessageModule.sendMessage;
@@ -324,6 +325,11 @@ exports.LineWebhook2 = functions.https //.region(REGION)
                   unreadCount: 1,
                   lastMessagePreview: messagePreview,
                 };
+                // Extract phone number from first message
+                const phones = findThaiPhones(messageText);
+                if (phones.length > 0) {
+                  userData.phoneNumber = formatThaiPhone(phones[0]);
+                }
                 transaction.set(userRef, userData);
               } else {
                 // Existing user - update fields
@@ -341,6 +347,13 @@ exports.LineWebhook2 = functions.https //.region(REGION)
                 if (profileImg) {
                   updateData.pictureUrl = profileImg;
                   updateData.profile_pic = proFile.pictureUrl;
+                }
+                // Extract phone number if not already saved
+                if (!userDoc.data().phoneNumber) {
+                  const phones = findThaiPhones(messageText);
+                  if (phones.length > 0) {
+                    updateData.phoneNumber = formatThaiPhone(phones[0]);
+                  }
                 }
                 transaction.update(userRef, updateData);
               }

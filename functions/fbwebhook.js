@@ -14,6 +14,7 @@ const firestore = admin.firestore();
 const client = new vision.ImageAnnotatorClient();
 
 const linemsg = require("./linemsg");
+const { findThaiPhones, formatThaiPhone } = require("./phone-utils");
 
 // Create and Deploy Your First Cloud Functions
 // https://firebase.google.com/docs/functions/write-firebase-functions
@@ -173,6 +174,11 @@ async function receivedMessage(event) {
             unreadCount: 1,
             lastMessagePreview: messagePreview,
           };
+          // Extract phone number from first message
+          const phones = findThaiPhones(messageText);
+          if (phones.length > 0) {
+            userData.phoneNumber = formatThaiPhone(phones[0]);
+          }
           transaction.set(userRef, userData);
         } else {
           // Existing user - update fields
@@ -189,6 +195,13 @@ async function receivedMessage(event) {
           if (profileImg) {
             updateData.pictureUrl = profileImg;
             updateData.profile_pic = proFile.profile_pic;
+          }
+          // Extract phone number if not already saved
+          if (!userDoc.data().phoneNumber) {
+            const phones = findThaiPhones(messageText);
+            if (phones.length > 0) {
+              updateData.phoneNumber = formatThaiPhone(phones[0]);
+            }
           }
           transaction.update(userRef, updateData);
         }
