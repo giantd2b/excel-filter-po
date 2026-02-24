@@ -1,19 +1,13 @@
 //Reference from https://medium.com/@Astider/how-to-สร้าง-messenger-chatbot-แบบ-serverless-ด้วย-google-firebase-908c3eaba67e
 const functions = require("firebase-functions");
-const fs = require("fs");
-const Path = require("path");
-const vision = require("@google-cloud/vision");
 
 // The Firebase Admin SDK to access the Firebase Realtime Database.
 const admin = require("firebase-admin");
 
 const firestore = admin.firestore();
-// const client = new vision.ImageAnnotatorClient({
-//   keyFilename: "./servicesaccount.json",
-// });
-const client = new vision.ImageAnnotatorClient();
 
 const linemsg = require("./linemsg");
+const { analyzeSlip } = require("./slip-detection");
 const { findThaiPhones, formatThaiPhone } = require("./phone-utils");
 
 // Create and Deploy Your First Cloud Functions
@@ -385,134 +379,61 @@ async function getshareLink(link, mid) {
 }
 
 async function getConttent(msglink, senderid, mid, FBTOKEN, botname) {
-  let result = null;
-  msgResult = [];
-
   const file2 = admin.storage().bucket().file(`before/${mid}-slip.jpg`);
 
-  return await axios({
-    url: ` ${msglink}`,
-    method: "GET",
-    headers: {
-      //"Content-Type" : "application/json",
-      //Authorization: `Bearer ${accessTokens}`,
-    },
-    responseType: "stream",
-  })
-    .then(async (response) => {
-      result = response.data;
-
-      //async function process_RS(stream, cb) {
-      var buffers = [];
-      result.on("data", function (data) {
-        buffers.push(data);
-      });
-      result.on("end", async function () {
-        var buffer = Buffer.concat(buffers);
-
-        /* DO SOMETHING WITH workbook IN THE CALLBACK */
-
-        const [result] = await client.objectLocalization(buffer);
-        const objects = result.localizedObjectAnnotations;
-        objects.forEach(async (object) => {
-          console.log(`Name: ${object.name}`);
-          console.log(`Confidence: ${object.score}`);
-          if (object.name === "2D barcode" && object.score > 0.8) {
-            //await getProfile(senderid, mid, FBTOKEN, botname);
-            await file2.save(buffer);
-            await file2.makePublic();
-            let url = await file2.publicUrl();
-            await firestore
-              .collection("link")
-              .doc(mid)
-              .set({ link: url, userid: senderid });
-            console.log(url);
-            //linemsg.notic(`มีสลิปส่งมา ${url}`);
-            let slipAmount = await getBankAmount(buffer);
-
-            let proFile = await getProfile(senderid, FBTOKEN);
-            let profileImg = await getshareLink(proFile.profile_pic, mid);
-
-            const promise1 = Promise.resolve(slipAmount);
-            const promise2 = Promise.resolve(proFile);
-            const promise3 = Promise.resolve(profileImg);
-
-            return Promise.all([promise1, promise2, promise3]).then(
-              ([value1, value2, value3]) => {
-                linemsg.pushgroup(
-                  `มีสลิปส่งมา ${url} \n จำนวน: ${
-                    value1 !== undefined ? value1 : "ไม่มีข้อมูล"
-                  }\nจากคุณ: ${value2.first_name} ${
-                    value2.last_name
-                  }\nรูปภาพโปรไฟล์: ${value3}\nช่องทาง:${botname}
-                  `
-                );
-
-                console.log(`this is value2:${value2}`); // 1 2
-                console.log(`this is value3:${value3}`); // 1 2
-                //sendTextMessage(senderid,"รับยอดครับ",FBTOKEN)
-              }
-            );
-          } else {
-            console.log("ไม่ใช่รูปสลิป");
-          }
-        });
-
-        return;
-      });
-    })
-    .catch((error) => {
-      console.log(error);
+  try {
+    const response = await axios({
+      url: msglink,
+      method: "GET",
+      responseType: "arraybuffer",
     });
-  return;
-}
 
-async function getBankAmount(buff) {
-  let bankAmount = "";
-  const [result] = await client.textDetection(buff);
-  const detections = result.fullTextAnnotation.text;
-  let detections2 = detections.trim();
-  //console.log(detections.trim())
-  if (
-    detections2.includes(
-      "ธ.กสิกรไทย"
-    ) /*&& detections2.includes('สแกนตรวจสอบสลิป')*/
-  ) {
-    console.log("KBANK-SLIP");
-    let index = detections2.search(/ค่าธรรมเนียม:/);
-    //console.log(index)
-    let index2 = detections2.slice(index, index + 23);
-    //console.log(index2)
-    let index25 = index2.replace(/,/g, "");
-    //console.log(index25)
-    let dotindex = index25.search(/\./);
-    //console.log(dotindex);
-    let index35 = index25.slice(dotindex - 7, dotindex);
-    //console.log(index35);
+    const buffer = Buffer.from(response.data);
+    const slipData = await analyzeSlip(buffer);
 
-    let index4 = index35.match(/\d+/g);
-    let kbankAmount = index4[0];
-    //console.log(kbankAmount);
-    bankAmount = kbankAmount;
-    return bankAmount;
-  } else if (detections2.includes("SCB")) {
-    console.log("SCB-SLIP");
-    let index = detections2.search(/ตรวจสอบ/);
-    let index2 = detections2.slice(index, index + 120);
-    //console.log(index2)
-    let index25 = index2.replace(/,/g, "");
-    let index3 = index25.length;
-    let index35 = index25.slice(index3 - 9, index3);
-    //console.log(index35)
-    let index4 = index35.search(/\n/g, "");
-    let index45 = index35.slice(index4 + 1);
-    //console.log(index45)
-    let dotindex = index45.search(/\./);
-    //console.log(dotindex);
-    let index5 = index25.length;
-    let index59 = index5 - dotindex;
-    let index55 = index45.slice(dotindex - index59, dotindex);
-    bankAmount = index55;
-    return bankAmount;
+    if (slipData) {
+      await file2.save(buffer);
+      await file2.makePublic();
+      const url = await file2.publicUrl();
+
+      const linkData = {
+        link: url,
+        userid: senderid,
+        detected_at: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      if (slipData.bank_name) linkData.bank_name = slipData.bank_name;
+      if (slipData.amount) linkData.amount = slipData.amount;
+      if (slipData.date_time) linkData.date_time = slipData.date_time;
+      if (slipData.sender_name) linkData.sender_name = slipData.sender_name;
+      if (slipData.receiver_name) linkData.receiver_name = slipData.receiver_name;
+      if (slipData.reference_number) linkData.reference_number = slipData.reference_number;
+
+      await firestore
+        .collection("link")
+        .doc(mid)
+        .set(linkData);
+
+      const proFile = await getProfile(senderid, FBTOKEN);
+      const profileImg = await getshareLink(proFile.profile_pic, mid);
+
+      const lines = [`มีสลิปส่งมา ${url}`];
+      if (slipData.bank_name) lines.push(`ธนาคาร: ${slipData.bank_name}`);
+      if (slipData.amount) lines.push(`จำนวน: ${slipData.amount}`);
+      if (slipData.date_time) lines.push(`วันที่: ${slipData.date_time}`);
+      if (slipData.sender_name) lines.push(`ผู้โอน: ${slipData.sender_name}`);
+      if (slipData.receiver_name) lines.push(`ผู้รับ: ${slipData.receiver_name}`);
+      if (slipData.reference_number) lines.push(`อ้างอิง: ${slipData.reference_number}`);
+      lines.push(`จากคุณ: ${proFile.first_name} ${proFile.last_name}`);
+      lines.push(`รูปภาพโปรไฟล์: ${profileImg}`);
+      lines.push(`ช่องทาง: ${botname}`);
+
+      linemsg.pushgroup(lines.join("\n"));
+      console.log("Slip detected and notified:", slipData);
+    } else {
+      console.log("ไม่ใช่รูปสลิป");
+    }
+  } catch (error) {
+    console.log(error);
   }
 }
+
