@@ -23,7 +23,7 @@ interface ReplyTemplate {
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { user, logout, biometricEnabled, enableBiometric, disableBiometric } = useAuth();
+  const { user, logout } = useAuth();
 
   // Quick replies
   const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
@@ -303,29 +303,6 @@ export default function SettingsScreen() {
               </View>
             ))
           )}
-        </View>
-
-        {/* Security */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ความปลอดภัย</Text>
-          <TouchableOpacity
-            style={styles.infoRow}
-            onPress={() => {
-              if (biometricEnabled) {
-                Alert.alert('ปิด Face ID', 'ต้องการปิดการเข้าสู่ระบบด้วย Face ID หรือไม่?', [
-                  { text: 'ยกเลิก', style: 'cancel' },
-                  { text: 'ปิด', style: 'destructive', onPress: disableBiometric },
-                ]);
-              } else {
-                enableBiometric();
-              }
-            }}
-          >
-            <Text style={styles.infoLabel}>Face ID / Touch ID</Text>
-            <Text style={[styles.infoValue, { color: biometricEnabled ? '#10b981' : '#94a3b8' }]}>
-              {biometricEnabled ? 'เปิด' : 'ปิด'}
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* App info */}

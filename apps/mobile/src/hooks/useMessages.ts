@@ -21,11 +21,33 @@ export interface Message {
 
 const PAGE_SIZE = 50;
 
+function detectType(m: any): string {
+  const text = m.text || '';
+  const mediaType = (m.mediaType || '').toLowerCase();
+  const url = (m.mediaUrl || '').toLowerCase();
+
+  // File detection: text contains [ไฟล์ or [file], or URL ends with non-image extension
+  if (text.includes('[ไฟล์') || text.includes('[file]')) return 'file';
+  if (url.endsWith('.pdf') || url.endsWith('.doc') || url.endsWith('.docx') ||
+      url.endsWith('.xlsx') || url.endsWith('.xls') || url.endsWith('.zip')) return 'file';
+
+  // Sticker detection
+  if (text.includes('[สติกเกอร์]') || url.includes('stickershop.line-scdn.net')) return 'image';
+
+  // Audio detection
+  if (text.includes('[เสียง]') || text.includes('[audio]') || mediaType === 'audio') return 'audio';
+
+  if (mediaType === 'image') return 'image';
+  if (mediaType === 'video') return 'video';
+
+  return 'text';
+}
+
 function mapMessage(m: any): Message {
   return {
     id: m.id,
     text: m.text,
-    type: m.mediaType || 'text',
+    type: detectType(m),
     direction: m.type === 'outgoing' ? 'outgoing' : 'incoming',
     mediaUrl: m.mediaUrl,
     previewUrl: m.previewUrl,

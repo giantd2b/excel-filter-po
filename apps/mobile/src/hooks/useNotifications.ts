@@ -62,7 +62,7 @@ async function registerForPushNotifications() {
       projectId: 'excel-filter-po',
     });
 
-    await api.post('/users/push-token', {
+    await api.post('/admins/push-token', {
       token: tokenData.data,
       platform: Platform.OS,
     }).catch(() => {});

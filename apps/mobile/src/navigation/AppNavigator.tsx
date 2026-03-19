@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 import api from '../services/api';
@@ -64,26 +64,13 @@ function InboxBadge() {
   );
 }
 
-function NotificationHandler() {
-  const navigation = useNavigation<any>();
-  useNotifications((data) => {
-    // Navigate to chat when notification is tapped
-    if (data?.docId) {
-      navigation.navigate('Chat', {
-        userId: data.oduserId,
-        docId: data.docId,
-        displayName: data.displayName || '',
-        pictureUrl: data.pictureUrl || '',
-        channel: data.channel || '',
-        channelType: data.channelType || 'line',
-      });
-    }
-  });
-  return null;
-}
+// Notification handler moved inside HomeTabs to avoid navigation crash
 
 function HomeTabs() {
   const insets = useSafeAreaInsets();
+
+  // Register notifications inside the tab navigator (safe navigation context)
+  useNotifications();
 
   return (
     <Tab.Navigator
@@ -171,14 +158,7 @@ export default function AppNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
         <>
-          <Stack.Screen name="Main">
-            {() => (
-              <>
-                <NotificationHandler />
-                <HomeTabs />
-              </>
-            )}
-          </Stack.Screen>
+          <Stack.Screen name="Main" component={HomeTabs} />
           <Stack.Screen
             name="Chat"
             component={ChatScreen}

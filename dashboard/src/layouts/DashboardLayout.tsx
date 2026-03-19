@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { useGlobalNotifications } from "@/hooks/useGlobalNotifications";
 import Navbar from "@/components/Navbar";
 
 export default function DashboardLayout() {
@@ -9,6 +10,9 @@ export default function DashboardLayout() {
   const { pathname } = useLocation();
 
   const isInbox = pathname.startsWith("/dashboard/inbox");
+
+  // Global notification listener — works on ALL pages
+  useGlobalNotifications();
 
   useEffect(() => {
     if (!loading && !user) {
