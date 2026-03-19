@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { FirebaseModule } from './common/providers/firebase.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -17,10 +16,6 @@ import { AdminsModule } from './modules/admins/admins.module';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, 'public'),
-      renderPath: /^(?!\/api\/).*/,
-    }),
     FirebaseModule,
     AuthModule,
     UsersModule,
