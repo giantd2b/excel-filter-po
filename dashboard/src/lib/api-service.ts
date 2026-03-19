@@ -323,6 +323,71 @@ export async function deleteTemplate(id: string): Promise<void> {
   await api.delete(`/templates/${id}`);
 }
 
+// ─── Knowledge Base ─────────────────────────────────────────────────
+
+export interface KnowledgeEntry {
+  id: string;
+  service: string;
+  category: string;
+  question: string;
+  answer: string;
+  keywords: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getKnowledgeEntries(params?: {
+  service?: string;
+  category?: string;
+  search?: string;
+  isActive?: boolean;
+}): Promise<KnowledgeEntry[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.service) searchParams.set("service", params.service);
+  if (params?.category) searchParams.set("category", params.category);
+  if (params?.search) searchParams.set("search", params.search);
+  if (params?.isActive !== undefined)
+    searchParams.set("isActive", String(params.isActive));
+  const qs = searchParams.toString();
+  return api.get<KnowledgeEntry[]>(`/knowledge${qs ? `?${qs}` : ""}`);
+}
+
+export async function getKnowledgeServices(): Promise<string[]> {
+  return api.get<string[]>("/knowledge/services");
+}
+
+export async function createKnowledgeEntry(
+  data: Omit<KnowledgeEntry, "id" | "createdAt" | "updatedAt">
+): Promise<KnowledgeEntry> {
+  return api.post<KnowledgeEntry>("/knowledge", data);
+}
+
+export async function updateKnowledgeEntry(
+  id: string,
+  data: Partial<Omit<KnowledgeEntry, "id" | "createdAt" | "updatedAt">>
+): Promise<KnowledgeEntry> {
+  return api.put<KnowledgeEntry>(`/knowledge/${id}`, data);
+}
+
+export async function deleteKnowledgeEntry(id: string): Promise<void> {
+  await api.delete(`/knowledge/${id}`);
+}
+
+export async function bulkImportKnowledge(
+  entries: Array<{
+    service: string;
+    category: string;
+    question: string;
+    answer: string;
+    keywords?: string;
+    sortOrder?: number;
+  }>
+): Promise<{ count: number }> {
+  return api.post<{ count: number }>("/knowledge/import", entries);
+}
+
 // ─── Customer Details ────────────────────────────────────────────────
 
 export async function getCustomerDetails(id: string) {

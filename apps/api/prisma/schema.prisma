@@ -333,6 +333,25 @@ model AuthLog {
   @@map("auth_logs")
 }
 
+// ─── Knowledge Base ───────────────────────────────────────────────
+
+model KnowledgeEntry {
+  id        String   @id @default(uuid())
+  service   String   // "งานบุญ/พิธีสงฆ์", "อาหารไทยบุฟเฟต์", "โต๊ะจีน", "Cocktail/Canapé", "งานแต่งงาน", "International Buffet"
+  category  String   // "ราคา", "FAQ", "ข้อมูลทั่วไป", "แพคเกจ", etc.
+  question  String   // The question or topic
+  answer    String   // The answer content
+  keywords  String?  // Search keywords, comma separated
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([service])
+  @@index([isActive])
+  @@map("knowledge_entries")
+}
+
 model Product {
   id          String   @id @default(uuid())
   name        String

@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 import api from '../services/api';
@@ -64,13 +64,25 @@ function InboxBadge() {
   );
 }
 
-// Notification handler moved inside HomeTabs to avoid navigation crash
-
 function HomeTabs() {
   const insets = useSafeAreaInsets();
+  const rootNavigation = useNavigation<any>();
 
-  // Register notifications inside the tab navigator (safe navigation context)
-  useNotifications();
+  // Register notifications + handle tap to navigate to chat
+  useNotifications((data) => {
+    if (data?.docId) {
+      try {
+        rootNavigation.navigate('Chat', {
+          userId: data.oduserId || '',
+          docId: data.docId,
+          displayName: data.displayName || '',
+          pictureUrl: data.pictureUrl || '',
+          channel: data.channel || '',
+          channelType: data.channelType || 'line',
+        });
+      } catch {}
+    }
+  });
 
   return (
     <Tab.Navigator

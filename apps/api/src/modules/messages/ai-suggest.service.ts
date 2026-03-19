@@ -1,6 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../../common/providers/prisma.service';
+import { KnowledgeService } from '../knowledge/knowledge.service';
+
+// Static fallbacks (used only when DB has no entries)
+import { KNOWLEDGE_BASE } from '../../data/kb-temboon-merit';
+import { KB_THAI_BUFFET } from '../../data/kb-thai-buffet';
+import { KB_CHINESE_TABLE } from '../../data/kb-chinese-table';
+import { KB_COCKTAIL_CANAPE } from '../../data/kb-cocktail-canape';
+import { KB_WEDDING } from '../../data/kb-wedding';
 
 interface CachedSuggestions {
   suggestions: string[];
@@ -13,7 +21,40 @@ export class AiSuggestService {
   private readonly cache = new Map<string, CachedSuggestions>();
   private readonly CACHE_TTL = 30_000; // 30 seconds
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly knowledgeService: KnowledgeService,
+  ) {}
+
+  /**
+   * Build knowledge base text: prefer DB, fall back to static .ts files.
+   */
+  private async getKnowledgeBaseText(): Promise<string> {
+    try {
+      const dbText = await this.knowledgeService.getAllKnowledgeAsText();
+      if (dbText && dbText.trim().length > 0) {
+        return dbText;
+      }
+    } catch (err) {
+      this.logger.warn('Failed to load KB from DB, using static fallback', err);
+    }
+
+    // Fallback to static .ts files
+    return `Knowledge base for งานบุญ/พิธีสงฆ์:
+${KNOWLEDGE_BASE}
+
+Knowledge base for อาหารไทยบุฟเฟต์:
+${KB_THAI_BUFFET}
+
+Knowledge base for โต๊ะจีน:
+${KB_CHINESE_TABLE}
+
+Knowledge base for Cocktail & Canapé:
+${KB_COCKTAIL_CANAPE}
+
+Knowledge base for งานแต่งงาน:
+${KB_WEDDING}`;
+  }
 
   async getSuggestions(customerId: string): Promise<string[]> {
     // Check cache
@@ -83,10 +124,35 @@ export class AiSuggestService {
         contextInfo += `\nสลิปล่าสุด: ${slipInfo.join(', ')}`;
       }
 
-      const prompt = `You are a Thai customer service agent for a catering/food business (ธุรกิจจัดเลี้ยง/อาหาร).
-Given this conversation, suggest 3 short reply messages in Thai.
-Keep replies natural, polite, and helpful. Each reply must be under 100 characters.
-Return ONLY a JSON array of 3 strings, no explanation, no markdown.
+      // Get knowledge base text (DB with fallback)
+      const knowledgeText = await this.getKnowledgeBaseText();
+
+      const prompt = `You are a Thai customer service agent for เติมบุญ บาย ไอริส (Temboon by IRIS), a catering and merit ceremony business.
+
+We offer 6 service categories:
+1. งานบุญ/งานทำบุญ/พิธีสงฆ์
+2. งานจัดเลี้ยงอาหารไทยบุฟเฟต์
+3. งานจัดเลี้ยงโต๊ะจีน
+4. งานจัดเลี้ยง Cocktail/Canapé
+5. งานแต่งงาน
+6. งานบุฟเฟต์อินเตอร์ (International Buffet)
+
+${knowledgeText}
+
+RULES:
+- First, detect which service the customer is asking about from the conversation context
+- If about งานบุญ/พิธีสงฆ์: Use EXACT prices and info from the งานบุญ knowledge base
+- If about อาหารไทยบุฟเฟต์: Use EXACT prices and info from the อาหารไทยบุฟเฟต์ knowledge base
+- If about โต๊ะจีน: Use EXACT prices, menus, and info from the โต๊ะจีน knowledge base
+- If about Cocktail/Canapé: Use EXACT prices and info from the Cocktail & Canapé knowledge base
+- If about งานแต่งงาน: Use EXACT prices and info from the งานแต่งงาน knowledge base
+- If about International Buffet: suggest helpful general replies only — DO NOT quote prices you don't have
+- For unknown services, suggest "สอบถามรายละเอียดเพิ่มเติมได้เลยค่ะ" or similar
+- Suggest 3 short reply messages in Thai
+- Keep replies natural, polite (ค่ะ/ครับ), and helpful
+- Each reply must be under 100 characters
+- NEVER make up prices or info not in the knowledge base
+- Return ONLY a JSON array of 3 strings, no explanation, no markdown.
 
 ข้อมูลลูกค้า:
 ${contextInfo}

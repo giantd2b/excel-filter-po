@@ -12,6 +12,7 @@ import SlipReportPage from "@/pages/SlipReportPage";
 import AdminsPage from "@/pages/AdminsPage";
 import TemplatesPage from "@/pages/TemplatesPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
+import KnowledgePage from "@/pages/KnowledgePage";
 
 export const router = createBrowserRouter([
   {
@@ -67,6 +68,10 @@ export const router = createBrowserRouter([
       {
         path: "templates",
         element: <TemplatesPage />,
+      },
+      {
+        path: "knowledge",
+        element: <KnowledgePage />,
       },
     ],
   },

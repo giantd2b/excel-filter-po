@@ -31,6 +31,7 @@ export default function Navbar() {
       ? [
           { href: "/dashboard/analytics", label: "วิเคราะห์" },
           { href: "/dashboard/templates", label: "เทมเพลต" },
+          { href: "/dashboard/knowledge", label: "ฐานความรู้" },
           { href: "/dashboard/admins", label: "ผู้ดูแลระบบ" },
         ]
       : []),

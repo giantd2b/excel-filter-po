@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IRIS CRM — Knowledge Base Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f1f5f9; color: #1e293b; }
+  .header { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 32px; text-align: center; }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header p { opacity: 0.8; margin-top: 8px; font-size: 14px; }
+  .tabs { display: flex; gap: 8px; padding: 16px 24px; background: white; border-bottom: 1px solid #e2e8f0; overflow-x: auto; position: sticky; top: 0; z-index: 10; }
+  .tab { padding: 8px 20px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; border: 2px solid #e2e8f0; background: white; white-space: nowrap; transition: all 0.2s; }
+  .tab:hover { border-color: #6366f1; color: #6366f1; }
+  .tab.active { background: #6366f1; color: white; border-color: #6366f1; }
+  .service-section { display: none; max-width: 700px; margin: 24px auto; padding: 0 16px 40px; }
+  .service-section.active { display: block; }
+  .service-title { font-size: 18px; font-weight: 700; color: #4f46e5; margin-bottom: 20px; padding: 12px 16px; background: white; border-radius: 12px; border-left: 4px solid #6366f1; }
+  .chat { display: flex; flex-direction: column; gap: 16px; }
+  .q-group { display: flex; flex-direction: column; gap: 8px; }
+  .bubble { max-width: 85%; padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.6; word-wrap: break-word; }
+  .bubble.customer { align-self: flex-end; background: #6366f1; color: white; border-bottom-right-radius: 6px; }
+  .bubble.admin { align-self: flex-start; background: white; color: #1e293b; border-bottom-left-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #f1f5f9; }
+  .label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 2px; }
+  .label.right { text-align: right; }
+  .qnum { display: inline-block; background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700; width: 20px; height: 20px; line-height: 20px; text-align: center; border-radius: 50%; margin-right: 4px; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-left: 4px; }
+  .badge.green { background: #d1fae5; color: #059669; }
+  .badge.blue { background: #dbeafe; color: #2563eb; }
+  .badge.amber { background: #fef3c7; color: #d97706; }
+  .badge.purple { background: #ede9fe; color: #7c3aed; }
+  .badge.rose { background: #ffe4e6; color: #e11d48; }
+  @media (max-width: 600px) { .bubble { max-width: 92%; font-size: 13px; } .tabs { padding: 12px 8px; } .tab { font-size: 12px; padding: 6px 14px; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🤖 IRIS CRM — AI Knowledge Base Preview</h1>
+  <p>ตัวอย่างคำถาม-คำตอบจาก Knowledge Base ทั้ง 5 บริการ</p>
+</div>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" onclick="showSection('merit')">🙏 งานบุญ/พิธีสงฆ์ (15)</div>
+  <div class="tab" onclick="showSection('buffet')">🍜 อาหารไทยบุฟเฟต์ (8)</div>
+  <div class="tab" onclick="showSection('chinese')">🥢 โต๊ะจีน (8)</div>
+  <div class="tab" onclick="showSection('cocktail')">🍸 Cocktail/Canapé (8)</div>
+  <div class="tab" onclick="showSection('wedding')">💒 งานแต่งงาน (8)</div>
+</div>
+
+<!-- ===================== งานบุญ/พิธีสงฆ์ (15 questions) ===================== -->
+<div class="service-section active" id="merit">
+  <div class="service-title">🙏 งานบุญ / พิธีสงฆ์ <span class="badge green">75 FAQ · 15 ตัวอย่าง</span></div>
+  <div class="chat">
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">1</span> ลูกค้า</div>
+      <div class="bubble customer">สนใจจัดงานบุญค่ะ แขก 20 คน พระ 9 รูป มีแพคเกจอะไรบ้าง ราคาเท่าไหร่</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">มี 3 แพคเกจค่ะ: ครบวงจร 19,490 / ครบวงจรพลัส 21,990 / Prime 25,990 บาท (แขก 20 พระ 9 รูป ยังไม่รวม VAT 7%) ลองดูแพคเกจก่อนนะคะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">2</span> ลูกค้า</div>
+      <div class="bubble customer">ครบวงจร กับ ครบวงจรพลัส ต่างกันยังไงคะ</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ครบวงจรพลัส: เลือกสีพรมได้, สังฆทานแบบชะลอมสวยงาม, มีคอฟฟี่เบรค+ขนม, อาหารเมนูพรีเมี่ยม ส่วนครบวงจร: เลือกแบบไม่ได้, สังฆทานธรรมดา, ไม่มีคอฟฟี่เบรค, เมนูธรรมดาค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">3</span> ลูกค้า</div>
+      <div class="bubble customer">แพคเกจ Prime ต่างจากครบวงจรพลัสยังไง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">Prime: เลือกสีพรม+ผ้าฉากหลัง+รูปแบบอาสนะได้, สังฆทาน VIP, คอฟฟี่เบรค+ขนม 2 อย่าง, อาหารพรีเมี่ยม 6 อย่าง มีผ้าโยงประดับฉากหลังด้วยค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">4</span> ลูกค้า</div>
+      <div class="bubble customer">ถ้าพระ 5 รูป ลดราคาไหมคะ</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">พระ 5 รูป ลดราคา 1,500 บาทค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">5</span> ลูกค้า</div>
+      <div class="bubble customer">ถ้านิมนต์พระเอง รับส่งเองด้วย ลดได้ไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ลูกค้านิมนต์พระเองและรับส่งเอง ลดได้ 1,000 บาทค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">6</span> ลูกค้า</div>
+      <div class="bubble customer">แพคเกจไม่มีแขกเลย มีไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">มีค่ะ แพคเกจไม่มีแขก แบบครบวงจร 14,990 บาท / แบบ Prime 19,990 บาท (พระ 9 รูป)</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">7</span> ลูกค้า</div>
+      <div class="bubble customer">จัดที่ชลบุรี มีค่าเดินทางไหมคะ</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ฟรีค่าเดินทาง 60 กิโลเมตรจากสาขาค่ะ สาขาสำนักงานใหญ่อยู่พัทยา ดูแลชลบุรีและระยอง สาขาบางบ่อดูแลฉะเชิงเทราและสมุทรปราการค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">8</span> ลูกค้า</div>
+      <div class="bubble customer">มัดจำเท่าไหร่ ชำระยังไง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ยอดไม่เกิน 25,000 มัดจำ 3,000 บาท / ยอด 25,001-35,000 มัดจำ 5,000 บาท / ออแกไนท์มัดจำ 50% ชำระส่วนที่เหลือหลังจบงาน ได้ทั้งเงินสดและโอนค่ะ รับบัตรเครดิต (ค่าธรรมเนียม 3%)</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">9</span> ลูกค้า</div>
+      <div class="bubble customer">เลี้ยงเพล กำหนดการเป็นยังไงคะ</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ทีมงานมา 08.00-08.30 น. / พระมา 10.00-10.30 / สวดมนต์ 10.30-11.00 / ถวายภัตตาหาร 11.15-11.30 / สังฆทาน+กรวดน้ำ 11.45-12.00 / แขกทาน 12.00+ / บริการถึง 13.30-14.00 น. ค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">10</span> ลูกค้า</div>
+      <div class="bubble customer">ต้องจองล่วงหน้ากี่วัน</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">เสาร์-อาทิตย์ ล่วงหน้า 2-3 สัปดาห์ / วันธรรมดา 1-2 สัปดาห์ ขึ้นอยู่กับคิวว่างค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">11</span> ลูกค้า</div>
+      <div class="bubble customer">พิธีสงฆ์ใช้พื้นที่กี่เมตร จัดรูปแบบไหนได้บ้าง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">พระ 9 รูป ใช้พื้นที่ประมาณ 24 ตร.ม. / พระ 5 รูป ประมาณ 12 ตร.ม. จัดที่นั่งพระได้แนวยาว (I-Shape) ตัว L (L-Shape) หรือ ตัว U (U-Shape) ตามพื้นที่ค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">12</span> ลูกค้า</div>
+      <div class="bubble customer">ในแพคเกจมีสังฆทาน มีอะไรบ้าง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ชุดสังฆทาน (ครบวงจร/ครบวงจรพลัส): แปรงสีฟัน ยาสีฟัน สบู่ ทิชชู ยาพารา น้ำยาล้างจาน น้ำยาซักผ้า โจ๊กซอง นม น้ำดื่ม / ชุด Prime เพิ่มมาม่าค่ะ ทุกแพคเกจมีสังฆทานให้ แต่ไม่รวมซองปัจจัยค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">13</span> ลูกค้า</div>
+      <div class="bubble customer">ไม่มีพระพุทธรูปทำยังไง เลือกโทนสีงานได้ไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ยืมพระพุทธรูปจากร้านได้ค่ะ เลือกโทนสีได้ตามแพคเกจ: ครบวงจรเลือกสีริบบิ้น-ดอกไม้-สังฆทาน / ครบวงจรพลัสเพิ่มสีพรม / Prime เลือกได้ทั้งสีพรม ผ้าฉาก และรูปแบบอาสนะค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">14</span> ลูกค้า</div>
+      <div class="bubble customer">แพคเกจ 50 ท่าน มีเต้นท์ให้ไหม ไม่รับเต้นท์ลดไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">50 ท่าน มีเต้นท์ใหญ่ 5×12 เมตร 1 หลัง (วางโต๊ะได้ 8 โต๊ะ) ค่ะ ไม่รับเต้นท์ใหญ่+เล็ก ลด 2,500 บาท แต่ถ้ารับเต้นท์เล็กแทนเต้นท์ใหญ่จะไม่ได้ลดค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">15</span> ลูกค้า</div>
+      <div class="bubble customer">หัก ณ ที่จ่ายได้ไหม อยากนำอาหารมาเสริมเองด้วย</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">แพคเกจพิธีสงฆ์+อาหาร หัก ณ ที่จ่ายได้ค่ะ (ยกเว้นแพคเกจอาหารอย่างเดียว) นำอาหารมาเสริมได้ค่ะ แจ้งล่วงหน้าทีมงานจะเตรียมจาน-ชามไปใส่ให้ ถ้าเยอะเช่าถาดอุ่นร้อนเพิ่มได้ค่ะ</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== อาหารไทยบุฟเฟต์ (8 questions) ===================== -->
+<div class="service-section" id="buffet">
+  <div class="service-title">🍜 อาหารไทยบุฟเฟต์ <span class="badge blue">2 แพคเกจ · 8 ตัวอย่าง</span></div>
+  <div class="chat">
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">1</span> ลูกค้า</div>
+      <div class="bubble customer">จัดบุฟเฟต์อาหารไทย 50 คน ราคาเท่าไหร่</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">แพคเกจเริ่มต้น (เมนูหมูไก่) 5 อย่าง = 12,500 บาท (250/ท่าน) / พรีเมียม (เมนูทะเลเนื้อ) 5 อย่าง = 17,500 บาท (350/ท่าน) เลือก 5-8 อย่างค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">2</span> ลูกค้า</div>
+      <div class="bubble customer">เริ่มต้นกับพรีเมียมต่างกันยังไง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">เริ่มต้น: อาหารเน้นเมนูหมูและไก่ / พรีเมียม: เน้นเมนูทะเลและเนื้อ + ฟรีน้ำสมุนไพรและผลไม้ตามฤดูกาล ส่วนต่าง +100 ถึง +115 บาท/ท่านค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">3</span> ลูกค้า</div>
+      <div class="bubble customer">อาหาร 8 อย่าง 100 คน พรีเมียม เท่าไหร่</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">พรีเมียม 8 อย่าง 100 ท่าน = 45,500 บาท (455 บาท/ท่าน) ค่ะ เริ่มต้น 8 อย่าง = 34,000 บาท (340/ท่าน)</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">4</span> ลูกค้า</div>
+      <div class="bubble customer">แขกขั้นต่ำกี่คน</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">เริ่มต้นที่ 40 ท่านขึ้นไปค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">5</span> ลูกค้า</div>
+      <div class="bubble customer">ถ้า 70 คน คิดราคายังไง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">คิดราคาต่อหัว × จำนวนแขกค่ะ เช่น เริ่มต้น 5 อย่าง = 250 × 70 = 17,500 บาท / พรีเมียม 5 อย่าง = 350 × 70 = 24,500 บาท</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">6</span> ลูกค้า</div>
+      <div class="bubble customer">รวมอะไรบ้าง ต้องเตรียมอะไรเพิ่มไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ฟรีทุกแพคเกจ: ข้าวหอมมะลิ น้ำดื่ม ขนมหวาน 1 อย่าง อุปกรณ์จัดเลี้ยง ค่าขนส่งในพื้นที่ โต๊ะเก้าอี้ตามจำนวนแขก ไม่ต้องเตรียมเพิ่มค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">7</span> ลูกค้า</div>
+      <div class="bubble customer">เลือกเมนูเองได้ไหม ต้องส่งเมื่อไหร่</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">เลือกเมนูได้ตามแพคเกจค่ะ ส่งเมนูให้ทางร้านล่วงหน้าก่อนวันงาน 7 วันเป็นอย่างช้า</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">8</span> ลูกค้า</div>
+      <div class="bubble customer">6 อย่าง กับ 7 อย่าง ต่างกันเท่าไหร่ต่อหัว</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">เพิ่ม 1 อย่าง ต่าง 30 บาท/ท่านค่ะ เช่น เริ่มต้น: 6 อย่าง = 280 / 7 อย่าง = 310 / พรีเมียม: 6 อย่าง = 385 / 7 อย่าง = 420 บาท/ท่าน</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== โต๊ะจีน (8 questions) ===================== -->
+<div class="service-section" id="chinese">
+  <div class="service-title">🥢 โต๊ะจีน <span class="badge amber">3 แพคเกจ · 8 ตัวอย่าง</span></div>
+  <div class="chat">
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">1</span> ลูกค้า</div>
+      <div class="bubble customer">โต๊ะจีนราคาเท่าไหร่ครับ</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">มี 3 แพคเกจค่ะ: 2,000 บาท/โต๊ะ (8 จาน) / 2,300 บาท (9 จาน) / 2,600 บาท (10 จาน) สำหรับ 8 ท่าน/โต๊ะ อาหารปรุงสดหน้างานค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">2</span> ลูกค้า</div>
+      <div class="bubble customer">ขั้นต่ำกี่โต๊ะ มีค่าเดินทางไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ขั้นต่ำ 10 โต๊ะค่ะ 15 โต๊ะขึ้นไปฟรีค่าเดินทาง ต่ำกว่า 15 โต๊ะมีค่าเดินทาง 200 บาท/โต๊ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">3</span> ลูกค้า</div>
+      <div class="bubble customer">แพคเกจ 2,300 มีอะไรบ้าง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">9 จานค่ะ: 1.ข้าวเกรียบ/ถั่ว 2.ออเดิร์ฟ 3.ซุปกระเพาะปลา 4.ขาหมูน้ำแดง/เป็ดอบ/ไก่ทอดซอส 5.กุ้งอบวุ้นเส้น/ยำ 6.ปลากระพง 7.ตุ๋น/แกง 8.ข้าวผัด 9.ของหวาน เลือกจานละ 1 เมนูค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">4</span> ลูกค้า</div>
+      <div class="bubble customer">ราคารวมเครื่องดื่มไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ไม่รวมค่ะ เพิ่ม 250 บาท/โต๊ะ ชุด A (น้ำเปล่า2+น้ำอัดลม2+โซดา4) หรือ ชุด B (น้ำเปล่า2+น้ำอัดลม3) รวมน้ำแข็งตลอดงาน ถ้าไม่สั่งเครื่องดื่มจะไม่มีน้ำแข็งให้ค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">5</span> ลูกค้า</div>
+      <div class="bubble customer">บริการกี่ชั่วโมง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">4 ชั่วโมง นับจากอาหารจานแรกค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">6</span> ลูกค้า</div>
+      <div class="bubble customer">2,600 กับ 2,000 ต่างกันยังไง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">2,600 (10 จาน) จุดเด่น: ปลากระพง, กุ้งจานเดี่ยว, ออเดิร์ฟทะเล, กระเพาะปลาเนื้อปู ส่วน 2,000 (8 จาน) ใช้ปลาทับทิม ไม่มีจานกุ้งเดี่ยวค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">7</span> ลูกค้า</div>
+      <div class="bubble customer">จัดงานชั้น 2 ได้ไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">จัดได้ค่ะ มีค่าบริการเพิ่มเติม สอบถามรายละเอียดได้เลยค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">8</span> ลูกค้า</div>
+      <div class="bubble customer">เลือกเมนูเองได้ไหม อาหารทำสดหน้างานหรือเปล่า</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">เลือกได้จานละ 1 เมนูค่ะ อาหารโต๊ะจีนปรุงสดที่หน้างานทุกจานค่ะ</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== Cocktail/Canapé (8 questions) ===================== -->
+<div class="service-section" id="cocktail">
+  <div class="service-title">🍸 Cocktail & Canapé <span class="badge purple">ราคาตามจำนวนแขก · 8 ตัวอย่าง</span></div>
+  <div class="chat">
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">1</span> ลูกค้า</div>
+      <div class="bubble customer">สนใจ cocktail party 50 คน ราคาเท่าไหร่</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">50 ท่าน: 6 อย่าง 350/ท่าน (17,500) / 7 อย่าง 390/ท่าน (19,500) / 8 อย่าง 430/ท่าน (21,500) / 9 อย่าง 470/ท่าน (23,500) ยังไม่รวม VAT 7% ค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">2</span> ลูกค้า</div>
+      <div class="bubble customer">ถ้า 100 คน ถูกลงไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ถูกลงค่ะ 100 ท่าน 6 อย่าง = 280 บาท/ท่าน (เทียบ 50 ท่าน = 350) ยิ่งแขกมากยิ่งคุ้มค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">3</span> ลูกค้า</div>
+      <div class="bubble customer">แขกขั้นต่ำ-สูงสุดเท่าไหร่</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ขั้นต่ำ 40 ท่าน สูงสุด 100 ท่านค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">4</span> ลูกค้า</div>
+      <div class="bubble customer">รวมเครื่องดื่มไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ฟรีน้ำดื่มและน้ำสมุนไพร (เลือกได้ 1 เมนู) ทุกแพคเกจค่ะ เพิ่มเครื่องดื่มอื่นได้ 45 บาท/ท่าน</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">5</span> ลูกค้า</div>
+      <div class="bubble customer">รวมโต๊ะเก้าอี้ไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ไม่รวมโต๊ะเก้าอี้สำหรับแขกค่ะ แต่เช่าเพิ่มได้ รวมโต๊ะวางอาหารพร้อมดอกไม้ประดิษฐ์ตกแต่งค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">6</span> ลูกค้า</div>
+      <div class="bubble customer">บริการกี่ชั่วโมง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">3 ชั่วโมง นับจากเริ่มทานอาหารค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">7</span> ลูกค้า</div>
+      <div class="bubble customer">เพิ่มเมนูอาหารได้ไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ได้ค่ะ คิดเพิ่มรายการละ 35-55 บาท/ท่าน</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">8</span> ลูกค้า</div>
+      <div class="bubble customer">40 คน 9 อย่าง รวม VAT เท่าไหร่</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">40 ท่าน 9 อย่าง = 500 × 40 = 20,000 + VAT 7% (1,400) = 21,400 บาทค่ะ</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== งานแต่งงาน (8 questions) ===================== -->
+<div class="service-section" id="wedding">
+  <div class="service-title">💒 งานแต่งงาน <span class="badge rose">2 แพคเกจ · 8 ตัวอย่าง</span></div>
+  <div class="chat">
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">1</span> ลูกค้า</div>
+      <div class="bubble customer">สนใจจัดงานแต่ง ราคาเริ่มต้นเท่าไหร่คะ</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">แพคเกจ 50 ท่าน 79,999 บาท / 100 ท่าน 99,999 บาท เป็นงานเช้าเลี้ยงเที่ยง พร้อมสถานที่ อาหารบุฟเฟต์ พิธีแต่งไทยครบชุด นายพิธี เครื่องเสียงค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">2</span> ลูกค้า</div>
+      <div class="bubble customer">รวมพิธีอะไรบ้าง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">ครบค่ะ: พิธีสงฆ์พร้อมแท่น, ขบวนขันหมาก 9 คู่, กั้นประตูเงินทอง, พิธีสู่ขอ+หมั้น, ไหว้ผู้ใหญ่, หลั่งน้ำสังข์ พร้อมนายพิธีดูแลตลอดงานค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">3</span> ลูกค้า</div>
+      <div class="bubble customer">จัดได้ที่ไหนบ้าง Indoor Outdoor</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">Indoor จัดที่ "ไอริส กรีนเฮาส์ พัทยา" ของเราค่ะ / Outdoor จัดที่บ้านลูกค้า หอประชุม หรือสถานที่อื่นได้ค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">4</span> ลูกค้า</div>
+      <div class="bubble customer">อาหารเป็นแบบไหน</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">บุฟเฟต์ค่ะ อาหารคาว 6 อย่าง หวาน 1 อย่าง ผลไม้รวม พร้อมคอฟฟี่เบรคและข้าวต้ม</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">5</span> ลูกค้า</div>
+      <div class="bubble customer">แขกเกิน 100 คน เพิ่มได้ไหม</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">เพิ่มได้ค่ะ อาหาร 300 บาท/ท่าน หรือเพิ่มโต๊ะจีน 2,300 บาท/โต๊ะ (เฉพาะแพคเกจ 100 ท่าน)</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">6</span> ลูกค้า</div>
+      <div class="bubble customer">ต้องเตรียมอะไรเองบ้าง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">เตรียม 3 อย่างค่ะ: 1) ของบังจัยสำหรับพิธีสงฆ์ 2) เหล้า+คนถือขันหมาก 3) ของรับไหว้ผู้ใหญ่ นอกนั้นทางเราเตรียมให้ครบค่ะ</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">7</span> ลูกค้า</div>
+      <div class="bubble customer">สไตล์ตกแต่งเป็นแบบไหน ฉากใหญ่แค่ไหน</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">สไตล์มินิมอล (Minimal) ค่ะ ฉากหน้างาน 6 เมตร + ฉากพิธีการ 4.8 เมตร พร้อมโต๊ะลงทะเบียน ขาตั้งรูป 6 อัน กล่องใส่ซอง</div>
+    </div>
+
+    <div class="q-group">
+      <div class="label right"><span class="qnum">8</span> ลูกค้า</div>
+      <div class="bubble customer">50 ท่าน กับ 100 ท่าน ต่างกันยังไงบ้าง</div>
+      <div class="label">AI แนะนำ ✨</div>
+      <div class="bubble admin">พิธีการและตกแต่งเหมือนกันทุกอย่างค่ะ ต่างที่จำนวนอาหารและคอฟฟี่เบรค แพคเกจ 100 ท่านเพิ่มโต๊ะจีนได้ 2,300/โต๊ะ ราคาเฉลี่ย 100 ท่าน (~1,000/คน) คุ้มกว่า 50 ท่าน (~1,600/คน) ค่ะ</div>
+    </div>
+
+  </div>
+</div>
+
+<div style="text-align:center; padding: 40px; color: #94a3b8; font-size: 12px;">
+  <p>Generated from IRIS CRM Knowledge Base — 5 services · 47 mock Q&A</p>
+  <p style="margin-top: 8px;">⚠️ กรุณาตรวจสอบข้อมูลราคาและรายละเอียดก่อนนำไปใช้จริง</p>
+</div>
+
+<script>
+function showSection(id) {
+  document.querySelectorAll('.service-section').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

@@ -109,11 +109,7 @@ export class InboxGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Send push notification for incoming messages (fire-and-forget)
     if (message.type === 'incoming') {
-      this.sendPushNotification(
-        message.senderName || 'ข้อความใหม่',
-        message.text || (message.mediaType ? '[สื่อ]' : 'ข้อความใหม่'),
-        { docId: userId, type: 'new_message' },
-      ).catch(() => {});
+      this.sendPushWithCustomerInfo(userId, message).catch(() => {});
     }
   }
 
@@ -122,6 +118,44 @@ export class InboxGateway implements OnGatewayConnection, OnGatewayDisconnect {
       userId,
       suggestions,
     });
+  }
+
+  private async sendPushWithCustomerInfo(customerId: string, message: any) {
+    try {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: customerId },
+        select: {
+          displayName: true,
+          nickname: true,
+          pictureUrl: true,
+          channel: true,
+          channelType: true,
+          platformUserId: true,
+        },
+      });
+
+      const name = customer?.nickname || customer?.displayName || 'ลูกค้า';
+      const channel = (customer?.channel || '')
+        .replace('Line_', 'LINE ')
+        .replace('FB_', 'FB ')
+        .replace('fb_', 'FB ');
+      const channelType = customer?.channelType === 'LINE' ? 'line' : 'facebook';
+
+      const title = `${name} • ${channel}`;
+      const body = message.text || (message.mediaType ? '[สื่อ]' : 'ข้อความใหม่');
+
+      await this.sendPushNotification(title, body, {
+        docId: customerId,
+        oduserId: customer?.platformUserId,
+        displayName: name,
+        pictureUrl: customer?.pictureUrl || '',
+        channel: customer?.channel || '',
+        channelType,
+        type: 'new_message',
+      });
+    } catch (err: any) {
+      this.logger.warn(`Push with customer info failed: ${err.message}`);
+    }
   }
 
   private async sendPushNotification(title: string, body: string, data?: Record<string, any>) {
