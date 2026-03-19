@@ -1,5 +1,3 @@
-"use client";
-
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import {
   User,
@@ -8,6 +6,8 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { getSocket, disconnectSocket } from "@/lib/socket";
+import { api } from "@/lib/api-client";
 
 interface AuthContextType {
   user: User | null;
@@ -26,6 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
+      if (user) {
+        getSocket().catch(() => {});
+      } else {
+        disconnectSocket();
+      }
     });
 
     return () => unsubscribe();
@@ -33,9 +38,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
+    // Log auth event (fire-and-forget)
+    api.post("/admins/auth-log", { action: "login", platform: "web" }).catch(() => {});
   };
 
   const signOut = async () => {
+    api.post("/admins/auth-log", { action: "logout", platform: "web" }).catch(() => {});
+    disconnectSocket();
     await firebaseSignOut(auth);
   };
 

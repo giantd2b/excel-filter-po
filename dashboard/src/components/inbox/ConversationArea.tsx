@@ -1,39 +1,46 @@
-"use client";
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChatUser, Message } from "@/types/inbox";
 import { MessageBubble, DateDivider } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { EmptyState } from "./EmptyState";
-import { useMessagesListener } from "@/hooks/useFirestoreListener";
-import { Loader2, User } from "lucide-react";
-import Image from "next/image";
+import { useMessagesSocket } from "@/hooks/useWebSocket";
+import { markAsRead, sendMessage, uploadChatMedia } from "@/lib/api-service";
+import {
+  Loader2,
+  User,
+  PanelRightOpen,
+  WifiOff,
+  Clock,
+  CheckCircle2,
+  RotateCcw,
+} from "lucide-react";
+import { setCustomerStatus } from "@/lib/api-service";
 
 interface ConversationAreaProps {
   selectedUser: ChatUser | null;
   onMessageSent: () => void;
+  onToggleInfoPanel?: () => void;
 }
 
 export function ConversationArea({
   selectedUser,
   onMessageSent,
+  onToggleInfoPanel,
 }: ConversationAreaProps) {
   const [, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMessagesLength = useRef(0);
 
   const handleNewMessage = useCallback(() => {
-    // Scroll to bottom when new message arrives
     scrollToBottom();
   }, []);
 
-  const { messages, loading, error } = useMessagesListener({
+  const { messages, loading, error } = useMessagesSocket({
     userId: selectedUser?.id || null,
     onNewMessage: handleNewMessage,
   });
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     if (messages.length > prevMessagesLength.current) {
       scrollToBottom();
     }
@@ -42,7 +49,9 @@ export function ConversationArea({
 
   useEffect(() => {
     if (selectedUser) {
-      markAsRead();
+      markAsRead(selectedUser.id).catch((err: unknown) =>
+        console.error("Failed to mark as read:", err)
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUser?.id]);
@@ -53,44 +62,43 @@ export function ConversationArea({
     }, 100);
   };
 
-  const markAsRead = async () => {
-    if (!selectedUser) return;
-
-    try {
-      await fetch("/api/inbox/read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: selectedUser.id }),
-      });
-    } catch (err) {
-      console.error("Failed to mark as read:", err);
-    }
-  };
-
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (
+    text: string,
+    media?: { file: File; mediaType: "image" | "video" | "file" }
+  ) => {
     if (!selectedUser) return;
 
     setSending(true);
     try {
-      const response = await fetch("/api/inbox/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          oduserId: selectedUser.oduserId,
-          docId: selectedUser.id,
-          text,
-          channel: selectedUser.channel,
-        }),
-      });
+      let mediaUrl: string | undefined;
+      let previewUrl: string | undefined;
+      let mediaType: "image" | "video" | undefined;
+      let sendText = text || undefined;
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send message");
+      // Upload media first if present
+      if (media) {
+        const uploaded = await uploadChatMedia(media.file, selectedUser.id);
+        mediaUrl = uploaded.url;
+        previewUrl = uploaded.previewUrl;
+        if (media.mediaType === "file") {
+          // For non-media files, send as text with file link
+          sendText = sendText || `[ไฟล์: ${media.file.name}]`;
+        } else {
+          mediaType = uploaded.mediaType;
+        }
       }
 
+      await sendMessage({
+        oduserId: selectedUser.oduserId,
+        docId: selectedUser.id,
+        text: sendText,
+        mediaType,
+        mediaUrl,
+        previewUrl,
+        channel: selectedUser.channel,
+      });
+
       onMessageSent();
-      // Message will appear via real-time listener
     } catch (err) {
       console.error("Failed to send:", err);
       throw err;
@@ -113,57 +121,117 @@ export function ConversationArea({
     return <EmptyState />;
   }
 
+  const channelLabel =
+    selectedUser.channelType === "line" ? "LINE" : "Facebook";
+  const channelName = selectedUser.channel
+    .replace("Line_", "")
+    .replace("FB_", "");
+
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-            {selectedUser.pictureUrl ? (
-              <Image
-                src={selectedUser.pictureUrl}
-                alt={selectedUser.displayName}
-                width={40}
-                height={40}
-                className="object-cover w-full h-full"
-                unoptimized
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <User className="w-5 h-5 text-gray-400" />
-              </div>
-            )}
+          <div className="relative">
+            <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 ring-2 ring-white shadow-sm">
+              {selectedUser.pictureUrl ? (
+                <img
+                  src={selectedUser.pictureUrl}
+                  alt={selectedUser.displayName}
+                  width={36}
+                  height={36}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-slate-400" />
+                </div>
+              )}
+            </div>
+            <div
+              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                selectedUser.channelType === "line"
+                  ? "bg-emerald-500"
+                  : "bg-blue-500"
+              }`}
+            />
           </div>
           <div>
-            <h3 className="font-medium text-gray-900">
+            <h3 className="text-sm font-semibold text-slate-800 leading-tight">
               {selectedUser.displayName}
             </h3>
-            <p className="text-xs text-gray-500">
-              {selectedUser.channelType === "line" ? "LINE" : "Facebook"} -{" "}
-              {selectedUser.channel.replace("Line_", "").replace("FB_", "")}
-            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                  selectedUser.channelType === "line"
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-blue-50 text-blue-600"
+                }`}
+              >
+                {channelLabel}
+              </span>
+              <span className="text-[11px] text-slate-400">{channelName}</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span>Live</span>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              setCustomerStatus(selectedUser.id, "FOLLOW_UP");
+              onMessageSent();
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-amber-200 text-amber-600 bg-amber-50 hover:bg-amber-100 transition-colors"
+          >
+            <Clock className="w-3 h-3" />
+            Follow up
+          </button>
+          <button
+            onClick={() => {
+              setCustomerStatus(selectedUser.id, "RESOLVED");
+              onMessageSent();
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            Resolve
+          </button>
+          {onToggleInfoPanel && (
+            <button
+              onClick={onToggleInfoPanel}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+              title="Customer info"
+            >
+              <PanelRightOpen className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
+      <div className="flex-1 overflow-y-auto px-5 py-4 bg-slate-50/50">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+            <p className="text-xs text-slate-400 font-medium">
+              Loading messages...
+            </p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full">
-            <p className="text-red-500 text-sm mb-2">{error}</p>
-            <p className="text-gray-500 text-xs">Could not load messages</p>
+            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mb-3">
+              <WifiOff className="w-5 h-5 text-red-400" />
+            </div>
+            <p className="text-sm font-medium text-slate-600 mb-1">
+              Could not load messages
+            </p>
+            <p className="text-xs text-slate-400">{error}</p>
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            <p className="text-sm">No messages yet</p>
+          <div className="flex flex-col items-center justify-center h-full">
+            <p className="text-sm text-slate-400">
+              No messages yet. Start the conversation!
+            </p>
           </div>
         ) : (
           <>

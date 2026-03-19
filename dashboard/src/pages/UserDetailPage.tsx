@@ -1,12 +1,7 @@
-"use client";
-
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
+import { useParams, Link } from "react-router-dom";
 import MessageList from "@/components/MessageList";
+import { getUserById } from "@/lib/api-service";
 
 interface UserDetail {
   id: string;
@@ -39,23 +34,21 @@ function formatDate(timestamp: number): string {
 }
 
 export default function UserDetailPage() {
-  const params = useParams();
+  const { id } = useParams<{ id: string }>();
   const [user, setUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (params.id) {
-      fetchUser(params.id as string);
+    if (id) {
+      fetchUser(id);
     }
-  }, [params.id]);
+  }, [id]);
 
-  const fetchUser = async (id: string) => {
+  const fetchUser = async (userId: string) => {
     try {
-      const res = await fetch(`/api/users/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch user");
-      const data = await res.json();
-      setUser(data.user);
+      const data = await getUserById(userId);
+      setUser(data as UserDetail | null);
     } catch (err) {
       setError("ไม่สามารถโหลดข้อมูล User ได้");
       console.error(err);
@@ -76,7 +69,7 @@ export default function UserDetailPage() {
     return (
       <div>
         <Link
-          href="/dashboard/users"
+          to="/dashboard/users"
           className="text-blue-600 hover:underline mb-4 inline-block"
         >
           &larr; กลับไปรายชื่อ Users
@@ -91,7 +84,7 @@ export default function UserDetailPage() {
   return (
     <div>
       <Link
-        href="/dashboard/users"
+        to="/dashboard/users"
         className="text-blue-600 hover:underline mb-4 inline-block"
       >
         &larr; กลับไปรายชื่อ Users
@@ -103,13 +96,12 @@ export default function UserDetailPage() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="text-center">
               {user.pictureUrl || user.profile_pic ? (
-                <Image
+                <img
                   src={user.pictureUrl || user.profile_pic}
                   alt={user.displayName || "User"}
                   width={120}
                   height={120}
-                  className="rounded-full mx-auto mb-4 object-cover"
-                  unoptimized
+                  className="rounded-full mx-auto mb-4 object-cover w-[120px] h-[120px]"
                 />
               ) : (
                 <div className="w-24 h-24 rounded-full bg-gray-300 mx-auto mb-4 flex items-center justify-center">
@@ -137,7 +129,9 @@ export default function UserDetailPage() {
             <div className="mt-6 space-y-3">
               <div>
                 <p className="text-sm text-gray-500">User ID</p>
-                <p className="text-sm text-gray-800 break-all">{user.userId || user.id}</p>
+                <p className="text-sm text-gray-800 break-all">
+                  {user.userId || user.id}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">เข้าร่วมเมื่อ</p>

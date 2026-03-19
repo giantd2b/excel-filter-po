@@ -2,12 +2,16 @@
 
 export interface Message {
   id: string;
-  text: string;
+  text?: string;
   type: "incoming" | "outgoing";
   sender: "user" | "admin";
   timestamp: number;
   status?: "sent" | "delivered" | "failed";
   adminId?: string;
+  adminName?: string;
+  mediaType?: "image" | "video";
+  mediaUrl?: string;
+  previewUrl?: string;
 }
 
 export interface ChatUser {

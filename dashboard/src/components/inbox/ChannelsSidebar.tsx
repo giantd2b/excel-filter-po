@@ -1,7 +1,12 @@
-"use client";
-
 import { useState, useEffect } from "react";
-import { MessageSquare, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import {
+  MessageCircle,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Inbox,
+} from "lucide-react";
+import { getInboxStats } from "@/lib/api-service";
 
 interface ChannelStats {
   id: string;
@@ -45,18 +50,14 @@ export function ChannelsSidebar({
 
   useEffect(() => {
     fetchStats();
-    // Refresh stats every 30 seconds
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchStats = async () => {
     try {
-      const response = await fetch("/api/inbox/stats");
-      const data = await response.json();
-      if (response.ok) {
-        setStats(data);
-      }
+      const data = await getInboxStats();
+      setStats(data);
     } catch (error) {
       console.error("Failed to fetch stats:", error);
     } finally {
@@ -66,10 +67,10 @@ export function ChannelsSidebar({
 
   const isAllSelected = !selectedChannel && !selectedType;
 
-  const renderBadge = (count: number) => {
+  const Badge = ({ count }: { count: number }) => {
     if (count === 0) return null;
     return (
-      <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-medium">
+      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-md bg-white/15 text-[10px] font-semibold tabular-nums">
         {count > 99 ? "99+" : count}
       </span>
     );
@@ -77,85 +78,95 @@ export function ChannelsSidebar({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      <div className="flex items-center justify-center h-full bg-slate-900">
+        <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <h2 className="font-semibold text-lg text-gray-800">Inbox</h2>
+    <div className="flex flex-col h-full bg-slate-900 text-slate-300">
+      {/* Brand header */}
+      <div className="px-5 py-4 border-b border-white/5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <Inbox className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-sm text-white tracking-tight">
+              Inbox
+            </h2>
+            <p className="text-[10px] text-slate-500 font-medium">
+              {stats?.totalUnread || 0} unread
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Channels list */}
-      <div className="flex-1 overflow-y-auto p-2">
+      {/* Navigation */}
+      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
         {/* All conversations */}
         <button
           onClick={onSelectAll}
-          className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
             isAllSelected
-              ? "bg-blue-100 text-blue-700"
-              : "hover:bg-gray-100 text-gray-700"
+              ? "bg-white/10 text-white shadow-sm"
+              : "hover:bg-white/5 text-slate-400 hover:text-slate-200"
           }`}
         >
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5" />
-            <span className="font-medium">All Conversations</span>
+          <div className="flex items-center gap-2.5">
+            <MessageCircle className="w-4 h-4" />
+            <span>All Conversations</span>
           </div>
-          {renderBadge(stats?.totalUnread || 0)}
+          <Badge count={stats?.totalUnread || 0} />
         </button>
 
         {/* LINE Section */}
-        <div className="mt-4">
+        <div className="pt-4">
           <button
             onClick={() => setLineExpanded(!lineExpanded)}
-            className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-600"
+            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500 hover:text-slate-400 transition-colors"
           >
             <div className="flex items-center gap-2">
               {lineExpanded ? (
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-3 h-3" />
               ) : (
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3 h-3" />
               )}
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-500 text-white text-[10px] font-bold">
-                L
-              </span>
+              <div className="w-3.5 h-3.5 rounded bg-emerald-500 flex items-center justify-center">
+                <span className="text-[7px] font-black text-white">L</span>
+              </div>
               <span>LINE</span>
             </div>
-            {renderBadge(stats?.line?.totalUnread || 0)}
+            <Badge count={stats?.line?.totalUnread || 0} />
           </button>
 
           {lineExpanded && (
-            <div className="ml-4 mt-1 space-y-1">
-              {/* All LINE */}
+            <div className="mt-1 space-y-0.5 ml-2">
               <button
                 onClick={() => onSelectType("line")}
-                className={`w-full flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-[13px] transition-all duration-150 ${
                   selectedType === "line" && !selectedChannel
-                    ? "bg-green-100 text-green-700"
-                    : "hover:bg-gray-100 text-gray-600"
+                    ? "bg-emerald-500/15 text-emerald-400 font-medium"
+                    : "hover:bg-white/5 text-slate-400 hover:text-slate-300"
                 }`}
               >
                 <span>All LINE</span>
-                {renderBadge(stats?.line?.totalUnread || 0)}
+                <Badge count={stats?.line?.totalUnread || 0} />
               </button>
 
-              {/* Individual LINE channels */}
               {stats?.line?.channels.map((channel) => (
                 <button
                   key={channel.id}
                   onClick={() => onSelectChannel(channel.id)}
-                  className={`w-full flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-[13px] transition-all duration-150 ${
                     selectedChannel === channel.id
-                      ? "bg-green-100 text-green-700"
-                      : "hover:bg-gray-100 text-gray-600"
+                      ? "bg-emerald-500/15 text-emerald-400 font-medium"
+                      : "hover:bg-white/5 text-slate-400 hover:text-slate-300"
                   }`}
                 >
                   <span className="truncate">{channel.name}</span>
-                  {renderBadge(channel.unreadCount)}
+                  <Badge count={channel.unreadCount} />
                 </button>
               ))}
             </div>
@@ -163,53 +174,51 @@ export function ChannelsSidebar({
         </div>
 
         {/* Facebook Section */}
-        <div className="mt-4">
+        <div className="pt-4">
           <button
             onClick={() => setFbExpanded(!fbExpanded)}
-            className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-600"
+            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500 hover:text-slate-400 transition-colors"
           >
             <div className="flex items-center gap-2">
               {fbExpanded ? (
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-3 h-3" />
               ) : (
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3 h-3" />
               )}
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-blue-600 text-white text-[10px] font-bold">
-                F
-              </span>
+              <div className="w-3.5 h-3.5 rounded bg-blue-500 flex items-center justify-center">
+                <span className="text-[7px] font-black text-white">f</span>
+              </div>
               <span>Facebook</span>
             </div>
-            {renderBadge(stats?.facebook?.totalUnread || 0)}
+            <Badge count={stats?.facebook?.totalUnread || 0} />
           </button>
 
           {fbExpanded && (
-            <div className="ml-4 mt-1 space-y-1">
-              {/* All Facebook */}
+            <div className="mt-1 space-y-0.5 ml-2">
               <button
                 onClick={() => onSelectType("facebook")}
-                className={`w-full flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-[13px] transition-all duration-150 ${
                   selectedType === "facebook" && !selectedChannel
-                    ? "bg-blue-100 text-blue-700"
-                    : "hover:bg-gray-100 text-gray-600"
+                    ? "bg-blue-500/15 text-blue-400 font-medium"
+                    : "hover:bg-white/5 text-slate-400 hover:text-slate-300"
                 }`}
               >
                 <span>All Facebook</span>
-                {renderBadge(stats?.facebook?.totalUnread || 0)}
+                <Badge count={stats?.facebook?.totalUnread || 0} />
               </button>
 
-              {/* Individual Facebook channels */}
               {stats?.facebook?.channels.map((channel) => (
                 <button
                   key={channel.id}
                   onClick={() => onSelectChannel(channel.id)}
-                  className={`w-full flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-[13px] transition-all duration-150 ${
                     selectedChannel === channel.id
-                      ? "bg-blue-100 text-blue-700"
-                      : "hover:bg-gray-100 text-gray-600"
+                      ? "bg-blue-500/15 text-blue-400 font-medium"
+                      : "hover:bg-white/5 text-slate-400 hover:text-slate-300"
                   }`}
                 >
                   <span className="truncate">{channel.name}</span>
-                  {renderBadge(channel.unreadCount)}
+                  <Badge count={channel.unreadCount} />
                 </button>
               ))}
             </div>

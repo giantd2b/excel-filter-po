@@ -1,24 +1,7 @@
-"use client";
-
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState } from "react";
-import Link from "next/link";
-/* eslint-disable @next/next/no-img-element */
+import { Link } from "react-router-dom";
 import SkeletonTable from "@/components/SkeletonTable";
-
-interface NewUser {
-  id: string;
-  oderId: string;
-  displayName: string;
-  pictureUrl: string;
-  channel: string;
-  timestamp: number;
-  lastmessagetime: number;
-  messageCount: number;
-  isFirstTime: boolean;
-  firstMessage: string;
-}
+import { getNewUsers, NewUser } from "@/lib/api-service";
 
 function formatDate(timestamp: number): string {
   if (!timestamp) return "-";
@@ -56,9 +39,7 @@ export default function NewCustomersPage() {
   const fetchNewUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/users/new?days=${days}&limit=100`);
-      if (!res.ok) throw new Error("Failed to fetch new users");
-      const data = await res.json();
+      const data = await getNewUsers(days, 100);
       setUsers(data.users);
       setTotal(data.total);
     } catch (err) {
@@ -210,7 +191,7 @@ export default function NewCustomersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <Link
-                        href={`/dashboard/users/${user.id}`}
+                        to={`/dashboard/users/${user.id}`}
                         className="text-blue-600 hover:text-blue-900"
                       >
                         ดูรายละเอียด

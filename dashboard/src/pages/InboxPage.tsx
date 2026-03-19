@@ -1,11 +1,10 @@
-"use client";
-
 import { useState, useCallback } from "react";
 import { ChatUser } from "@/types/inbox";
 import { ChannelsSidebar } from "@/components/inbox/ChannelsSidebar";
 import { ChatList } from "@/components/inbox/ChatList";
 import { ConversationArea } from "@/components/inbox/ConversationArea";
-import { useTotalUnreadListener } from "@/hooks/useFirestoreListener";
+import { CustomerInfoPanel } from "@/components/inbox/CustomerInfoPanel";
+import { useUnreadSocket } from "@/hooks/useWebSocket";
 import { useNotifications } from "@/hooks/useNotifications";
 
 export default function InboxPage() {
@@ -14,10 +13,10 @@ export default function InboxPage() {
     null
   );
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
+  const [showInfoPanel, setShowInfoPanel] = useState(true);
 
   const { updateDocumentTitle } = useNotifications();
 
-  // Update document title with unread count
   const handleUnreadUpdate = useCallback(
     (count: number) => {
       updateDocumentTitle(count);
@@ -25,7 +24,7 @@ export default function InboxPage() {
     [updateDocumentTitle]
   );
 
-  useTotalUnreadListener(handleUnreadUpdate);
+  useUnreadSocket(handleUnreadUpdate);
 
   const handleSelectAll = useCallback(() => {
     setSelectedChannel(null);
@@ -46,14 +45,12 @@ export default function InboxPage() {
     setSelectedUser(user);
   }, []);
 
-  const handleMessageSent = useCallback(() => {
-    // Real-time updates handle this now
-  }, []);
+  const handleMessageSent = useCallback(() => {}, []);
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full bg-white">
       {/* Channels Sidebar */}
-      <div className="w-64 border-r flex-shrink-0">
+      <div className="w-56 flex-shrink-0">
         <ChannelsSidebar
           selectedChannel={selectedChannel}
           selectedType={selectedType}
@@ -64,7 +61,7 @@ export default function InboxPage() {
       </div>
 
       {/* Chat List */}
-      <div className="w-80 border-r flex-shrink-0 bg-white">
+      <div className="w-80 flex-shrink-0 border-r border-slate-200/60">
         <ChatList
           selectedChannel={selectedChannel}
           channelType={selectedType}
@@ -74,12 +71,20 @@ export default function InboxPage() {
       </div>
 
       {/* Conversation Area */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <ConversationArea
           selectedUser={selectedUser}
           onMessageSent={handleMessageSent}
+          onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
         />
       </div>
+
+      {/* Customer Info Panel */}
+      {showInfoPanel && selectedUser && (
+        <div className="w-72 flex-shrink-0 border-l border-slate-200/60">
+          <CustomerInfoPanel userId={selectedUser.id} />
+        </div>
+      )}
     </div>
   );
 }

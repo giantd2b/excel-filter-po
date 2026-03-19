@@ -1,10 +1,7 @@
-"use client";
-
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState, useCallback } from "react";
 import UserTable, { User } from "@/components/UserTable";
 import SkeletonTable from "@/components/SkeletonTable";
+import { getUsers } from "@/lib/api-service";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -17,44 +14,39 @@ export default function UsersPage() {
   const [hasMore, setHasMore] = useState(false);
   const [lastId, setLastId] = useState<string | null>(null);
 
-  const fetchUsers = useCallback(async (loadMore = false) => {
-    try {
-      if (loadMore) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
+  const fetchUsers = useCallback(
+    async (loadMore = false) => {
+      try {
+        if (loadMore) {
+          setLoadingMore(true);
+        } else {
+          setLoading(true);
+        }
+
+        const data = await getUsers(20, loadMore ? lastId : null);
+
+        if (loadMore) {
+          setUsers((prev) => [...prev, ...data.users]);
+        } else {
+          setUsers(data.users);
+          const uniqueChannels = [
+            ...new Set(data.users.map((u: User) => u.channel).filter(Boolean)),
+          ] as string[];
+          setChannels(uniqueChannels);
+        }
+
+        setHasMore(data.hasMore);
+        setLastId(data.nextLastId);
+      } catch (err) {
+        setError("ไม่สามารถโหลดข้อมูล Users ได้");
+        console.error(err);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
       }
-
-      const params = new URLSearchParams({ limit: "20" });
-      if (loadMore && lastId) {
-        params.set("lastId", lastId);
-      }
-
-      const res = await fetch(`/api/users?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch users");
-      const data = await res.json();
-
-      if (loadMore) {
-        setUsers((prev) => [...prev, ...data.users]);
-      } else {
-        setUsers(data.users);
-        // Extract unique channels
-        const uniqueChannels = [
-          ...new Set(data.users.map((u: User) => u.channel).filter(Boolean)),
-        ] as string[];
-        setChannels(uniqueChannels);
-      }
-
-      setHasMore(data.hasMore);
-      setLastId(data.nextLastId);
-    } catch (err) {
-      setError("ไม่สามารถโหลดข้อมูล Users ได้");
-      console.error(err);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [lastId]);
+    },
+    [lastId]
+  );
 
   useEffect(() => {
     fetchUsers();

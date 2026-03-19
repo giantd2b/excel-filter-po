@@ -369,6 +369,13 @@ export async function unassignCustomer(customerId: string) {
   return api.post(`/users/${customerId}/unassign`, {});
 }
 
+export async function setCustomerNickname(
+  customerId: string,
+  nickname: string | null
+) {
+  return api.post(`/users/${customerId}/nickname`, { nickname });
+}
+
 export async function setCustomerStatus(
   customerId: string,
   status: "OPEN" | "FOLLOW_UP" | "RESOLVED"

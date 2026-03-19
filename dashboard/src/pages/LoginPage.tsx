@@ -1,7 +1,5 @@
-"use client";
-
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
@@ -10,13 +8,13 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { user, signIn, loading: authLoading } = useAuth();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user && !authLoading) {
-      router.push("/dashboard");
+      navigate("/dashboard");
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +23,7 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password);
-      router.push("/dashboard");
+      navigate("/dashboard");
     } catch {
       setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
     } finally {

@@ -1,10 +1,7 @@
-"use client";
-
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState } from "react";
 import StatsCard from "@/components/StatsCard";
 import SkeletonStats from "@/components/SkeletonStats";
+import { getStats } from "@/lib/api-service";
 
 interface Stats {
   totalUsers: number;
@@ -24,9 +21,7 @@ export default function DashboardPage() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch("/api/stats");
-      if (!res.ok) throw new Error("Failed to fetch stats");
-      const data = await res.json();
+      const data = await getStats();
       setStats(data);
     } catch (err) {
       setError("ไม่สามารถโหลดข้อมูลสถิติได้");
