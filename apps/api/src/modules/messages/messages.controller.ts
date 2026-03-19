@@ -13,12 +13,16 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MessagesService } from './messages.service';
+import { FbSyncService } from './fb-sync.service';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
 
 @Controller('messages')
 @UseGuards(FirebaseAuthGuard)
 export class MessagesController {
-  constructor(private readonly messagesService: MessagesService) {}
+  constructor(
+    private readonly messagesService: MessagesService,
+    private readonly fbSyncService: FbSyncService,
+  ) {}
 
   @Get(':userId')
   getMessages(
@@ -54,6 +58,16 @@ export class MessagesController {
       mimeType: file.mimetype,
       size: file.size,
     };
+  }
+
+  @Post('fb-sync')
+  syncFacebookReplies() {
+    return this.fbSyncService.syncNow();
+  }
+
+  @Post('fb-sync/full')
+  syncFacebookFull() {
+    return this.fbSyncService.syncFullHistory();
   }
 
   @Post('send')
