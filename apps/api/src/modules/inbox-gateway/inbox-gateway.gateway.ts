@@ -9,7 +9,9 @@ import {
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import axios from 'axios';
 import { FirebaseService } from '../../common/providers/firebase.service';
+import { PrismaService } from '../../common/providers/prisma.service';
 
 @WebSocketGateway({
   cors: {
@@ -24,7 +26,10 @@ export class InboxGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(InboxGateway.name);
 
-  constructor(private readonly firebase: FirebaseService) {}
+  constructor(
+    private readonly firebase: FirebaseService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async handleConnection(client: Socket) {
     try {
@@ -101,6 +106,44 @@ export class InboxGateway implements OnGatewayConnection, OnGatewayDisconnect {
       userId,
       message,
     });
+
+    // Send push notification for incoming messages (fire-and-forget)
+    if (message.type === 'incoming') {
+      this.sendPushNotification(
+        message.senderName || 'ข้อความใหม่',
+        message.text || (message.mediaType ? '[สื่อ]' : 'ข้อความใหม่'),
+        { docId: userId, type: 'new_message' },
+      ).catch(() => {});
+    }
+  }
+
+  private async sendPushNotification(title: string, body: string, data?: Record<string, any>) {
+    try {
+      const tokens = await this.prisma.pushToken.findMany();
+      if (tokens.length === 0) return;
+
+      const messages = tokens.map((t) => ({
+        to: t.token,
+        sound: 'default',
+        title,
+        body: body.length > 100 ? body.substring(0, 100) + '...' : body,
+        data: data || {},
+      }));
+
+      const res = await axios.post('https://exp.host/--/api/v2/push/send', messages, {
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      });
+
+      // Clean up invalid tokens
+      const results = res.data?.data || [];
+      for (let i = 0; i < results.length; i++) {
+        if (results[i]?.details?.error === 'DeviceNotRegistered') {
+          this.prisma.pushToken.delete({ where: { token: messages[i].to } }).catch(() => {});
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Push failed: ${err.message}`);
+    }
   }
 
   emitConversationUpdated(conversation: any) {

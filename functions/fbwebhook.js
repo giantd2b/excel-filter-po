@@ -364,12 +364,8 @@ async function getshareLink(link, mid) {
     result.on("end", async function () {
       var buffer = Buffer.concat(buffers);
 
-      /* DO SOMETHING WITH workbook IN THE CALLBACK */
-
       await file.save(buffer);
       await file.makePublic();
-      //url = await file.publicUrl();
-      await firestore.collection("link").doc(mid).set({ link: publicUrl });
 
       return;
     });

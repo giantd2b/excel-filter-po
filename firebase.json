@@ -27,14 +27,17 @@
     "source": "functions"
   },
   "hosting": {
-    "source": "dashboard",
+    "public": "dashboard/dist",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
-    "frameworksBackend": {
-      "region": "asia-southeast1"
-    }
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
   }
 }

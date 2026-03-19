@@ -1,0 +1,22 @@
+[
+  {
+    "id": "8BCYQB5tlhNWKmu6S0mM",
+    "bankName": "ไทยพาณิชย์",
+    "accountName": "บริษัท ไอริส เติมบุญ จำกัด",
+    "accountNumber": "835-247795-1",
+    "accountType": "ออมทรัพย์",
+    "createdAt": "2026-02-23T06:37:00.408Z",
+    "isActive": true,
+    "updatedAt": "2026-02-23T06:37:16.835Z"
+  },
+  {
+    "id": "OZNwXZvPp5UWGChZpWTZ",
+    "bankName": "ไทยพาณิชย์",
+    "accountName": "เติมบุญบายไอริส โดย นางสาว ศิริ เกตุประสาท",
+    "accountNumber": "934-3003559",
+    "accountType": "กระแสรายวัน",
+    "isActive": true,
+    "createdAt": "2026-02-23T06:37:00.408Z",
+    "updatedAt": "2026-02-23T06:37:00.408Z"
+  }
+]

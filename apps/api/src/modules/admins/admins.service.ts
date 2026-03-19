@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import axios from 'axios';
 import { PrismaService } from '../../common/providers/prisma.service';
 import { FirebaseService } from '../../common/providers/firebase.service';
 import { AdminRole } from '@prisma/client';
 
 @Injectable()
 export class AdminsService {
+  private readonly logger = new Logger(AdminsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly firebase: FirebaseService,
@@ -104,6 +107,65 @@ export class AdminsService {
         role,
       },
     });
+  }
+
+  // ─── Push Tokens ───────────────────────────────────────────
+
+  async registerPushToken(adminId: string, token: string, platform: string) {
+    // Upsert: if token exists, update adminId; if not, create
+    return this.prisma.pushToken.upsert({
+      where: { token },
+      update: { adminId, platform },
+      create: { adminId, token, platform },
+    });
+  }
+
+  async sendPushToAllAdmins(title: string, body: string, data?: Record<string, any>) {
+    try {
+      const tokens = await this.prisma.pushToken.findMany();
+      if (tokens.length === 0) return;
+
+      const messages = tokens.map((t) => ({
+        to: t.token,
+        sound: 'default',
+        title,
+        body,
+        data: data || {},
+      }));
+
+      // Send via Expo Push API (batches of 100)
+      for (let i = 0; i < messages.length; i += 100) {
+        const batch = messages.slice(i, i + 100);
+        try {
+          const response = await axios.post(
+            'https://exp.host/--/api/v2/push/send',
+            batch,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+            },
+          );
+
+          // Remove invalid tokens
+          const results = response.data?.data || [];
+          for (let j = 0; j < results.length; j++) {
+            if (results[j]?.status === 'error' &&
+                (results[j]?.details?.error === 'DeviceNotRegistered' ||
+                 results[j]?.details?.error === 'InvalidCredentials')) {
+              await this.prisma.pushToken.delete({
+                where: { token: batch[j].to },
+              }).catch(() => {});
+            }
+          }
+        } catch (err: any) {
+          this.logger.warn(`Push send failed: ${err.message}`);
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(`Push notification error: ${err.message}`);
+    }
   }
 
   // ─── Auth Logs ─────────────────────────────────────────────

@@ -1,0 +1,43 @@
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    env_file:
+      - ./apps/api/.env
+    volumes:
+      - ./apps/api/src:/app/src
+      - ./apps/api/service-account.json:/app/service-account.json:ro
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=development
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account.json
+      - PORT=3000
+      - DATABASE_URL=postgresql://admin:admin123@postgres:5432/iris_crm
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: iris-crm-db
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: iris_crm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d iris_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

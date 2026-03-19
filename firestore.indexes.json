@@ -1,4 +1,21 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "user",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "channel", "order": "ASCENDING" },
+        { "fieldPath": "lastmessagetime", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "user",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "unreadCount", "order": "ASCENDING" },
+        { "fieldPath": "lastmessagetime", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

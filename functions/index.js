@@ -11,6 +11,8 @@ const firestore = admin.firestore();
 
 const { analyzeSlip } = require("./slip-detection");
 const { findThaiPhones, formatThaiPhone } = require("./phone-utils");
+const { dailySlipReport } = require("./dailyReport");
+exports.dailySlipReport = dailySlipReport;
 exports.fbwebhook = require("./fbwebhook");
 const sendMessageModule = require("./sendMessage");
 exports.sendMessage = sendMessageModule.sendMessage;
@@ -149,7 +151,7 @@ exports.LineWebhook2 = functions.https //.region(REGION)
             .file(`slip/${messageID}-slip.jpg`);
           let fileURL = null;
 
-          return await getConttent(messageID);
+          await getConttent(messageID);
           async function getConttent(msgID) {
             try {
               const response = await axios({
@@ -206,7 +208,6 @@ exports.LineWebhook2 = functions.https //.region(REGION)
             } catch (error) {
               console.log(error);
             }
-            return res.end();
           }
 
         } else if (event.message.type === "text") {

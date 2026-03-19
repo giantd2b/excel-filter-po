@@ -95,6 +95,20 @@ export class AdminsController {
     return this.adminsService.activate(id);
   }
 
+  // ─── Push Tokens ────────────────────────────────────────────
+
+  @Post('push-token')
+  async registerPushToken(
+    @Req() req: any,
+    @Body() body: { token: string; platform: string },
+  ) {
+    return this.adminsService.registerPushToken(
+      req.user?.uid || req.admin?.id,
+      body.token,
+      body.platform,
+    );
+  }
+
   // ─── Auth Logs ─────────────────────────────────────────────
 
   @Post('auth-log')
