@@ -26,9 +26,10 @@ export default function Navbar() {
     { href: "/dashboard/users", label: "รายชื่อ Users" },
     { href: "/dashboard/bank-accounts", label: "บัญชีธนาคาร" },
     { href: "/dashboard/slip-report", label: "รายงานสลิป" },
-    // Only show admin management for non-agents
+    // Only show admin management and analytics for non-agents
     ...(!isAgent
       ? [
+          { href: "/dashboard/analytics", label: "วิเคราะห์" },
           { href: "/dashboard/templates", label: "เทมเพลต" },
           { href: "/dashboard/admins", label: "ผู้ดูแลระบบ" },
         ]

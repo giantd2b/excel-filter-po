@@ -117,6 +117,13 @@ export class InboxGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  emitSuggestionsUpdate(userId: string, suggestions: string[]) {
+    this.server.to(`messages:${userId}`).emit('suggestions:update', {
+      userId,
+      suggestions,
+    });
+  }
+
   private async sendPushNotification(title: string, body: string, data?: Record<string, any>) {
     try {
       const tokens = await this.prisma.pushToken.findMany();

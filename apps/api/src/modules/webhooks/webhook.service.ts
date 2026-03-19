@@ -12,6 +12,7 @@ import { InboxStatsService } from '../inbox-gateway/inbox-stats.service';
 import { findThaiPhones, formatThaiPhone } from '../../common/utils/phone.utils';
 import { pushGroupMessage } from '../../common/utils/line-notify.utils';
 import { SlipDetectionService } from '../slips/slip-detection.service';
+import { AiSuggestService } from '../messages/ai-suggest.service';
 
 @Injectable()
 export class WebhookService {
@@ -23,6 +24,7 @@ export class WebhookService {
     private readonly replyTokenCache: ReplyTokenCacheService,
     private readonly inboxGateway: InboxGateway,
     private readonly inboxStats: InboxStatsService,
+    private readonly aiSuggest: AiSuggestService,
   ) {}
 
   // ─── LINE Text Message ────────────────────────────────────────
@@ -141,6 +143,9 @@ export class WebhookService {
         lastMessagePreview: messagePreview,
       });
       this.inboxStats.refreshAndBroadcast();
+
+      // Auto-generate AI reply suggestions (fire-and-forget)
+      this.triggerAiSuggestions(customerId);
 
       this.logger.log(`Saved message for LINE user ${userId} on ${lineBot}`);
     } catch (error: any) {
@@ -371,6 +376,9 @@ export class WebhookService {
         lastMessagePreview: messagePreview,
       });
       this.inboxStats.refreshAndBroadcast();
+
+      // Auto-generate AI reply suggestions (fire-and-forget)
+      this.triggerAiSuggestions(customerId);
 
       this.logger.log(`Saved message for Facebook user ${senderID} on ${fbbot}`);
     } catch (error: any) {
@@ -733,17 +741,42 @@ export class WebhookService {
         });
 
         const buffer = Buffer.from(response.data);
-        const ext = mediaType === 'video' ? 'mp4' : mediaType === 'audio' ? 'm4a' : 'bin';
+        const contentType = response.headers['content-type'] || 'application/octet-stream';
+
+        // Determine file extension from original filename or content type
+        let ext = 'bin';
+        const originalName = message.fileName || '';
+        if (originalName.includes('.')) {
+          ext = originalName.split('.').pop() || 'bin';
+        } else if (mediaType === 'video') {
+          ext = 'mp4';
+        } else if (mediaType === 'audio') {
+          ext = 'm4a';
+        } else if (contentType.includes('pdf')) {
+          ext = 'pdf';
+        }
+
+        const fileName = originalName || `${messageID}.${ext}`;
         const bucket = this.firebase.storage.bucket();
-        const file = bucket.file(`chat-media/${customerId}/${messageID}.${ext}`);
-        await file.save(buffer);
+        const file = bucket.file(`chat-media/${customerId}/${fileName}`);
+        await file.save(buffer, {
+          metadata: {
+            contentType,
+            contentDisposition: `inline; filename="${fileName}"`,
+          },
+        });
         await file.makePublic();
         mediaUrl = file.publicUrl();
       } catch (err: any) {
         this.logger.warn(`Failed to download LINE ${mediaType}: ${err.message}`);
       }
 
-      const dbMediaType = mediaType === 'video' ? 'VIDEO' : 'IMAGE'; // Store all as IMAGE for mediaUrl rendering
+      // Determine DB media type
+      let dbMediaType: 'IMAGE' | 'VIDEO' | null = null;
+      if (mediaType === 'video') dbMediaType = 'VIDEO';
+      else if (mediaType === 'image') dbMediaType = 'IMAGE';
+      // file and audio: no mediaType (rendered as file/audio by text detection)
+
       const preview = mediaType === 'video' ? '[วิดีโอ]' : mediaType === 'audio' ? '[เสียง]' : `[ไฟล์: ${message.fileName || 'file'}]`;
 
       await this.ensureCustomerExists(userId, customerId, lineBot, 'LINE', accessToken);
@@ -1043,6 +1076,19 @@ export class WebhookService {
     } catch (error: any) {
       this.logger.error(`Failed to process FB sticker: ${error.message}`);
     }
+  }
+
+  // ─── Helper: Fire-and-forget AI suggestions ─────────────────
+
+  private triggerAiSuggestions(customerId: string) {
+    this.aiSuggest.invalidateCache(customerId);
+    this.aiSuggest.getSuggestions(customerId).then((suggestions) => {
+      if (suggestions.length > 0) {
+        this.inboxGateway.emitSuggestionsUpdate(customerId, suggestions);
+      }
+    }).catch((err) => {
+      this.logger.warn(`AI suggestions failed for ${customerId}: ${err.message}`);
+    });
   }
 
   // ─── Helper: Ensure customer exists ───────────────────────────

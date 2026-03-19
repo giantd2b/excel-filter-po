@@ -14,6 +14,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MessagesService } from './messages.service';
 import { FbSyncService } from './fb-sync.service';
+import { AiSuggestService } from './ai-suggest.service';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
 
 @Controller('messages')
@@ -22,7 +23,13 @@ export class MessagesController {
   constructor(
     private readonly messagesService: MessagesService,
     private readonly fbSyncService: FbSyncService,
+    private readonly aiSuggestService: AiSuggestService,
   ) {}
+
+  @Get(':userId/suggestions')
+  getSuggestions(@Param('userId') userId: string) {
+    return this.aiSuggestService.getSuggestions(userId);
+  }
 
   @Get(':userId')
   getMessages(

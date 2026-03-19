@@ -23,7 +23,6 @@ module.exports = {
       infoPlist: {
         NSPhotoLibraryUsageDescription: 'ใช้เลือกรูปภาพเพื่อส่งให้ลูกค้า',
         NSCameraUsageDescription: 'ใช้กล้องถ่ายรูปเพื่อส่งให้ลูกค้า',
-        NSFaceIDUsageDescription: 'ใช้ Face ID เพื่อเข้าสู่ระบบอย่างรวดเร็ว',
         ITSAppUsesNonExemptEncryption: false,
       },
     },
@@ -47,12 +46,6 @@ module.exports = {
       'expo-secure-store',
       'expo-notifications',
       'expo-document-picker',
-      [
-        'expo-local-authentication',
-        {
-          faceIDPermission: 'ใช้ Face ID เพื่อเข้าสู่ระบบ',
-        },
-      ],
     ],
     owner: 'giantd2b',
   },

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
 import { Send, Loader2, Image, X, Zap, Paperclip, FileText } from "lucide-react";
 import { QuickReplies } from "./QuickReplies";
 
@@ -11,11 +11,15 @@ interface MessageInputProps {
   placeholder?: string;
 }
 
-export function MessageInput({
+export interface MessageInputHandle {
+  setText: (text: string) => void;
+}
+
+export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(function MessageInput({
   onSend,
   disabled = false,
   placeholder = "Type a message...",
-}: MessageInputProps) {
+}, ref) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -23,6 +27,13 @@ export function MessageInput({
   const [showTemplates, setShowTemplates] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    setText: (newText: string) => {
+      setText(newText);
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    },
+  }));
 
   const adjustHeight = () => {
     const textarea = textareaRef.current;
@@ -283,4 +294,4 @@ export function MessageInput({
       </form>
     </div>
   );
-}
+});

@@ -12,6 +12,7 @@ import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module
 import { InboxGatewayModule } from './modules/inbox-gateway/inbox-gateway.module';
 import { TemplatesModule } from './modules/templates/templates.module';
 import { AdminsModule } from './modules/admins/admins.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AdminsModule } from './modules/admins/admins.module';
     InboxGatewayModule,
     TemplatesModule,
     AdminsModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

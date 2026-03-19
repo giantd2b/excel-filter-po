@@ -11,6 +11,7 @@ import BankAccountsPage from "@/pages/BankAccountsPage";
 import SlipReportPage from "@/pages/SlipReportPage";
 import AdminsPage from "@/pages/AdminsPage";
 import TemplatesPage from "@/pages/TemplatesPage";
+import AnalyticsPage from "@/pages/AnalyticsPage";
 
 export const router = createBrowserRouter([
   {
@@ -58,6 +59,10 @@ export const router = createBrowserRouter([
       {
         path: "admins",
         element: <AdminsPage />,
+      },
+      {
+        path: "analytics",
+        element: <AnalyticsPage />,
       },
       {
         path: "templates",

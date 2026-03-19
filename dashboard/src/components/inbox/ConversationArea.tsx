@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChatUser, Message } from "@/types/inbox";
 import { MessageBubble, DateDivider } from "./MessageBubble";
-import { MessageInput } from "./MessageInput";
+import { MessageInput, MessageInputHandle } from "./MessageInput";
+import { AISuggestions } from "./AISuggestions";
 import { EmptyState } from "./EmptyState";
 import { useMessagesSocket } from "@/hooks/useWebSocket";
 import { markAsRead, sendMessage, uploadChatMedia } from "@/lib/api-service";
@@ -29,6 +30,7 @@ export function ConversationArea({
 }: ConversationAreaProps) {
   const [, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageInputRef = useRef<MessageInputHandle>(null);
   const prevMessagesLength = useRef(0);
 
   const handleNewMessage = useCallback(() => {
@@ -55,6 +57,10 @@ export function ConversationArea({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUser?.id]);
+
+  const handleSuggestionSelect = useCallback((text: string) => {
+    messageInputRef.current?.setText(text);
+  }, []);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -248,8 +254,15 @@ export function ConversationArea({
         )}
       </div>
 
+      {/* AI Suggestions */}
+      <AISuggestions
+        customerId={selectedUser.id}
+        onSelect={handleSuggestionSelect}
+      />
+
       {/* Input */}
       <MessageInput
+        ref={messageInputRef}
         onSend={handleSendMessage}
         disabled={loading || !!error}
         placeholder={`Reply to ${selectedUser.displayName}...`}

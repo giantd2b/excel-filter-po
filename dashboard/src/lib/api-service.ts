@@ -226,6 +226,12 @@ export async function sendMessage(
   return api.post<SendMessageResult>("/messages/send", params);
 }
 
+// ─── AI Suggestions ─────────────────────────────────────────────
+
+export async function getAiSuggestions(customerId: string): Promise<string[]> {
+  return api.get<string[]>(`/messages/${customerId}/suggestions`);
+}
+
 // ─── Slip Records ───────────────────────────────────────────────────
 
 export interface SlipRecord {
