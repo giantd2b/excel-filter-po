@@ -91,23 +91,33 @@ export class MessagesService {
       throw new BadRequestException('Invalid channel format');
     }
 
-    // Build platform messages
-    if (isLine) {
-      const messages = this.buildLineMessages(text, mediaType, mediaUrl, previewUrl);
-      await this.sendLineMessage(oduserId, messages, channel);
-    } else {
-      await this.sendFacebookMessage(oduserId, text, mediaType, mediaUrl, channel);
-    }
-
-    // Save outgoing message to PostgreSQL
+    // Send to platform — track success/failure
     const messageId = `out_${Date.now()}`;
     const timestamp = Date.now();
+    let status = 'sent';
+    let sendError: string | null = null;
+    let sendMethod: string | null = null;
+
+    try {
+      if (isLine) {
+        const messages = this.buildLineMessages(text, mediaType, mediaUrl, previewUrl);
+        sendMethod = await this.sendLineMessage(oduserId, messages, channel);
+      } else {
+        await this.sendFacebookMessage(oduserId, text, mediaType, mediaUrl, channel);
+        sendMethod = 'facebook';
+      }
+      status = 'sent';
+    } catch (err: any) {
+      status = 'failed';
+      sendError = err.response?.data?.message || err.message || 'Unknown error';
+      this.logger.error(`Failed to send message to ${channel}:${oduserId}: ${sendError}`);
+    }
 
     const preview = mediaType
       ? `[You] [${mediaType === 'image' ? 'รูปภาพ' : 'วิดีโอ'}]`
       : `[You] ${(text || '').substring(0, 80)}`;
 
-    // Save message + update customer in a transaction
+    // Save message with delivery status
     await this.prisma.$transaction([
       this.prisma.message.create({
         data: {
@@ -117,7 +127,7 @@ export class MessagesService {
           type: 'OUTGOING',
           sender: 'ADMIN',
           timestamp: BigInt(timestamp),
-          status: 'sent',
+          status,
           adminId: adminId || null,
           adminName: adminName || null,
           mediaType: mediaType === 'image' ? 'IMAGE' : mediaType === 'video' ? 'VIDEO' : null,
@@ -163,7 +173,7 @@ export class MessagesService {
       type: 'outgoing',
       sender: 'admin',
       timestamp,
-      status: 'sent',
+      status,
       adminId: adminId || null,
       adminName: adminName || null,
       mediaType: mediaType || undefined,
@@ -173,10 +183,17 @@ export class MessagesService {
       id: docId,
       channel,
       lastmessagetime: timestamp,
-      lastMessagePreview: preview,
+      lastMessagePreview: status === 'failed' ? `[ส่งไม่สำเร็จ] ${preview}` : preview,
     });
 
-    return { success: true, messageId, timestamp };
+    return {
+      success: status === 'sent',
+      messageId,
+      timestamp,
+      status,
+      sendMethod,
+      error: sendError,
+    };
   }
 
   // ─── LINE ─────────────────────────────────────────────────────────
@@ -210,7 +227,7 @@ export class MessagesService {
     return messages;
   }
 
-  private async sendLineMessage(userId: string, messages: any[], channel: string) {
+  private async sendLineMessage(userId: string, messages: any[], channel: string): Promise<string> {
     const accessToken = getLineAccessToken(channel);
 
     // Try Reply API first (free)
@@ -227,7 +244,7 @@ export class MessagesService {
           data: { replyToken: cached.replyToken, messages },
         });
         this.logger.log(`Reply API used for ${userId} — FREE`);
-        return;
+        return 'line_reply';
       } catch (err: any) {
         this.logger.warn(
           `Reply API failed, falling back to Push: ${err.response?.data?.message || err.message}`,
@@ -246,6 +263,7 @@ export class MessagesService {
       data: { to: userId, messages },
     });
     this.logger.log(`Push API used for ${userId} — QUOTA`);
+    return 'line_push';
   }
 
   // ─── Facebook ─────────────────────────────────────────────────────
