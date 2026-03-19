@@ -388,6 +388,16 @@ export async function bulkImportKnowledge(
   return api.post<{ count: number }>("/knowledge/import", entries);
 }
 
+// ─── AI System Prompt ────────────────────────────────────────────────
+
+export async function getSystemPrompt(): Promise<{ prompt: string | null }> {
+  return api.get<{ prompt: string | null }>("/knowledge/system-prompt");
+}
+
+export async function updateSystemPrompt(prompt: string): Promise<void> {
+  await api.put("/knowledge/system-prompt", { prompt });
+}
+
 // ─── Customer Details ────────────────────────────────────────────────
 
 export async function getCustomerDetails(id: string) {

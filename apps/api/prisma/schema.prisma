@@ -352,6 +352,14 @@ model KnowledgeEntry {
   @@map("knowledge_entries")
 }
 
+model SystemSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
 model Product {
   id          String   @id @default(uuid())
   name        String

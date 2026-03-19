@@ -13,11 +13,15 @@ import {
 } from '@nestjs/common';
 import { KnowledgeService } from './knowledge.service';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
+import { PrismaService } from '../../common/providers/prisma.service';
 
 @Controller('knowledge')
 @UseGuards(FirebaseAuthGuard)
 export class KnowledgeController {
-  constructor(private readonly knowledgeService: KnowledgeService) {}
+  constructor(
+    private readonly knowledgeService: KnowledgeService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get()
   findAll(
@@ -42,6 +46,25 @@ export class KnowledgeController {
   @Get('prompt-text')
   getPromptText() {
     return this.knowledgeService.getAllKnowledgeAsText();
+  }
+
+  @Get('system-prompt')
+  async getSystemPrompt() {
+    const setting = await this.prisma.systemSetting.findUnique({ where: { key: 'ai_system_prompt' } });
+    return { prompt: setting?.value || null };
+  }
+
+  @Put('system-prompt')
+  async updateSystemPrompt(@Body() body: { prompt: string }, @Req() req: any) {
+    if (req.admin.role !== 'SUPER_ADMIN' && req.admin.role !== 'ADMIN') {
+      throw new ForbiddenException('Only ADMIN or SUPER_ADMIN can edit system prompt');
+    }
+    await this.prisma.systemSetting.upsert({
+      where: { key: 'ai_system_prompt' },
+      update: { value: body.prompt },
+      create: { key: 'ai_system_prompt', value: body.prompt },
+    });
+    return { success: true };
   }
 
   @Get(':id')

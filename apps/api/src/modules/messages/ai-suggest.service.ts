@@ -26,6 +26,44 @@ export class AiSuggestService {
     private readonly knowledgeService: KnowledgeService,
   ) {}
 
+  private static readonly DEFAULT_SYSTEM_PROMPT = `You are a Thai customer service agent for เติมบุญ บาย ไอริส (Temboon by IRIS), a catering and merit ceremony business.
+
+We offer 6 service categories:
+1. งานบุญ/งานทำบุญ/พิธีสงฆ์
+2. งานจัดเลี้ยงอาหารไทยบุฟเฟต์
+3. งานจัดเลี้ยงโต๊ะจีน
+4. งานจัดเลี้ยง Cocktail/Canapé
+5. งานแต่งงาน
+6. งานบุฟเฟต์อินเตอร์ (International Buffet)
+
+RULES:
+- First, detect which service the customer is asking about from the conversation context
+- Use EXACT prices and info from the knowledge base for that service
+- If the service has no knowledge base data, suggest helpful general replies only
+- For unknown services, suggest "สอบถามรายละเอียดเพิ่มเติมได้เลยค่ะ"
+- Suggest 3 short reply messages in Thai
+- Keep replies natural, polite (ค่ะ/ครับ), and helpful
+- Each reply must be under 100 characters
+- NEVER make up prices or info not in the knowledge base
+- Return ONLY a JSON array of 3 strings, no explanation, no markdown.`;
+
+  private systemPromptCache: { text: string; timestamp: number } | null = null;
+  private readonly PROMPT_CACHE_TTL = 300_000; // 5 minutes
+
+  private async getSystemPrompt(): Promise<string> {
+    if (this.systemPromptCache && Date.now() - this.systemPromptCache.timestamp < this.PROMPT_CACHE_TTL) {
+      return this.systemPromptCache.text;
+    }
+    try {
+      const setting = await this.prisma.systemSetting.findUnique({ where: { key: 'ai_system_prompt' } });
+      const text = setting?.value || AiSuggestService.DEFAULT_SYSTEM_PROMPT;
+      this.systemPromptCache = { text, timestamp: Date.now() };
+      return text;
+    } catch {
+      return AiSuggestService.DEFAULT_SYSTEM_PROMPT;
+    }
+  }
+
   /**
    * Build knowledge base text: prefer DB, fall back to static .ts files.
    */
@@ -127,32 +165,12 @@ ${KB_WEDDING}`;
       // Get knowledge base text (DB with fallback)
       const knowledgeText = await this.getKnowledgeBaseText();
 
-      const prompt = `You are a Thai customer service agent for เติมบุญ บาย ไอริส (Temboon by IRIS), a catering and merit ceremony business.
+      // Get system prompt from DB or use default
+      const systemPrompt = await this.getSystemPrompt();
 
-We offer 6 service categories:
-1. งานบุญ/งานทำบุญ/พิธีสงฆ์
-2. งานจัดเลี้ยงอาหารไทยบุฟเฟต์
-3. งานจัดเลี้ยงโต๊ะจีน
-4. งานจัดเลี้ยง Cocktail/Canapé
-5. งานแต่งงาน
-6. งานบุฟเฟต์อินเตอร์ (International Buffet)
+      const prompt = `${systemPrompt}
 
 ${knowledgeText}
-
-RULES:
-- First, detect which service the customer is asking about from the conversation context
-- If about งานบุญ/พิธีสงฆ์: Use EXACT prices and info from the งานบุญ knowledge base
-- If about อาหารไทยบุฟเฟต์: Use EXACT prices and info from the อาหารไทยบุฟเฟต์ knowledge base
-- If about โต๊ะจีน: Use EXACT prices, menus, and info from the โต๊ะจีน knowledge base
-- If about Cocktail/Canapé: Use EXACT prices and info from the Cocktail & Canapé knowledge base
-- If about งานแต่งงาน: Use EXACT prices and info from the งานแต่งงาน knowledge base
-- If about International Buffet: suggest helpful general replies only — DO NOT quote prices you don't have
-- For unknown services, suggest "สอบถามรายละเอียดเพิ่มเติมได้เลยค่ะ" or similar
-- Suggest 3 short reply messages in Thai
-- Keep replies natural, polite (ค่ะ/ครับ), and helpful
-- Each reply must be under 100 characters
-- NEVER make up prices or info not in the knowledge base
-- Return ONLY a JSON array of 3 strings, no explanation, no markdown.
 
 ข้อมูลลูกค้า:
 ${contextInfo}

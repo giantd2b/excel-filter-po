@@ -5,6 +5,8 @@ import {
   updateKnowledgeEntry,
   deleteKnowledgeEntry,
   bulkImportKnowledge,
+  getSystemPrompt,
+  updateSystemPrompt,
   KnowledgeEntry,
 } from "@/lib/api-service";
 import {
@@ -18,6 +20,7 @@ import {
   Save,
   Upload,
   Eye,
+  Bot,
   EyeOff,
   ChevronDown,
   BarChart3,
@@ -90,6 +93,10 @@ export default function KnowledgePage() {
   const [importJson, setImportJson] = useState("");
   const [importing, setImporting] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [promptText, setPromptText] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptSaving, setPromptSaving] = useState(false);
 
   useEffect(() => {
     fetchEntries();
@@ -273,6 +280,27 @@ export default function KnowledgePage() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={async () => {
+              setShowPromptEditor(!showPromptEditor);
+              if (!showPromptEditor && !promptText) {
+                setPromptLoading(true);
+                try {
+                  const res = await getSystemPrompt();
+                  setPromptText(res.prompt || "");
+                } catch {}
+                setPromptLoading(false);
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg transition-colors ${
+              showPromptEditor
+                ? "bg-indigo-50 text-indigo-600 border-indigo-200"
+                : "text-slate-600 bg-white border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            <Bot className="w-4 h-4" />
+            AI Prompt
+          </button>
+          <button
             onClick={() => setShowStats(!showStats)}
             className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
           >
@@ -299,6 +327,68 @@ export default function KnowledgePage() {
           </button>
         </div>
       </div>
+
+      {/* AI Prompt Editor */}
+      {showPromptEditor && (
+        <div className="bg-white rounded-xl border border-indigo-200 p-5 mb-6 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Bot className="w-4 h-4 text-indigo-500" />
+              AI System Prompt
+            </h3>
+            <button
+              onClick={() => setShowPromptEditor(false)}
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 mb-3">
+            แก้ไข prompt ที่ AI ใช้ในการแนะนำคำตอบ ข้อมูลจาก Knowledge Base จะถูกเพิ่มต่อท้ายอัตโนมัติ
+          </p>
+          {promptLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+            </div>
+          ) : (
+            <>
+              <textarea
+                value={promptText}
+                onChange={(e) => setPromptText(e.target.value)}
+                rows={12}
+                placeholder="ใส่ system prompt สำหรับ AI... (เว้นว่างจะใช้ค่าเริ่มต้น)"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono resize-y"
+              />
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-[10px] text-slate-400">
+                  เว้นว่างจะใช้ prompt เริ่มต้น • Knowledge Base จะถูกเพิ่มต่อท้ายอัตโนมัติ • Cache 5 นาที
+                </p>
+                <button
+                  onClick={async () => {
+                    setPromptSaving(true);
+                    try {
+                      await updateSystemPrompt(promptText);
+                      alert("บันทึก prompt สำเร็จ");
+                    } catch {
+                      alert("ไม่สามารถบันทึกได้");
+                    }
+                    setPromptSaving(false);
+                  }}
+                  disabled={promptSaving}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 text-sm font-medium"
+                >
+                  {promptSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  บันทึก Prompt
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       {showStats && (
