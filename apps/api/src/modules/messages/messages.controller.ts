@@ -61,13 +61,17 @@ export class MessagesController {
   }
 
   @Post('fb-sync')
-  syncFacebookReplies() {
+  syncFacebookReplies(@Req() req: any) {
     return this.fbSyncService.syncNow();
   }
 
   @Post('fb-sync/full')
-  syncFacebookFull() {
-    return this.fbSyncService.syncFullHistory();
+  syncFacebookFull(@Req() req: any) {
+    // Run in background, return immediately
+    this.fbSyncService.syncFullHistory().catch((e) =>
+      console.error('Full sync error:', e.message),
+    );
+    return { status: 'started', message: 'Full sync running in background' };
   }
 
   @Post('send')
