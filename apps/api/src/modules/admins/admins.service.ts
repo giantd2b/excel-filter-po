@@ -105,4 +105,28 @@ export class AdminsService {
       },
     });
   }
+
+  // ─── Auth Logs ─────────────────────────────────────────────
+
+  async createAuthLog(data: {
+    adminId: string;
+    email: string;
+    action: string;
+    ip?: string;
+    userAgent?: string;
+    platform?: string;
+  }) {
+    return this.prisma.authLog.create({ data });
+  }
+
+  async getAuthLogs(limit = 50, adminId?: string) {
+    const where: any = {};
+    if (adminId) where.adminId = adminId;
+
+    return this.prisma.authLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
 }

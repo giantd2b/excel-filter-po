@@ -1,10 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import axios from 'axios';
 import { PrismaService } from '../../common/providers/prisma.service';
 import { InboxGateway } from '../inbox-gateway/inbox-gateway.gateway';
 import { InboxStatsService } from '../inbox-gateway/inbox-stats.service';
+import { getLineAccessToken, getFacebookPageToken } from '../../common/utils/channel-tokens';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly inboxGateway: InboxGateway,
@@ -31,15 +35,27 @@ export class UsersService {
     return this.prisma.customer.findUnique({ where: { id } });
   }
 
-  async getStats() {
+  async getStats(month?: string) {
+    // month format: "2026-03" — if provided, filter by firstContactAt in that month
+    let dateFilter: any = undefined;
+    if (month) {
+      const [y, m] = month.split('-').map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 1);
+      dateFilter = { firstContactAt: { gte: start, lt: end } };
+    }
+
+    const where = dateFilter || {};
+
     const [total, line, facebook] = await Promise.all([
-      this.prisma.customer.count(),
-      this.prisma.customer.count({ where: { channelType: 'LINE' } }),
-      this.prisma.customer.count({ where: { channelType: 'FACEBOOK' } }),
+      this.prisma.customer.count({ where }),
+      this.prisma.customer.count({ where: { ...where, channelType: 'LINE' } }),
+      this.prisma.customer.count({ where: { ...where, channelType: 'FACEBOOK' } }),
     ]);
 
     const channelCounts = await this.prisma.customer.groupBy({
       by: ['channel'],
+      where,
       _count: true,
     });
 
@@ -48,7 +64,22 @@ export class UsersService {
       channels[c.channel] = c._count;
     });
 
-    return { total, line, facebook, channels };
+    // Message counts for the period
+    let messageFilter: any = undefined;
+    if (month) {
+      const [y, m] = month.split('-').map(Number);
+      const startMs = new Date(y, m - 1, 1).getTime();
+      const endMs = new Date(y, m, 1).getTime();
+      messageFilter = { timestamp: { gte: BigInt(startMs), lt: BigInt(endMs) } };
+    }
+    const msgWhere = messageFilter || {};
+    const [totalMessages, incomingMessages, outgoingMessages] = await Promise.all([
+      this.prisma.message.count({ where: msgWhere }),
+      this.prisma.message.count({ where: { ...msgWhere, type: 'INCOMING' } }),
+      this.prisma.message.count({ where: { ...msgWhere, type: 'OUTGOING' } }),
+    ]);
+
+    return { total, line, facebook, channels, totalMessages, incomingMessages, outgoingMessages };
   }
 
   async getNewCustomers(days = 7) {
@@ -116,7 +147,53 @@ export class UsersService {
     });
     this.inboxStats.refreshAndBroadcast();
 
+    // Mark as read on platform (fire-and-forget)
+    this.markAsReadOnPlatform(customer).catch(() => {});
+
     return { success: true };
+  }
+
+  /**
+   * Mark messages as read on LINE / Facebook platforms.
+   */
+  private async markAsReadOnPlatform(customer: any) {
+    const channel = customer.channel || '';
+
+    if (channel.startsWith('Line_') && customer.markAsReadToken) {
+      // LINE: Mark as Read API
+      try {
+        const accessToken = getLineAccessToken(channel);
+        await axios.post(
+          'https://api.line.me/v2/bot/chat/markAsRead',
+          { markAsReadToken: customer.markAsReadToken },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+        );
+        this.logger.log(`Marked as read on LINE for ${customer.id}`);
+      } catch (err: any) {
+        this.logger.warn(`LINE markAsRead failed: ${err.response?.data?.message || err.message}`);
+      }
+    } else if (channel.startsWith('FB_')) {
+      // Facebook: Send mark_seen action
+      try {
+        const pageToken = getFacebookPageToken(channel);
+        await axios.post(
+          'https://graph.facebook.com/v18.0/me/messages',
+          {
+            recipient: { id: customer.platformUserId },
+            sender_action: 'mark_seen',
+          },
+          { params: { access_token: pageToken } },
+        );
+        this.logger.log(`Marked as seen on Facebook for ${customer.id}`);
+      } catch (err: any) {
+        this.logger.warn(`FB mark_seen failed: ${err.response?.data?.error?.message || err.message}`);
+      }
+    }
   }
 
   // ─── CRM: Tags ────────────────────────────────────────────────
@@ -181,6 +258,13 @@ export class UsersService {
     return this.prisma.customer.update({
       where: { id: customerId },
       data: { assignedToId: null, assignedToName: null, assignedAt: null },
+    });
+  }
+
+  async setNickname(customerId: string, nickname: string | null) {
+    return this.prisma.customer.update({
+      where: { id: customerId },
+      data: { nickname: nickname?.trim() || null },
     });
   }
 

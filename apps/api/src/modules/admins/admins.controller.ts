@@ -5,9 +5,11 @@ import {
   Put,
   Param,
   Body,
+  Query,
   Req,
   UseGuards,
   ForbiddenException,
+  Headers,
 } from '@nestjs/common';
 import { AdminsService } from './admins.service';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
@@ -91,5 +93,37 @@ export class AdminsController {
   @Roles('SUPER_ADMIN')
   activate(@Param('id') id: string) {
     return this.adminsService.activate(id);
+  }
+
+  // ─── Auth Logs ─────────────────────────────────────────────
+
+  @Post('auth-log')
+  async logAuth(
+    @Req() req: any,
+    @Body() body: { action: string; platform?: string },
+    @Headers('x-forwarded-for') forwardedFor?: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    const ip = forwardedFor || req.ip || req.connection?.remoteAddress;
+    return this.adminsService.createAuthLog({
+      adminId: req.user?.uid || req.admin?.id || 'unknown',
+      email: req.user?.email || req.admin?.email || 'unknown',
+      action: body.action,
+      ip,
+      userAgent,
+      platform: body.platform,
+    });
+  }
+
+  @Get('auth-logs')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  getAuthLogs(
+    @Query('limit') limit?: string,
+    @Query('adminId') adminId?: string,
+  ) {
+    return this.adminsService.getAuthLogs(
+      limit ? parseInt(limit, 10) : 50,
+      adminId,
+    );
   }
 }

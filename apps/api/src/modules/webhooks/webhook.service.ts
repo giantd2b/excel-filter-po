@@ -62,6 +62,9 @@ export class WebhookService {
       // Composite ID: userId__channel (separate chat per channel)
       const customerId = `${proFile.userId}__${lineBot}`;
 
+      // Save markAsReadToken from webhook event (LINE only, never expires)
+      const markAsReadToken = event.markAsReadToken || null;
+
       // Upsert customer in PostgreSQL
       await this.prisma.customer.upsert({
         where: { id: customerId },
@@ -75,6 +78,7 @@ export class WebhookService {
           channelType: 'LINE',
           statusMessage: proFile.statusMessage || null,
           phoneNumber: phoneNumber || null,
+          markAsReadToken,
           unreadCount: 1,
           lastMessageAt: new Date(messageTime),
           lastMessagePreview: messagePreview,
@@ -82,6 +86,7 @@ export class WebhookService {
         },
         update: {
           displayName: proFile.displayName,
+          ...(markAsReadToken && { markAsReadToken }),
           ...(profileImg && { pictureUrl: profileImg, profilePic: proFile.pictureUrl }),
           ...(phoneNumber && { phoneNumber }),
           unreadCount: { increment: 1 },

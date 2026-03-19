@@ -13,6 +13,7 @@ model Customer {
   id                String             @id // Format: {userId}__{channel} for uniqueness per channel
   platformUserId    String             @map("platform_user_id") // Original LINE userId or FB PSID
   displayName       String             @map("display_name")
+  nickname          String?            // Admin-editable name, separate from platform displayName
   firstName         String?            @map("first_name")
   lastName          String?            @map("last_name")
   pictureUrl        String?            @map("picture_url")
@@ -21,6 +22,9 @@ model Customer {
   channelType       ChannelType        @map("channel_type")
   phoneNumber       String?            @map("phone_number")
   statusMessage     String?            @map("status_message")
+
+  // Platform read token (LINE markAsReadToken — never expires)
+  markAsReadToken   String?            @map("mark_as_read_token")
 
   // Chat state
   status            ConversationStatus @default(OPEN)
@@ -294,6 +298,24 @@ enum AdminRole {
   SUPER_ADMIN
   ADMIN
   AGENT
+}
+
+// ─── Auth Logs ─────────────────────────────────────────────────────
+
+model AuthLog {
+  id        String   @id @default(uuid())
+  adminId   String   @map("admin_id")
+  email     String
+  action    String   // "login", "logout", "token_refresh", "login_failed"
+  ip        String?
+  userAgent String?  @map("user_agent")
+  platform  String?  // "web", "mobile_ios", "mobile_android"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("auth_logs")
 }
 
 model Product {

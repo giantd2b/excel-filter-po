@@ -21,8 +21,8 @@ export class UsersController {
   }
 
   @Get('stats')
-  getStats() {
-    return this.usersService.getStats();
+  getStats(@Query('month') month?: string) {
+    return this.usersService.getStats(month);
   }
 
   @Get('new')
@@ -98,6 +98,14 @@ export class UsersController {
   @Post(':id/unassign')
   unassign(@Param('id') id: string) {
     return this.usersService.unassign(id);
+  }
+
+  @Post(':id/nickname')
+  setNickname(
+    @Param('id') id: string,
+    @Body() body: { nickname: string | null },
+  ) {
+    return this.usersService.setNickname(id, body.nickname);
   }
 
   @Post(':id/status')

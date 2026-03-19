@@ -46,7 +46,9 @@ export class ConversationsController {
     return customers.map((c) => ({
       id: c.id,
       oduserId: c.platformUserId,
-      displayName: c.displayName,
+      displayName: c.nickname || c.displayName,
+      nickname: c.nickname || null,
+      platformName: c.displayName,
       pictureUrl: c.pictureUrl || '',
       channel: c.channel,
       channelType: c.channelType === 'LINE' ? 'line' : 'facebook',
