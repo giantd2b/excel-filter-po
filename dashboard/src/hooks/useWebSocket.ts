@@ -51,6 +51,9 @@ export function useConversationsSocket({
         lastmessagetime: u.lastmessagetime || 0,
         unreadCount: u.unreadCount || 0,
         lastMessagePreview: u.lastMessagePreview || "",
+        status: u.status,
+        assignedToName: u.assignedToName,
+        tags: u.tags || [],
       }));
 
       setConversations(mapped);
