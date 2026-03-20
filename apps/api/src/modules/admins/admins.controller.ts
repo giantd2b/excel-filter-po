@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Param,
   Body,
   Query,
@@ -93,6 +94,47 @@ export class AdminsController {
   @Roles('SUPER_ADMIN')
   activate(@Param('id') id: string) {
     return this.adminsService.activate(id);
+  }
+
+  // ─── API Keys ──────────────────────────────────────────────
+
+  @Get('api-keys')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  getApiKeys() {
+    return this.adminsService.getApiKeys();
+  }
+
+  @Post('api-keys')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  createApiKey(
+    @Req() req: any,
+    @Body() body: { name: string },
+  ) {
+    return this.adminsService.createApiKey(body.name, req.admin?.id || req.user?.uid);
+  }
+
+  @Post('api-keys/:id/deactivate')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  deactivateApiKey(@Param('id') id: string) {
+    return this.adminsService.deactivateApiKey(id);
+  }
+
+  @Post('api-keys/:id/activate')
+  @Roles('SUPER_ADMIN', 'ADMIN')
+  activateApiKey(@Param('id') id: string) {
+    return this.adminsService.activateApiKey(id);
+  }
+
+  @Delete('api-keys/:id')
+  @Roles('SUPER_ADMIN')
+  deleteApiKey(@Param('id') id: string) {
+    return this.adminsService.deleteApiKey(id);
+  }
+
+  @Post('api-keys/:id/delete')
+  @Roles('SUPER_ADMIN')
+  deleteApiKeyPost(@Param('id') id: string) {
+    return this.adminsService.deleteApiKey(id);
   }
 
   // ─── Push Tokens ────────────────────────────────────────────

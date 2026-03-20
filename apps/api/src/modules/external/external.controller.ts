@@ -9,11 +9,23 @@ import { PrismaService } from '../../common/providers/prisma.service';
 export class ExternalController {
   constructor(private readonly prisma: PrismaService) {}
 
-  private validateApiKey(apiKey: string | undefined) {
-    const validKey = process.env.EXTERNAL_API_KEY;
-    if (!validKey || apiKey !== validKey) {
+  private async validateApiKey(apiKey: string | undefined) {
+    if (!apiKey) {
       throw new UnauthorizedException('Invalid or missing API key. Use X-API-Key header.');
     }
+
+    // Check env var (legacy)
+    const envKey = process.env.EXTERNAL_API_KEY;
+    if (envKey && apiKey === envKey) return;
+
+    // Check DB keys
+    const dbKey = await this.prisma.apiKey.findUnique({ where: { key: apiKey } });
+    if (!dbKey || !dbKey.isActive) {
+      throw new UnauthorizedException('Invalid or missing API key. Use X-API-Key header.');
+    }
+
+    // Update last used (fire-and-forget)
+    this.prisma.apiKey.update({ where: { id: dbKey.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
   }
 
   /**
@@ -30,7 +42,7 @@ export class ExternalController {
     @Query('limit') limitStr?: string,
     @Query('offset') offsetStr?: string,
   ) {
-    this.validateApiKey(apiKey);
+    await this.validateApiKey(apiKey);
 
     const limit = limitStr ? parseInt(limitStr, 10) : 50;
     const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
@@ -108,7 +120,7 @@ export class ExternalController {
     @Headers('x-api-key') apiKey: string,
     @Param('id') id: string,
   ) {
-    this.validateApiKey(apiKey);
+    await this.validateApiKey(apiKey);
 
     const customer = await this.prisma.customer.findUnique({
       where: { id },
@@ -155,7 +167,7 @@ export class ExternalController {
     @Query('limit') limitStr?: string,
     @Query('before') before?: string,
   ) {
-    this.validateApiKey(apiKey);
+    await this.validateApiKey(apiKey);
 
     const limit = limitStr ? parseInt(limitStr, 10) : 50;
     const where: any = { customerId: id };
@@ -204,7 +216,7 @@ export class ExternalController {
    */
   @Get('channels')
   async getChannels(@Headers('x-api-key') apiKey: string) {
-    this.validateApiKey(apiKey);
+    await this.validateApiKey(apiKey);
 
     const stats = await this.prisma.customer.groupBy({
       by: ['channel', 'channelType'],
@@ -231,7 +243,7 @@ export class ExternalController {
     @Headers('x-api-key') apiKey: string,
     @Query('platformUserId') platformUserId: string,
   ) {
-    this.validateApiKey(apiKey);
+    await this.validateApiKey(apiKey);
 
     if (!platformUserId) return { error: 'platformUserId is required' };
 

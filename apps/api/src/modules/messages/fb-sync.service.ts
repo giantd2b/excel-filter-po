@@ -125,6 +125,19 @@ export class FbSyncService {
           });
           if (existingOriginal) continue;
 
+          // Check by same text + same timestamp (within 5 seconds) to avoid duplicates
+          if (msg.message) {
+            const existingByText = await this.prisma.message.findFirst({
+              where: {
+                customerId,
+                text: msg.message,
+                type: 'OUTGOING',
+                timestamp: { gte: BigInt(timestamp - 5000), lte: BigInt(timestamp + 5000) },
+              },
+            });
+            if (existingByText) continue;
+          }
+
           // Determine content
           let text = msg.message || null;
           let mediaType: 'IMAGE' | 'VIDEO' | null = null;

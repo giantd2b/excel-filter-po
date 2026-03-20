@@ -109,6 +109,51 @@ export class AdminsService {
     });
   }
 
+  // ─── API Keys ─────────────────────────────────────────────
+
+  async getApiKeys() {
+    return this.prisma.apiKey.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createApiKey(name: string, createdBy: string) {
+    const crypto = require('crypto');
+    const key = 'iris-crm-' + crypto.randomBytes(24).toString('hex');
+    return this.prisma.apiKey.create({
+      data: { name, key, createdBy },
+    });
+  }
+
+  async deactivateApiKey(id: string) {
+    return this.prisma.apiKey.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
+
+  async activateApiKey(id: string) {
+    return this.prisma.apiKey.update({
+      where: { id },
+      data: { isActive: true },
+    });
+  }
+
+  async deleteApiKey(id: string) {
+    return this.prisma.apiKey.delete({ where: { id } });
+  }
+
+  async validateApiKey(key: string): Promise<boolean> {
+    const apiKey = await this.prisma.apiKey.findUnique({ where: { key } });
+    if (!apiKey || !apiKey.isActive) return false;
+    // Update last used
+    this.prisma.apiKey.update({
+      where: { id: apiKey.id },
+      data: { lastUsedAt: new Date() },
+    }).catch(() => {});
+    return true;
+  }
+
   // ─── Push Tokens ───────────────────────────────────────────
 
   async registerPushToken(adminId: string, token: string, platform: string) {
