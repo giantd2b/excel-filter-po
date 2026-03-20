@@ -274,4 +274,47 @@ export class UsersService {
       data: { status },
     });
   }
+
+  /**
+   * Look up customer's jobs from IRIS Jobs API by phone number.
+   * Auto-tags customer with "ลูกค้าจองงานแล้ว" if jobs found.
+   */
+  async getCustomerJobs(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { phoneNumber: true },
+    });
+
+    if (!customer?.phoneNumber) {
+      return { jobs: [], matched: false, reason: 'No phone number' };
+    }
+
+    const cleanPhone = customer.phoneNumber.replace(/[-\s]/g, '');
+
+    try {
+      const JOBS_API = 'https://iris-job.vercel.app/api/external/lookup';
+      const JOBS_KEY = process.env.IRIS_JOBS_API_KEY || 'iris-jobs-7cba15f1c6f5de3a3365554e6e36eb01fdd4f4b6184288045b709869312d9819';
+
+      const resp = await axios.get(`${JOBS_API}?phone=${cleanPhone}`, {
+        headers: { 'X-API-Key': JOBS_KEY },
+        timeout: 5000,
+      });
+
+      const jobs = resp.data?.data || [];
+
+      if (jobs.length > 0) {
+        // Auto-tag with "ลูกค้าจองงานแล้ว"
+        await this.addTag(customerId, 'ลูกค้าจองงานแล้ว', '#884929').catch(() => {});
+      }
+
+      return {
+        jobs,
+        matched: jobs.length > 0,
+        phone: customer.phoneNumber,
+      };
+    } catch (err: any) {
+      this.logger.warn(`IRIS Jobs lookup failed: ${err.message}`);
+      return { jobs: [], matched: false, reason: 'API error' };
+    }
+  }
 }

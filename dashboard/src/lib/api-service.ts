@@ -230,6 +230,12 @@ export async function sendMessage(
   return api.post<SendMessageResult>("/messages/send", params);
 }
 
+// ─── IRIS Jobs Lookup ────────────────────────────────────────────────
+
+export async function getCustomerJobs(customerId: string) {
+  return api.get<{ jobs: any[]; matched: boolean; phone?: string }>(`/users/${customerId}/jobs`);
+}
+
 // ─── AI Suggestions ─────────────────────────────────────────────
 
 export async function getAiSuggestions(customerId: string): Promise<string[]> {

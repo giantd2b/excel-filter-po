@@ -11,6 +11,7 @@ import {
   unassignCustomer,
   setCustomerStatus,
   setCustomerNickname,
+  getCustomerJobs,
 } from "@/lib/api-service";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -31,6 +32,8 @@ import {
   UserCheck,
   UserX,
   Circle,
+  Briefcase,
+  ExternalLink,
 } from "lucide-react";
 
 interface CustomerInfoPanelProps {
@@ -61,10 +64,15 @@ export function CustomerInfoPanel({
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
 
+  // Jobs
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+
   useEffect(() => {
     if (!userId) {
       setDetails(null);
       setNotes([]);
+      setJobs([]);
       return;
     }
     setLoading(true);
@@ -75,6 +83,14 @@ export function CustomerInfoPanel({
     ])
       .then(([d, n, t]) => {
         setDetails(d);
+        // Auto-fetch jobs if customer has phone
+        if (d?.phoneNumber) {
+          setJobsLoading(true);
+          getCustomerJobs(userId)
+            .then((res) => setJobs(res.jobs || []))
+            .catch(() => setJobs([]))
+            .finally(() => setJobsLoading(false));
+        }
         setNotes(n);
         setAllTags(t);
         setNicknameValue(d?.nickname || "");
@@ -504,6 +520,61 @@ export function CustomerInfoPanel({
           )}
         </div>
       </div>
+
+      {/* IRIS Jobs */}
+      {(jobs.length > 0 || jobsLoading) && (
+        <div className="px-4 py-3.5 border-b border-slate-100/80">
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <Briefcase className="w-3.5 h-3.5 text-brand-500" />
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.06em]">
+              งานที่จอง
+            </span>
+            <span className="text-[9px] text-brand-500 font-semibold ml-1">
+              {jobs.length}
+            </span>
+          </div>
+          {jobsLoading ? (
+            <div className="flex items-center justify-center py-3">
+              <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {jobs.map((job: any, i: number) => (
+                <div
+                  key={job.id || i}
+                  className="bg-brand-50/50 rounded-lg px-3 py-2.5 border border-brand-100/50"
+                >
+                  <p className="text-[12px] font-medium text-slate-700 leading-relaxed">
+                    {job.job || job.detail || 'งานจัดเลี้ยง'}
+                  </p>
+                  {job.due && (
+                    <p className="text-[10px] text-brand-500 font-semibold mt-1">
+                      📅 {job.due}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    {job.revenue && (
+                      <span className="text-[10px] text-slate-500">
+                        ฿{Number(job.revenue).toLocaleString()}
+                      </span>
+                    )}
+                    {job.guest && (
+                      <span className="text-[10px] text-slate-500">
+                        👥 {job.guest} ท่าน
+                      </span>
+                    )}
+                    {job.city && (
+                      <span className="text-[10px] text-slate-400">
+                        📍 {job.city}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recent slips */}
       {details.recentSlips?.length > 0 && (

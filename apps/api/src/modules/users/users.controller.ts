@@ -55,6 +55,11 @@ export class UsersController {
     return this.usersService.markAsRead(id);
   }
 
+  @Get(':id/jobs')
+  async getCustomerJobs(@Param('id') id: string) {
+    return this.usersService.getCustomerJobs(id);
+  }
+
   @Post('bulk-read')
   async bulkMarkAsRead(@Body() body: { ids: string[] }) {
     let count = 0;
