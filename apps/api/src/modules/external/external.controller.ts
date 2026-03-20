@@ -236,19 +236,40 @@ export class ExternalController {
 
   /**
    * GET /api/external/lookup
-   * Look up a customer by platform user ID (LINE userId or Facebook PSID).
+   * Look up a customer by platform user ID, phone number, or name.
+   * Query params: platformUserId, phone, name (at least one required)
    */
   @Get('lookup')
   async lookup(
     @Headers('x-api-key') apiKey: string,
-    @Query('platformUserId') platformUserId: string,
+    @Query('platformUserId') platformUserId?: string,
+    @Query('phone') phone?: string,
+    @Query('name') name?: string,
   ) {
     await this.validateApiKey(apiKey);
 
-    if (!platformUserId) return { error: 'platformUserId is required' };
+    if (!platformUserId && !phone && !name) {
+      return { error: 'At least one query param required: platformUserId, phone, or name' };
+    }
+
+    const where: any = {};
+    if (platformUserId) where.platformUserId = platformUserId;
+    if (phone) {
+      // Clean phone: remove dashes, spaces
+      const cleanPhone = phone.replace(/[-\s]/g, '');
+      where.phoneNumber = { contains: cleanPhone.length >= 4 ? cleanPhone.slice(-4) : cleanPhone };
+    }
+    if (name) {
+      where.OR = [
+        { displayName: { contains: name, mode: 'insensitive' } },
+        { nickname: { contains: name, mode: 'insensitive' } },
+      ];
+    }
 
     const customers = await this.prisma.customer.findMany({
-      where: { platformUserId },
+      where,
+      take: 20,
+      orderBy: { lastMessageAt: 'desc' },
       select: {
         id: true,
         platformUserId: true,
@@ -259,14 +280,35 @@ export class ExternalController {
         channelType: true,
         phoneNumber: true,
         status: true,
+        unreadCount: true,
         lastMessageAt: true,
+        lastMessagePreview: true,
         firstContactAt: true,
+        assignedToName: true,
+        tags: { include: { tag: { select: { name: true, color: true } } } },
       },
     });
 
     return {
-      data: customers,
-      count: customers.length,
+      data: customers.map((c) => ({
+        id: c.id,
+        platformUserId: c.platformUserId,
+        displayName: c.nickname || c.displayName,
+        originalName: c.displayName,
+        nickname: c.nickname,
+        pictureUrl: c.pictureUrl,
+        channel: c.channel,
+        channelType: c.channelType,
+        phoneNumber: c.phoneNumber,
+        status: c.status,
+        unreadCount: c.unreadCount,
+        lastMessageAt: c.lastMessageAt,
+        lastMessagePreview: c.lastMessagePreview,
+        firstContactAt: c.firstContactAt,
+        assignedTo: c.assignedToName,
+        tags: c.tags.map((t) => ({ name: t.tag.name, color: t.tag.color })),
+      })),
+      total: customers.length,
     };
   }
 }
