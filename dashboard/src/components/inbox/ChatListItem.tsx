@@ -46,7 +46,7 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
       onClick={onClick}
       className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-all duration-150 border-b border-slate-100/60 relative ${
         isSelected
-          ? "bg-indigo-50/60 border-l-2 border-l-indigo-500"
+          ? "bg-brand-50/60 border-l-2 border-l-brand-500"
           : "hover:bg-slate-50/60 border-l-2 border-l-transparent"
       }`}
     >
@@ -102,7 +102,7 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
           </div>
           <span
             className={`text-[11px] flex-shrink-0 tabular-nums leading-tight ${
-              hasUnread ? "text-indigo-500 font-semibold" : "text-slate-300"
+              hasUnread ? "text-brand-500 font-semibold" : "text-slate-300"
             }`}
           >
             {formatTime(user.lastmessagetime)}
@@ -140,14 +140,14 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
             }`}
           >
             {user.assignedToName && (
-              <span className="text-indigo-400 font-medium">
+              <span className="text-brand-400 font-medium">
                 {user.assignedToName} &middot;{" "}
               </span>
             )}
             {user.lastMessagePreview || "No messages"}
           </p>
           {hasUnread && (
-            <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-500 text-white text-[10px] font-bold tabular-nums">
+            <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-brand-500 text-white text-[10px] font-bold tabular-nums">
               {user.unreadCount > 99 ? "99+" : user.unreadCount}
             </span>
           )}

@@ -9,8 +9,8 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_BADGE_COLORS: Record<string, string> = {
-  SUPER_ADMIN: "bg-purple-50 text-purple-600 ring-1 ring-purple-500/10",
-  ADMIN: "bg-indigo-50 text-indigo-600 ring-1 ring-indigo-500/10",
+  SUPER_ADMIN: "bg-brand-50 text-brand-500 ring-1 ring-brand-500/10",
+  ADMIN: "bg-brand-50 text-brand-400 ring-1 ring-brand-500/10",
   AGENT: "bg-slate-50 text-slate-500 ring-1 ring-slate-500/10",
 };
 
@@ -45,18 +45,13 @@ export default function Navbar() {
     (href !== "/dashboard" && pathname?.startsWith(href));
 
   return (
-    <nav className="bg-white border-b border-slate-200/60 shadow-[0_1px_2px_rgba(0,0,0,0.03)]" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Noto Sans Thai', sans-serif" }}>
+    <nav className="bg-white border-b border-slate-200/60 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
       <div className="w-full px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           {/* Left: Brand */}
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-sm shadow-indigo-500/20">
-                <span className="text-[11px] font-black text-white tracking-tight">IR</span>
-              </div>
-              <span className="text-[15px] font-bold text-slate-800 tracking-tight">
-                IRIS
-              </span>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="IRIS" className="h-8 w-auto" />
             </div>
 
             {/* Center: Nav links */}
@@ -67,7 +62,7 @@ export default function Navbar() {
                   to={item.href}
                   className={`inline-flex items-center px-2.5 py-1.5 text-[13px] font-medium rounded-md transition-all duration-150 ${
                     isActive(item.href)
-                      ? "bg-indigo-50 text-indigo-600"
+                      ? "bg-brand-50 text-brand-500"
                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                   }`}
                 >
@@ -87,8 +82,8 @@ export default function Navbar() {
                   className="w-7 h-7 rounded-full object-cover ring-2 ring-white shadow-sm"
                 />
               ) : admin ? (
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center ring-2 ring-white shadow-sm">
-                  <span className="text-[11px] font-semibold text-indigo-600">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-100 to-brand-50 flex items-center justify-center ring-2 ring-white shadow-sm">
+                  <span className="text-[11px] font-semibold text-brand-500">
                     {admin.name.charAt(0).toUpperCase()}
                   </span>
                 </div>

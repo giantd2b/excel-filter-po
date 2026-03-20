@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -12,7 +13,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user && !authLoading) {
-      navigate("/dashboard");
+      navigate("/dashboard/inbox");
     }
   }, [user, authLoading, navigate]);
 
@@ -23,7 +24,7 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password);
-      navigate("/dashboard");
+      navigate("/dashboard/inbox");
     } catch {
       setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
     } finally {
@@ -33,8 +34,8 @@ export default function LoginPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
       </div>
     );
   }
@@ -44,66 +45,102 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">
-          Dashboard Login
-        </h1>
-        <p className="text-center text-gray-600 mb-6">
-          Excel Filter PO - User Management
+    <div className="min-h-screen flex items-center justify-center bg-slate-50/50">
+      <div className="w-full max-w-[400px] px-6">
+        {/* Logo + Brand */}
+        <div className="text-center mb-8">
+          <img
+            src="/logo.png"
+            alt="IRIS เติมบุญ"
+            className="h-16 w-auto mx-auto mb-5"
+          />
+          <h1 className="text-[22px] font-bold text-slate-800 tracking-tight">
+            IRIS CRM
+          </h1>
+          <p className="text-[13px] text-slate-400 mt-1">
+            Professional Catering Management
+          </p>
+        </div>
+
+        {/* Login Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-7">
+          {error && (
+            <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-[13px] font-medium mb-5">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-[13px] font-medium text-slate-700 mb-1.5"
+              >
+                อีเมล
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2.5 text-[14px] bg-slate-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all text-slate-800 placeholder:text-slate-300"
+                placeholder="admin@example.com"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-[13px] font-medium text-slate-700 mb-1.5"
+              >
+                รหัสผ่าน
+              </label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2.5 text-[14px] bg-slate-50 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all text-slate-800 placeholder:text-slate-300"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 px-4 rounded-xl text-[14px] font-semibold text-white transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: "#884929",
+                boxShadow: "0 2px 8px rgba(136, 73, 41, 0.25)",
+              }}
+              onMouseEnter={(e) =>
+                !loading &&
+                (e.currentTarget.style.backgroundColor = "#6b3920")
+              }
+              onMouseLeave={(e) =>
+                !loading &&
+                (e.currentTarget.style.backgroundColor = "#884929")
+              }
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  กำลังเข้าสู่ระบบ...
+                </span>
+              ) : (
+                "เข้าสู่ระบบ"
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Footer */}
+        <p className="text-center text-[11px] text-slate-300 mt-6">
+          IRIS เติมบุญ · Professional Catering
         </p>
-
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label
-              htmlFor="email"
-              className="block text-gray-700 text-sm font-bold mb-2"
-            >
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              placeholder="admin@example.com"
-              required
-            />
-          </div>
-
-          <div className="mb-6">
-            <label
-              htmlFor="password"
-              className="block text-gray-700 text-sm font-bold mb-2"
-            >
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              placeholder="********"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
-          </button>
-        </form>
       </div>
     </div>
   );

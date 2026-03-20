@@ -167,7 +167,7 @@ export function CustomerInfoPanel({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full bg-white">
-        <div className="w-5 h-5 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin" />
+        <div className="w-5 h-5 border-2 border-slate-200 border-t-brand-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -226,7 +226,7 @@ export function CustomerInfoPanel({
               value={nicknameValue}
               onChange={(e) => setNicknameValue(e.target.value)}
               placeholder="ตั้งชื่อเรียก..."
-              className="w-28 text-[11px] px-2.5 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/15 focus:border-indigo-300 transition-all"
+              className="w-28 text-[11px] px-2.5 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/15 focus:border-brand-300 transition-all"
               autoFocus
             />
             <button
@@ -235,7 +235,7 @@ export function CustomerInfoPanel({
                 setDetails((prev: any) => ({ ...prev, nickname: nicknameValue.trim() || null }));
                 setEditingNickname(false);
               }}
-              className="text-[10px] px-2 py-1 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 font-medium transition-colors"
+              className="text-[10px] px-2 py-1 bg-brand-500 text-white rounded-lg hover:bg-brand-600 font-medium transition-colors"
             >
               บันทึก
             </button>
@@ -249,7 +249,7 @@ export function CustomerInfoPanel({
         ) : (
           <button
             onClick={() => setEditingNickname(true)}
-            className="text-[10px] text-indigo-500 hover:text-indigo-600 font-medium mt-1 transition-colors"
+            className="text-[10px] text-brand-500 hover:text-brand-600 font-medium mt-1 transition-colors"
           >
             {details.nickname ? "แก้ไขชื่อเรียก" : "ตั้งชื่อเรียก"}
           </button>
@@ -315,7 +315,7 @@ export function CustomerInfoPanel({
           ) : (
             <button
               onClick={handleAssign}
-              className="flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-600 transition-colors"
+              className="flex items-center gap-1 text-[11px] font-medium text-brand-500 hover:text-brand-600 transition-colors"
             >
               <UserCheck className="w-3 h-3" />
               Assign to me
@@ -386,7 +386,7 @@ export function CustomerInfoPanel({
           </div>
           <button
             onClick={() => setShowTagInput(!showTagInput)}
-            className="p-0.5 rounded-md text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-all duration-150"
+            className="p-0.5 rounded-md text-slate-300 hover:text-brand-500 hover:bg-brand-50 transition-all duration-150"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -427,13 +427,13 @@ export function CustomerInfoPanel({
               onChange={(e) => setNewTagName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
               placeholder="Tag name..."
-              className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-slate-50 border-0 focus:outline-none focus:ring-2 focus:ring-indigo-500/15 transition-all"
+              className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-slate-50 border-0 focus:outline-none focus:ring-2 focus:ring-brand-500/15 transition-all"
               autoFocus
             />
             <button
               onClick={handleAddTag}
               disabled={!newTagName.trim()}
-              className="px-2.5 py-1.5 rounded-lg bg-indigo-500 text-white text-[10px] font-medium disabled:opacity-40 hover:bg-indigo-600 transition-colors"
+              className="px-2.5 py-1.5 rounded-lg bg-brand-500 text-white text-[10px] font-medium disabled:opacity-40 hover:bg-brand-600 transition-colors"
             >
               Add
             </button>
@@ -461,12 +461,12 @@ export function CustomerInfoPanel({
             onChange={(e) => setNewNote(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
             placeholder="Add a note..."
-            className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-slate-50 border-0 focus:outline-none focus:ring-2 focus:ring-indigo-500/15 transition-all placeholder:text-slate-300"
+            className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-slate-50 border-0 focus:outline-none focus:ring-2 focus:ring-brand-500/15 transition-all placeholder:text-slate-300"
           />
           <button
             onClick={handleAddNote}
             disabled={!newNote.trim() || addingNote}
-            className="p-1.5 rounded-lg bg-indigo-500 text-white disabled:opacity-40 hover:bg-indigo-600 transition-colors"
+            className="p-1.5 rounded-lg bg-brand-500 text-white disabled:opacity-40 hover:bg-brand-600 transition-colors"
           >
             {addingNote ? (
               <Loader2 className="w-3 h-3 animate-spin" />

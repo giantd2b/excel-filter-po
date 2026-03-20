@@ -71,7 +71,7 @@ export function ChannelsSidebar({
   const Badge = ({ count }: { count: number }) => {
     if (count === 0) return null;
     return (
-      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-md bg-white/[0.08] text-[10px] font-semibold tabular-nums text-slate-400">
+      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-brand-50 text-[10px] font-semibold tabular-nums text-brand-500">
         {count > 99 ? "99+" : count}
       </span>
     );
@@ -79,26 +79,26 @@ export function ChannelsSidebar({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-slate-900">
-        <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
+      <div className="flex items-center justify-center h-full bg-slate-50">
+        <Loader2 className="w-4 h-4 animate-spin text-brand-500" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 text-slate-400 select-none">
+    <div className="flex flex-col h-full bg-slate-50/80 text-slate-600 select-none border-r border-slate-200/60">
       {/* Brand header */}
-      <div className="px-4 py-4 border-b border-white/[0.04]">
+      <div className="px-4 py-4 border-b border-slate-200/60">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+          <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center shadow-sm">
             <Inbox className="w-[15px] h-[15px] text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-[14px] font-semibold text-white leading-tight tracking-[-0.01em]">
+            <h2 className="text-[14px] font-semibold text-slate-800 leading-tight tracking-[-0.01em]">
               Inbox
             </h2>
             {(stats?.totalUnread || 0) > 0 && (
-              <p className="text-[10px] text-slate-500 font-medium mt-0.5 tabular-nums">
+              <p className="text-[10px] text-brand-500 font-medium mt-0.5 tabular-nums">
                 {stats?.totalUnread} unread
               </p>
             )}
@@ -113,8 +113,8 @@ export function ChannelsSidebar({
           onClick={onSelectAll}
           className={`w-full flex items-center justify-between px-2.5 py-[7px] rounded-lg text-[13px] font-medium transition-all duration-150 group ${
             isAllSelected
-              ? "bg-white/[0.08] text-white"
-              : "hover:bg-white/[0.04] text-slate-400 hover:text-slate-300"
+              ? "bg-brand-50 text-brand-500 shadow-sm"
+              : "hover:bg-white text-slate-700 hover:text-slate-900"
           }`}
         >
           <div className="flex items-center gap-2.5">
@@ -128,7 +128,7 @@ export function ChannelsSidebar({
         <div className="pt-5">
           <button
             onClick={() => setLineExpanded(!lineExpanded)}
-            className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 hover:text-slate-400 transition-colors duration-150"
+            className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 hover:text-slate-600 transition-colors duration-150"
           >
             <div className="flex items-center gap-2">
               {lineExpanded ? (
@@ -151,11 +151,11 @@ export function ChannelsSidebar({
                 className={`w-full flex items-center justify-between px-2.5 py-[6px] rounded-md text-[13px] transition-all duration-150 ${
                   selectedType === "line" && !selectedChannel
                     ? "bg-emerald-500/10 text-emerald-400 font-medium"
-                    : "hover:bg-white/[0.04] text-slate-500 hover:text-slate-400"
+                    : "hover:bg-white text-slate-700 hover:text-slate-900"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Hash className="w-3 h-3 opacity-50" />
+                  <Hash className="w-3 h-3 opacity-40" />
                   <span>All LINE</span>
                 </div>
                 <Badge count={stats?.line?.totalUnread || 0} />
@@ -168,11 +168,11 @@ export function ChannelsSidebar({
                   className={`w-full flex items-center justify-between px-2.5 py-[6px] rounded-md text-[13px] transition-all duration-150 ${
                     selectedChannel === channel.id
                       ? "bg-emerald-500/10 text-emerald-400 font-medium"
-                      : "hover:bg-white/[0.04] text-slate-500 hover:text-slate-400"
+                      : "hover:bg-white text-slate-700 hover:text-slate-900"
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <Hash className="w-3 h-3 opacity-50 flex-shrink-0" />
+                    <Hash className="w-3 h-3 opacity-40 flex-shrink-0" />
                     <span className="truncate">{channel.name}</span>
                   </div>
                   <Badge count={channel.unreadCount} />
@@ -186,7 +186,7 @@ export function ChannelsSidebar({
         <div className="pt-5">
           <button
             onClick={() => setFbExpanded(!fbExpanded)}
-            className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 hover:text-slate-400 transition-colors duration-150"
+            className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 hover:text-slate-600 transition-colors duration-150"
           >
             <div className="flex items-center gap-2">
               {fbExpanded ? (
@@ -209,11 +209,11 @@ export function ChannelsSidebar({
                 className={`w-full flex items-center justify-between px-2.5 py-[6px] rounded-md text-[13px] transition-all duration-150 ${
                   selectedType === "facebook" && !selectedChannel
                     ? "bg-blue-500/10 text-blue-400 font-medium"
-                    : "hover:bg-white/[0.04] text-slate-500 hover:text-slate-400"
+                    : "hover:bg-white text-slate-700 hover:text-slate-900"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Hash className="w-3 h-3 opacity-50" />
+                  <Hash className="w-3 h-3 opacity-40" />
                   <span>All Facebook</span>
                 </div>
                 <Badge count={stats?.facebook?.totalUnread || 0} />
@@ -226,11 +226,11 @@ export function ChannelsSidebar({
                   className={`w-full flex items-center justify-between px-2.5 py-[6px] rounded-md text-[13px] transition-all duration-150 ${
                     selectedChannel === channel.id
                       ? "bg-blue-500/10 text-blue-400 font-medium"
-                      : "hover:bg-white/[0.04] text-slate-500 hover:text-slate-400"
+                      : "hover:bg-white text-slate-700 hover:text-slate-900"
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <Hash className="w-3 h-3 opacity-50 flex-shrink-0" />
+                    <Hash className="w-3 h-3 opacity-40 flex-shrink-0" />
                     <span className="truncate">{channel.name}</span>
                   </div>
                   <Badge count={channel.unreadCount} />

@@ -28,7 +28,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         <div
           className={`max-w-[65%] overflow-hidden transition-all duration-150 ${
             isOutgoing
-              ? "bg-indigo-500 text-white rounded-2xl rounded-br-md shadow-sm shadow-indigo-500/10"
+              ? "bg-brand-500 text-white rounded-2xl rounded-br-md shadow-sm shadow-brand-500/10"
               : "bg-white text-slate-800 rounded-2xl rounded-bl-md border border-slate-100/80 shadow-sm shadow-slate-900/[0.03]"
           }`}
         >
@@ -67,7 +67,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               target="_blank"
               rel="noopener noreferrer"
               className={`flex items-center gap-2 px-4 pt-3 transition-colors duration-150 ${
-                isOutgoing ? "text-indigo-100 hover:text-white" : "text-indigo-500 hover:text-indigo-600"
+                isOutgoing ? "text-brand-100 hover:text-white" : "text-brand-500 hover:text-brand-600"
               }`}
             >
               <FileDown className="w-5 h-5" />
@@ -78,7 +78,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {/* Admin name label */}
           {isOutgoing && message.adminName && (
             <div className="px-4 pt-2.5 pb-0">
-              <span className="text-[10px] font-medium text-indigo-200/80">
+              <span className="text-[10px] font-medium text-brand-200/80">
                 {message.adminName}
               </span>
             </div>
@@ -94,7 +94,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             {!message.text && hasMedia && (
               <p
                 className={`text-[11px] ${
-                  isOutgoing ? "text-indigo-200" : "text-slate-400"
+                  isOutgoing ? "text-brand-200" : "text-slate-400"
                 }`}
               >
                 {message.mediaType === "image" ? "รูปภาพ" : "วิดีโอ"}
@@ -102,7 +102,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             )}
             <div
               className={`flex items-center justify-end gap-1 mt-1 ${
-                isOutgoing ? "text-indigo-200/70" : "text-slate-300"
+                isOutgoing ? "text-brand-200/70" : "text-slate-300"
               }`}
             >
               <span className="text-[10px] font-medium tabular-nums">
@@ -163,8 +163,8 @@ function LinkifyText({ text, isOutgoing }: { text: string; isOutgoing: boolean }
             rel="noopener noreferrer"
             className={`underline underline-offset-2 break-all transition-colors duration-150 ${
               isOutgoing
-                ? "text-indigo-100 hover:text-white"
-                : "text-indigo-500 hover:text-indigo-600"
+                ? "text-brand-100 hover:text-white"
+                : "text-brand-500 hover:text-brand-600"
             }`}
           >
             {part}

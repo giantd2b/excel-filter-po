@@ -141,7 +141,12 @@
       "WebFetch(domain:linedevth.line.me)",
       "Bash(rm -rf C:/Users/OatJirakitt/Documents/GitHub/excel-filter-po/apps/api/public/*)",
       "Bash(cp -r C:/Users/OatJirakitt/Documents/GitHub/excel-filter-po/dashboard/dist/* C:/Users/OatJirakitt/Documents/GitHub/excel-filter-po/apps/api/public/)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(sed -i 's/indigo-500/brand-500/g; s/indigo-600/brand-600/g; s/indigo-400/brand-400/g; s/indigo-300/brand-300/g; s/indigo-200/brand-200/g; s/indigo-100/brand-100/g; s/indigo-50/brand-50/g' \"$f\")",
+      "Bash(done)",
+      "Bash(VITE_API_URL=https://harmonious-presence-production.up.railway.app/api npm run dev)"
     ]
   }
 }

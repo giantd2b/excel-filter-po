@@ -67,7 +67,7 @@ export function ChatList({
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 bg-white">
-        <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-slate-200 border-t-brand-500 rounded-full animate-spin" />
         <p className="text-[12px] text-slate-400 font-medium">Loading chats...</p>
       </div>
     );
@@ -102,7 +102,7 @@ export function ChatList({
             onClick={handleToggleNotifications}
             className={`p-1.5 rounded-lg transition-all duration-150 ${
               notificationsEnabled
-                ? "bg-indigo-50 text-indigo-500 hover:bg-indigo-100"
+                ? "bg-brand-50 text-brand-500 hover:bg-brand-100"
                 : "bg-slate-50 text-slate-400 hover:bg-slate-100"
             }`}
             title={
@@ -127,7 +127,7 @@ export function ChatList({
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-[7px] text-[13px] bg-slate-50 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/15 focus:bg-white transition-all duration-150 placeholder:text-slate-300"
+            className="w-full pl-9 pr-3 py-[7px] text-[13px] bg-slate-50 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/15 focus:bg-white transition-all duration-150 placeholder:text-slate-300"
           />
         </div>
       </div>

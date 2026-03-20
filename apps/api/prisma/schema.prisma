@@ -334,6 +334,22 @@ model AuthLog {
   @@map("auth_logs")
 }
 
+// ─── API Keys ──────────────────────────────────────────────────────
+
+model ApiKey {
+  id          String   @id @default(uuid())
+  name        String   // "IRIS HR", "Catering App", etc.
+  key         String   @unique
+  createdBy   String   @map("created_by") // admin ID
+  isActive    Boolean  @default(true) @map("is_active")
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([key])
+  @@index([isActive])
+  @@map("api_keys")
+}
+
 // ─── Knowledge Base ───────────────────────────────────────────────
 
 model KnowledgeEntry {

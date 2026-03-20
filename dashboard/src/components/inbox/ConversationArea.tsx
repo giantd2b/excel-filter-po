@@ -221,7 +221,7 @@ export function ConversationArea({
       <div className="flex-1 overflow-y-auto px-6 py-5 bg-slate-50/30">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
-            <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-slate-200 border-t-brand-500 rounded-full animate-spin" />
             <p className="text-[12px] text-slate-400 font-medium">
               Loading messages...
             </p>
