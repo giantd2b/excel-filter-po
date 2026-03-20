@@ -55,6 +55,16 @@ export class UsersController {
     return this.usersService.markAsRead(id);
   }
 
+  @Post('bulk-read')
+  async bulkMarkAsRead(@Body() body: { ids: string[] }) {
+    let count = 0;
+    for (const id of body.ids) {
+      await this.usersService.markAsRead(id);
+      count++;
+    }
+    return { success: true, count };
+  }
+
   @Post(':id/tags')
   addTag(
     @Param('id') id: string,

@@ -13,6 +13,7 @@ import AdminsPage from "@/pages/AdminsPage";
 import TemplatesPage from "@/pages/TemplatesPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import KnowledgePage from "@/pages/KnowledgePage";
+import ApiKeysPage from "@/pages/ApiKeysPage";
 
 export const router = createBrowserRouter([
   {
@@ -72,6 +73,10 @@ export const router = createBrowserRouter([
       {
         path: "knowledge",
         element: <KnowledgePage />,
+      },
+      {
+        path: "api-keys",
+        element: <ApiKeysPage />,
       },
     ],
   },

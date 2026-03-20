@@ -202,6 +202,10 @@ export async function markAsRead(userId: string): Promise<void> {
   await api.post(`/users/${userId}/read`, {});
 }
 
+export async function bulkMarkAsRead(ids: string[]): Promise<void> {
+  await api.post("/users/bulk-read", { ids });
+}
+
 // ─── Inbox: Send Message (via NestJS API) ───────────────────────────
 
 interface SendMessageParams {

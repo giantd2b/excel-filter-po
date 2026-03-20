@@ -4,7 +4,8 @@ import { ChatListItem } from "./ChatListItem";
 import { useConversationsSocket } from "@/hooks/useWebSocket";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSound } from "@/hooks/useSound";
-import { Search, Loader2, Bell, BellOff, Wifi, WifiOff } from "lucide-react";
+import { Search, Loader2, Bell, BellOff, Wifi, WifiOff, CheckCheck } from "lucide-react";
+import { bulkMarkAsRead } from "@/lib/api-service";
 
 interface ChatListProps {
   selectedChannel: string | null;
@@ -98,6 +99,18 @@ export function ChatList({
               {filteredConversations.length} chats
             </p>
           </div>
+          <button
+            onClick={async () => {
+              if (!confirm("อ่านทั้งหมดแล้ว?")) return;
+              const unreadIds = filteredConversations.filter(c => c.unreadCount > 0).map(c => c.id);
+              if (unreadIds.length === 0) return;
+              await bulkMarkAsRead(unreadIds).catch(() => {});
+            }}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-brand-50 transition-all duration-150"
+            title="อ่านทั้งหมดแล้ว"
+          >
+            <CheckCheck className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={handleToggleNotifications}
             className={`p-1.5 rounded-lg transition-all duration-150 ${
