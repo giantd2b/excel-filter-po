@@ -10,6 +10,7 @@ export function getLineAccessToken(channel: string): string {
     'Line_ทดสอบระบบ': process.env.LINE_TOKEN_TEST,
     Line_Chon: process.env.LINE_TOKEN_CHON,
     'Line_โต๊ะจีน': process.env.LINE_TOKEN_TOHJEEN,
+    'Line_ไอริสเติมบุญ': process.env.LINE_TOKEN_IRIS_TEMBOON,
   };
 
   const token = tokenMap[channel];
@@ -27,6 +28,7 @@ export function getLineDestinationChannel(destination: string): { token: string;
     U08f3963a8a32d32cadb457dde35dc897: { envKey: 'LINE_TOKEN_TEST', channel: 'Line_ทดสอบระบบ' },
     U55912d0c8784e0453127fe2ae2a7723e: { envKey: 'LINE_TOKEN_CHON', channel: 'Line_Chon' },
     U85b0000da2c00ce71e42c98dad76b2a9: { envKey: 'LINE_TOKEN_TOHJEEN', channel: 'Line_โต๊ะจีน' },
+    U01bce79462ed13d1e983d1e9f72dde27: { envKey: 'LINE_TOKEN_IRIS_TEMBOON', channel: 'Line_ไอริสเติมบุญ' },
   };
 
   const entry = map[destination];
