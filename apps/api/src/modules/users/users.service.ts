@@ -351,6 +351,24 @@ export class UsersService {
       if (jobs.length > 0) {
         // Auto-tag with "ลูกค้าจองงานแล้ว"
         await this.addTag(customerId, 'ลูกค้าจองงานแล้ว', '#884929').catch(() => {});
+
+        // Save next upcoming job date on customer for chat list display
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const upcomingJobs = jobs
+          .filter((j: any) => j.due && new Date(j.due) >= today)
+          .sort((a: any, b: any) => new Date(a.due).getTime() - new Date(b.due).getTime());
+
+        const nextJob = upcomingJobs[0] || jobs[0]; // fallback to most recent if all past
+        if (nextJob?.due) {
+          await this.prisma.customer.update({
+            where: { id: customerId },
+            data: {
+              nextJobDate: new Date(nextJob.due),
+              nextJobTitle: (nextJob.job || '').substring(0, 100),
+            },
+          }).catch(() => {});
+        }
       }
 
       return {

@@ -58,6 +58,8 @@ export class ConversationsController {
       status: c.status,
       assignedToId: c.assignedToId,
       assignedToName: c.assignedToName,
+      nextJobDate: c.nextJobDate ? c.nextJobDate.toISOString().split('T')[0] : null,
+      nextJobTitle: c.nextJobTitle || null,
       tags: c.tags.map((ct) => ({
         id: ct.tag.id,
         name: ct.tag.name,

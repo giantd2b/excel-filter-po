@@ -53,6 +53,8 @@ export function useConversationsSocket({
         lastMessagePreview: u.lastMessagePreview || "",
         status: u.status,
         assignedToName: u.assignedToName,
+        nextJobDate: u.nextJobDate || null,
+        nextJobTitle: u.nextJobTitle || null,
         tags: u.tags || [],
       }));
 

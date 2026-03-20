@@ -109,6 +109,20 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
           </span>
         </div>
 
+        {/* Job date */}
+        {user.nextJobDate && (
+          <div className="flex items-center gap-1 mt-0.5 overflow-hidden">
+            <span className="text-[9px] font-semibold text-brand-500 flex-shrink-0">
+              📅 {new Date(user.nextJobDate).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}
+            </span>
+            {user.nextJobTitle && (
+              <span className="text-[9px] text-slate-400 truncate">
+                {user.nextJobTitle.substring(0, 30)}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Tags row */}
         {user.tags && user.tags.length > 0 && (
           <div className="flex gap-1 mt-1 overflow-hidden">

@@ -27,6 +27,10 @@ model Customer {
   // Platform read token (LINE markAsReadToken — never expires)
   markAsReadToken   String?            @map("mark_as_read_token")
 
+  // Job info (synced from IRIS Jobs)
+  nextJobDate       DateTime?          @map("next_job_date")
+  nextJobTitle      String?            @map("next_job_title")
+
   // Chat state
   status            ConversationStatus @default(OPEN)
   unreadCount       Int                @default(0) @map("unread_count")
