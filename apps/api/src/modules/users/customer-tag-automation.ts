@@ -79,10 +79,11 @@ export class CustomerTagAutomation {
         }
 
         // Check if ALL jobs are in the past
+        // API returns due as ISO date "2026-03-15"
         const allPast = jobs.every((job: any) => {
           if (!job.due) return false;
-          const jobDate = this.parseThaiDate(job.due);
-          return jobDate && jobDate < today;
+          const jobDate = new Date(job.due);
+          return jobDate < today;
         });
 
         if (allPast) {
@@ -118,36 +119,4 @@ export class CustomerTagAutomation {
     ]);
   }
 
-  /**
-   * Parse Thai date format like "31 มีค", "5 เมย", "15 มีค 69"
-   */
-  private parseThaiDate(dateStr: string): Date | null {
-    const thaiMonths: Record<string, number> = {
-      'มค': 0, 'กพ': 1, 'มีค': 2, 'เมย': 3, 'พค': 4, 'มิย': 5,
-      'กค': 6, 'สค': 7, 'กย': 8, 'ตค': 9, 'พย': 10, 'ธค': 11,
-      'ม.ค.': 0, 'ก.พ.': 1, 'มี.ค.': 2, 'เม.ย.': 3, 'พ.ค.': 4, 'มิ.ย.': 5,
-      'ก.ค.': 6, 'ส.ค.': 7, 'ก.ย.': 8, 'ต.ค.': 9, 'พ.ย.': 10, 'ธ.ค.': 11,
-    };
-
-    try {
-      // Extract day and month from string like "31 มีค" or "5 เมย 69"
-      const match = dateStr.match(/(\d{1,2})\s*(มค|กพ|มีค|เมย|พค|มิย|กค|สค|กย|ตค|พย|ธค|ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)/i);
-      if (!match) return null;
-
-      const day = parseInt(match[1]);
-      const month = thaiMonths[match[2]];
-      if (month === undefined) return null;
-
-      // Use current year, or next year if month is before current month
-      const now = new Date();
-      let year = now.getFullYear();
-      const currentMonth = now.getMonth();
-
-      // If the job month is more than 2 months ago, it's probably this year's past date
-      // If the job month is in the future, keep current year
-      return new Date(year, month, day);
-    } catch {
-      return null;
-    }
-  }
 }
