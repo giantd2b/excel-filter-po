@@ -22,6 +22,11 @@ export class MessagesService {
       where: { customerId: userId },
       orderBy: { timestamp: 'asc' },
       take: limit,
+      include: {
+        reactions: {
+          select: { emoji: true, adminName: true, adminId: true },
+        },
+      },
     });
 
     return messages.map((m) => ({
@@ -36,12 +41,61 @@ export class MessagesService {
       mediaType: m.mediaType?.toLowerCase() || undefined,
       mediaUrl: m.mediaUrl,
       previewUrl: m.previewUrl,
+      reactions: m.reactions || [],
     }));
   }
 
   /**
    * Upload media file to Firebase Storage, returns public URL.
    */
+  async addReaction(messageId: string, emoji: string, adminId: string, adminName: string) {
+    const reaction = await this.prisma.messageReaction.upsert({
+      where: { messageId_adminId: { messageId, adminId } },
+      update: { emoji },
+      create: { messageId, adminId, adminName, emoji },
+    });
+
+    // Get all reactions for this message
+    const reactions = await this.prisma.messageReaction.findMany({
+      where: { messageId },
+      select: { emoji: true, adminName: true },
+    });
+
+    // Find customerId for WebSocket broadcast
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      select: { customerId: true },
+    });
+
+    if (message) {
+      this.inboxGateway.emitReactionUpdate(message.customerId, messageId, reactions);
+    }
+
+    return reaction;
+  }
+
+  async removeReaction(messageId: string, adminId: string) {
+    await this.prisma.messageReaction.deleteMany({
+      where: { messageId, adminId },
+    });
+
+    const reactions = await this.prisma.messageReaction.findMany({
+      where: { messageId },
+      select: { emoji: true, adminName: true },
+    });
+
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      select: { customerId: true },
+    });
+
+    if (message) {
+      this.inboxGateway.emitReactionUpdate(message.customerId, messageId, reactions);
+    }
+
+    return { success: true };
+  }
+
   async uploadMedia(
     file: Express.Multer.File,
     docId: string,
@@ -55,6 +109,7 @@ export class MessagesService {
     await storageFile.save(file.buffer, {
       metadata: {
         contentType: file.mimetype,
+        contentDisposition: `inline; filename="${file.originalname}"`,
         cacheControl: 'public, max-age=31536000',
       },
     });
@@ -68,20 +123,22 @@ export class MessagesService {
     oduserId: string;
     docId: string;
     text?: string;
-    mediaType?: 'image' | 'video';
+    mediaType?: 'image' | 'video' | 'file';
     mediaUrl?: string;
     previewUrl?: string;
+    stickerId?: string;
+    stickerPackageId?: string;
     channel: string;
     adminId?: string;
     adminName?: string;
   }) {
-    const { oduserId, docId, text, mediaType, mediaUrl, previewUrl, channel, adminId, adminName } = data;
+    const { oduserId, docId, text, mediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, channel, adminId, adminName } = data;
 
     if (!oduserId || !docId || !channel) {
       throw new BadRequestException('Missing required fields: oduserId, docId, channel');
     }
-    if (!text && !mediaUrl) {
-      throw new BadRequestException('Must provide text or mediaUrl');
+    if (!text && !mediaUrl && !stickerId) {
+      throw new BadRequestException('Must provide text, mediaUrl, or stickerId');
     }
 
     const isLine = channel.startsWith('Line_');
@@ -98,12 +155,27 @@ export class MessagesService {
     let sendError: string | null = null;
     let sendMethod: string | null = null;
 
+    // Auto-detect file type if not set
+    if (!mediaType && mediaUrl && text?.startsWith('[ไฟล์')) {
+      (data as any).mediaType = 'file';
+    }
+    const effectiveMediaType = data.mediaType || (mediaUrl && text?.startsWith('[ไฟล์') ? 'file' : undefined);
+
+    // Don't send [ไฟล์: xxx] text to platform — only send the file/link
+    const platformText = (effectiveMediaType === 'file' || stickerId) ? undefined : text;
+    this.logger.log(`sendMessage: channel=${channel}, mediaType=${effectiveMediaType}, mediaUrl=${mediaUrl ? 'YES' : 'NO'}, sticker=${stickerId || 'NO'}, text=${(text || '').substring(0, 30)}`);
+
     try {
       if (isLine) {
-        const messages = this.buildLineMessages(text, mediaType, mediaUrl, previewUrl);
+        const messages = this.buildLineMessages(platformText, effectiveMediaType, mediaUrl, previewUrl, stickerId, stickerPackageId);
         sendMethod = await this.sendLineMessage(oduserId, messages, channel);
       } else {
-        await this.sendFacebookMessage(oduserId, text, mediaType, mediaUrl, channel);
+        // For Facebook: convert LINE sticker to image
+        const fbMediaType = stickerId ? 'image' : effectiveMediaType;
+        const fbMediaUrl = stickerId
+          ? `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`
+          : mediaUrl;
+        await this.sendFacebookMessage(oduserId, platformText, fbMediaType, fbMediaUrl, channel);
         sendMethod = 'facebook';
       }
       status = 'sent';
@@ -113,8 +185,13 @@ export class MessagesService {
       this.logger.error(`Failed to send message to ${channel}:${oduserId}: ${sendError}`);
     }
 
-    const preview = mediaType
-      ? `[You] [${mediaType === 'image' ? 'รูปภาพ' : 'วิดีโอ'}]`
+    const stickerUrl = stickerId ? `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png` : null;
+    const preview = stickerId
+      ? '[You] [สติกเกอร์]'
+      : effectiveMediaType === 'file'
+      ? `[You] [ไฟล์]`
+      : effectiveMediaType
+      ? `[You] [${effectiveMediaType === 'image' ? 'รูปภาพ' : 'วิดีโอ'}]`
       : `[You] ${(text || '').substring(0, 80)}`;
 
     // Save message with delivery status
@@ -123,15 +200,15 @@ export class MessagesService {
         data: {
           id: messageId,
           customerId: docId,
-          text: text || null,
+          text: stickerId ? '[สติกเกอร์]' : (text || null),
           type: 'OUTGOING',
           sender: 'ADMIN',
           timestamp: BigInt(timestamp),
           status,
           adminId: adminId || null,
           adminName: adminName || null,
-          mediaType: mediaType === 'image' ? 'IMAGE' : mediaType === 'video' ? 'VIDEO' : null,
-          mediaUrl: mediaUrl || null,
+          mediaType: stickerId ? 'IMAGE' : effectiveMediaType === 'image' ? 'IMAGE' : effectiveMediaType === 'video' ? 'VIDEO' : null,
+          mediaUrl: stickerUrl || mediaUrl || null,
           previewUrl: previewUrl || null,
         },
       }),
@@ -169,15 +246,15 @@ export class MessagesService {
     // Broadcast via WebSocket
     this.inboxGateway.emitNewMessage(docId, {
       id: messageId,
-      text: text || null,
+      text: stickerId ? '[สติกเกอร์]' : (text || null),
       type: 'outgoing',
       sender: 'admin',
       timestamp,
       status,
       adminId: adminId || null,
       adminName: adminName || null,
-      mediaType: mediaType || undefined,
-      mediaUrl: mediaUrl || undefined,
+      mediaType: stickerId ? 'image' : (effectiveMediaType || undefined),
+      mediaUrl: stickerUrl || mediaUrl || undefined,
     });
     this.inboxGateway.emitConversationUpdated({
       id: docId,
@@ -203,8 +280,18 @@ export class MessagesService {
     mediaType?: string,
     mediaUrl?: string,
     previewUrl?: string,
+    stickerId?: string,
+    stickerPackageId?: string,
   ): any[] {
     const messages: any[] = [];
+
+    if (stickerId && stickerPackageId) {
+      messages.push({
+        type: 'sticker',
+        packageId: stickerPackageId,
+        stickerId: stickerId,
+      });
+    }
 
     if (mediaType === 'image' && mediaUrl) {
       messages.push({
@@ -218,9 +305,17 @@ export class MessagesService {
         originalContentUrl: mediaUrl,
         previewImageUrl: previewUrl || mediaUrl,
       });
+    } else if (mediaType === 'file' && mediaUrl) {
+      // LINE doesn't support file type in messaging API
+      // Send as text with link instead
+      const fileName = decodeURIComponent(mediaUrl.split('/').pop() || 'file');
+      messages.push({
+        type: 'text',
+        text: `📎 ไฟล์: ${fileName}\n${mediaUrl}`,
+      });
     }
 
-    if (text) {
+    if (text && !(mediaType === 'file' && mediaUrl)) {
       messages.push({ type: 'text', text });
     }
 
@@ -277,8 +372,10 @@ export class MessagesService {
   ) {
     const pageToken = getFacebookPageToken(channel!);
 
-    // Send media first if present
+    // Send media/file first if present
     if (mediaType && mediaUrl) {
+      // Facebook attachment types: image, video, audio, file
+      const fbType = mediaType === 'file' ? 'file' : mediaType;
       await axios({
         url: 'https://graph.facebook.com/v18.0/me/messages',
         method: 'POST',
@@ -287,7 +384,7 @@ export class MessagesService {
           recipient: { id: userId },
           message: {
             attachment: {
-              type: mediaType,
+              type: fbType,
               payload: { url: mediaUrl, is_reusable: true },
             },
           },
@@ -295,8 +392,8 @@ export class MessagesService {
       });
     }
 
-    // Send text if present
-    if (text) {
+    // Send text if present (skip if file was sent with text like [ไฟล์: xxx])
+    if (text && !(mediaType === 'file' && text.startsWith('[ไฟล์'))) {
       await axios({
         url: 'https://graph.facebook.com/v18.0/me/messages',
         method: 'POST',

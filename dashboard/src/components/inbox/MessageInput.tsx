@@ -1,14 +1,46 @@
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
-import { Send, Loader2, Image, X, Zap, Paperclip, FileText } from "lucide-react";
+import { Send, Loader2, Image, X, Zap, Paperclip, FileText, Smile } from "lucide-react";
 import { QuickReplies } from "./QuickReplies";
+import { api } from "@/lib/api-client";
+
+// LINE official sticker packages (free for Messaging API)
+interface LineSticker { packageId: string; stickerId: string; }
+const LINE_STICKER_SETS: { name: string; packageId: string; stickerIds: string[] }[] = [
+  {
+    name: 'Moon',
+    packageId: '11537',
+    stickerIds: ['52002734','52002735','52002736','52002737','52002738','52002739','52002740','52002741','52002742','52002743','52002744','52002745'],
+  },
+  {
+    name: 'Brown & Friends',
+    packageId: '11538',
+    stickerIds: ['51626494','51626495','51626496','51626497','51626498','51626499','51626500','51626501','51626502','51626503','51626504','51626505'],
+  },
+  {
+    name: 'Brown Special',
+    packageId: '6325',
+    stickerIds: ['10979904','10979905','10979906','10979907','10979908','10979909','10979910','10979911','10979912','10979913','10979914','10979915'],
+  },
+  {
+    name: 'Cony Special',
+    packageId: '6359',
+    stickerIds: ['11069848','11069849','11069850','11069851','11069852','11069853','11069854','11069855','11069856','11069857','11069858','11069859'],
+  },
+];
+
+function stickerUrl(packageId: string, stickerId: string) {
+  return `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`;
+}
 
 interface MessageInputProps {
   onSend: (
     text: string,
-    media?: { file: File; mediaType: "image" | "video" | "file" }
+    media?: { file: File; mediaType: "image" | "video" | "file" },
+    sticker?: { packageId: string; stickerId: string }
   ) => Promise<void>;
   disabled?: boolean;
   placeholder?: string;
+  channelType?: "line" | "facebook";
 }
 
 export interface MessageInputHandle {
@@ -19,12 +51,14 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   onSend,
   disabled = false,
   placeholder = "Type a message...",
+  channelType,
 }, ref) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showStickers, setShowStickers] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -198,6 +232,62 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
         </div>
       )}
 
+      {/* Sticker picker */}
+      {showStickers && (
+        <div className="px-5 pt-3">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 max-h-64 overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-600">
+                {channelType === 'line' ? (
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block" />
+                    LINE Stickers
+                  </span>
+                ) : (
+                  'สติกเกอร์ (ส่งเป็นรูปภาพ)'
+                )}
+              </span>
+              <button onClick={() => setShowStickers(false)} className="p-1 rounded hover:bg-slate-100 text-slate-400">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {channelType === 'facebook' && (
+              <p className="text-[10px] text-amber-500 mb-2 bg-amber-50 rounded px-2 py-1">
+                Facebook จะได้รับสติกเกอร์เป็นรูปภาพ (ไม่ใช่สติกเกอร์แบบเคลื่อนไหว)
+              </p>
+            )}
+            {LINE_STICKER_SETS.map((set) => (
+              <div key={set.name} className="mb-3">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">{set.name}</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {set.stickerIds.map((sid) => (
+                    <button
+                      key={sid}
+                      onClick={async () => {
+                        setShowStickers(false);
+                        setSending(true);
+                        try {
+                          await onSend('', undefined, { packageId: set.packageId, stickerId: sid });
+                        } catch {}
+                        setSending(false);
+                      }}
+                      className="w-14 h-14 p-1 hover:bg-slate-100 rounded-lg transition-transform hover:scale-110"
+                    >
+                      <img
+                        src={stickerUrl(set.packageId, sid)}
+                        alt={`sticker-${sid}`}
+                        className="w-full h-full object-contain"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Quick replies popover */}
       {showTemplates && (
         <div className="px-5 pt-3">
@@ -259,6 +349,27 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             >
               <Paperclip className="w-4 h-4" />
             </button>
+
+          {/* Sticker button */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => { setShowStickers(!showStickers); setShowTemplates(false); }}
+              className={`p-2 rounded-lg transition-all duration-150 ${
+                showStickers
+                  ? "bg-emerald-50 text-emerald-500"
+                  : "text-slate-300 hover:text-slate-500 hover:bg-slate-50"
+              }`}
+              title={channelType === 'facebook' ? 'สติกเกอร์ (ส่งเป็นรูปภาพ)' : 'LINE สติกเกอร์'}
+            >
+              <Smile className="w-4 h-4" />
+            </button>
+            {channelType === 'line' && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full flex items-center justify-center">
+                <span className="text-[6px] text-white font-bold">L</span>
+              </span>
+            )}
+          </div>
           </div>
 
           {/* Textarea */}

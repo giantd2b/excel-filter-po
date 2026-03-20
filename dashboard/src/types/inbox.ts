@@ -1,5 +1,11 @@
 // Types for Unified Inbox
 
+export interface MessageReaction {
+  emoji: string;
+  adminName: string;
+  adminId?: string;
+}
+
 export interface Message {
   id: string;
   text?: string;
@@ -12,6 +18,7 @@ export interface Message {
   mediaType?: "image" | "video";
   mediaUrl?: string;
   previewUrl?: string;
+  reactions?: MessageReaction[];
 }
 
 export interface ChatUser {
@@ -71,6 +78,12 @@ export const LINE_CHANNELS: Record<string, ChannelConfig> = {
     name: "โต๊ะจีน",
     type: "line",
     destinationId: "U85b0000da2c00ce71e42c98dad76b2a9",
+  },
+  "Line_ไอริสเติมบุญ": {
+    id: "Line_ไอริสเติมบุญ",
+    name: "ไอริสเติมบุญ",
+    type: "line",
+    destinationId: "U01bce79462ed13d1e983d1e9f72dde27",
   },
   "Line_ทดสอบระบบ": {
     id: "Line_ทดสอบระบบ",

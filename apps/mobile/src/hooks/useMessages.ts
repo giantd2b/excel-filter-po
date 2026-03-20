@@ -24,12 +24,14 @@ const PAGE_SIZE = 50;
 function detectType(m: any): string {
   const text = m.text || '';
   const mediaType = (m.mediaType || '').toLowerCase();
-  const url = (m.mediaUrl || '').toLowerCase();
+  const url = decodeURIComponent(m.mediaUrl || '').toLowerCase();
+
+  // Explicit file mediaType from API
+  if (mediaType === 'file') return 'file';
 
   // File detection: text contains [ไฟล์ or [file], or URL ends with non-image extension
   if (text.includes('[ไฟล์') || text.includes('[file]')) return 'file';
-  if (url.endsWith('.pdf') || url.endsWith('.doc') || url.endsWith('.docx') ||
-      url.endsWith('.xlsx') || url.endsWith('.xls') || url.endsWith('.zip')) return 'file';
+  if (url.match(/\.(pdf|doc|docx|xlsx|xls|zip|rar|csv|pptx?)(\?|$)/)) return 'file';
 
   // Sticker detection
   if (text.includes('[สติกเกอร์]') || url.includes('stickershop.line-scdn.net')) return 'image';
@@ -39,6 +41,9 @@ function detectType(m: any): string {
 
   if (mediaType === 'image') return 'image';
   if (mediaType === 'video') return 'video';
+
+  // If has mediaUrl but no recognized type, treat as file
+  if (m.mediaUrl && !mediaType) return 'file';
 
   return 'text';
 }

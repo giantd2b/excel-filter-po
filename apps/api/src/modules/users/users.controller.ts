@@ -60,6 +60,11 @@ export class UsersController {
     return this.usersService.getCustomerJobs(id);
   }
 
+  @Get(':id/quotations')
+  async getCustomerQuotations(@Param('id') id: string) {
+    return this.usersService.getCustomerQuotations(id);
+  }
+
   @Post('bulk-read')
   async bulkMarkAsRead(@Body() body: { ids: string[] }) {
     let count = 0;

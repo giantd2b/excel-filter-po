@@ -70,7 +70,8 @@ export function ConversationArea({
 
   const handleSendMessage = async (
     text: string,
-    media?: { file: File; mediaType: "image" | "video" | "file" }
+    media?: { file: File; mediaType: "image" | "video" | "file" },
+    sticker?: { packageId: string; stickerId: string }
   ) => {
     if (!selectedUser) return;
 
@@ -78,7 +79,7 @@ export function ConversationArea({
     try {
       let mediaUrl: string | undefined;
       let previewUrl: string | undefined;
-      let mediaType: "image" | "video" | undefined;
+      let mediaType: "image" | "video" | "file" | undefined;
       let sendText = text || undefined;
 
       // Upload media first if present
@@ -87,8 +88,8 @@ export function ConversationArea({
         mediaUrl = uploaded.url;
         previewUrl = uploaded.previewUrl;
         if (media.mediaType === "file") {
-          // For non-media files, send as text with file link
           sendText = sendText || `[ไฟล์: ${media.file.name}]`;
+          mediaType = "file";
         } else {
           mediaType = uploaded.mediaType;
         }
@@ -102,6 +103,7 @@ export function ConversationArea({
         mediaUrl,
         previewUrl,
         channel: selectedUser.channel,
+        ...(sticker ? { stickerId: sticker.stickerId, stickerPackageId: sticker.packageId } : {}),
       });
 
       onMessageSent();
@@ -266,6 +268,7 @@ export function ConversationArea({
       {/* Input */}
       <MessageInput
         ref={messageInputRef}
+        channelType={selectedUser.channelType === 'line' ? 'line' : 'facebook'}
         onSend={handleSendMessage}
         disabled={loading || !!error}
         placeholder={`Reply to ${selectedUser.displayName}...`}

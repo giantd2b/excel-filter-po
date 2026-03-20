@@ -14,6 +14,7 @@ import TemplatesPage from "@/pages/TemplatesPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import KnowledgePage from "@/pages/KnowledgePage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
+import AgendaGeneratorPage from "@/pages/AgendaGeneratorPage";
 
 export const router = createBrowserRouter([
   {
@@ -77,6 +78,10 @@ export const router = createBrowserRouter([
       {
         path: "api-keys",
         element: <ApiKeysPage />,
+      },
+      {
+        path: "agenda",
+        element: <AgendaGeneratorPage />,
       },
     ],
   },

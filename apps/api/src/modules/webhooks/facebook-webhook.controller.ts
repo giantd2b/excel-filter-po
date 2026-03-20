@@ -50,16 +50,23 @@ export class FacebookWebhookController {
             fbbot,
           );
         } else if (event.message.attachments) {
-          for (const attachment of event.message.attachments) {
+          const attachments = event.message.attachments;
+          for (let i = 0; i < attachments.length; i++) {
+            const attachment = attachments[i];
             const type = attachment.type; // image, video, audio, file
             const url = attachment.payload?.url;
             if (!url) continue;
+
+            // Append index for multiple attachments to avoid duplicate message IDs
+            const msgId = attachments.length > 1
+              ? `${event.message.mid}_${i}`
+              : event.message.mid;
 
             if (type === 'image') {
               await this.webhookService.processFacebookImageMessage(
                 url,
                 event.sender.id,
-                event.message.mid,
+                msgId,
                 fbToken,
                 fbbot,
               );
@@ -67,7 +74,7 @@ export class FacebookWebhookController {
               // video, audio, file, sticker
               await this.webhookService.processFacebookMediaMessage(
                 event.sender.id,
-                event.message.mid,
+                msgId,
                 event.timestamp,
                 url,
                 type,

@@ -212,9 +212,11 @@ interface SendMessageParams {
   oduserId: string;
   docId: string;
   text?: string;
-  mediaType?: "image" | "video";
+  mediaType?: "image" | "video" | "file";
   mediaUrl?: string;
   previewUrl?: string;
+  stickerId?: string;
+  stickerPackageId?: string;
   channel: string;
 }
 

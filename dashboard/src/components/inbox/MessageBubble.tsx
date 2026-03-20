@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Message } from "@/types/inbox";
-import { Check, CheckCheck, AlertCircle, X, FileDown, Volume2 } from "lucide-react";
+import { Check, CheckCheck, AlertCircle, X, FileDown, Volume2, SmilePlus } from "lucide-react";
+import { api } from "@/lib/api-client";
+
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "🙏", "✅"];
 
 interface MessageBubbleProps {
   message: Message;
@@ -9,6 +12,8 @@ interface MessageBubbleProps {
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isOutgoing = message.type === "outgoing";
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [showReactions, setShowReactions] = useState(false);
+  const [reactions, setReactions] = useState(message.reactions || []);
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -23,7 +28,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   return (
     <>
       <div
-        className={`flex ${isOutgoing ? "justify-end" : "justify-start"} mb-2.5`}
+        className={`flex ${isOutgoing ? "justify-end" : "justify-start"} mb-2.5 group relative`}
       >
         <div
           className={`max-w-[65%] overflow-hidden transition-all duration-150 ${
@@ -122,7 +127,59 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             </div>
           </div>
         </div>
+
+        {/* React button - shows on hover */}
+        <button
+          onClick={() => setShowReactions(!showReactions)}
+          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 self-center ${
+            isOutgoing ? "order-first mr-1" : "ml-1"
+          }`}
+        >
+          <SmilePlus className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Reaction picker */}
+        {showReactions && (
+          <div className={`absolute ${isOutgoing ? "right-0" : "left-0"} -top-8 z-20 flex gap-0.5 bg-white rounded-full shadow-lg border border-slate-200 px-1.5 py-1`}>
+            {QUICK_REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={async () => {
+                  setShowReactions(false);
+                  try {
+                    await api.post(`/messages/${message.id}/react`, { emoji });
+                    setReactions(prev => {
+                      const filtered = prev.filter(r => r.adminId !== 'self');
+                      return [...filtered, { emoji, adminName: 'You', adminId: 'self' }];
+                    });
+                  } catch {}
+                }}
+                className="w-7 h-7 flex items-center justify-center hover:bg-slate-100 rounded-full text-base transition-transform hover:scale-125"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Reactions display */}
+      {reactions.length > 0 && (
+        <div className={`flex ${isOutgoing ? "justify-end" : "justify-start"} -mt-1.5 mb-1 px-2`}>
+          <div className="flex gap-0.5 bg-white rounded-full shadow-sm border border-slate-100 px-1.5 py-0.5">
+            {Object.entries(
+              reactions.reduce<Record<string, number>>((acc, r) => {
+                acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                return acc;
+              }, {})
+            ).map(([emoji, count]) => (
+              <span key={emoji} className="text-xs" title={reactions.filter(r => r.emoji === emoji).map(r => r.adminName).join(', ')}>
+                {emoji}{count > 1 ? <span className="text-[9px] text-slate-400 ml-0.5">{count}</span> : null}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightboxUrl && (

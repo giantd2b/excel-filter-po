@@ -250,7 +250,7 @@ export default function ChatScreen({ route }: any) {
         oduserId: userId,
         docId,
         text: isImage || isVideo ? undefined : `[ไฟล์: ${asset.name}]`,
-        mediaType: isImage ? 'image' : isVideo ? 'video' : undefined,
+        mediaType: isImage ? 'image' : isVideo ? 'video' : 'file',
         mediaUrl: uploadResult.url,
         previewUrl: uploadResult.previewUrl || uploadResult.url,
         channel,

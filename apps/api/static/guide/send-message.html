@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>คู่มือการส่งข้อความ - IRIS CRM</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: #f8fafc;
+      color: #334155;
+      line-height: 1.7;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      font-size: 16px;
+      color: #64748b;
+    }
+
+    .section {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      border: 1px solid #f1f5f9;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title .icon {
+      font-size: 24px;
+    }
+
+    .step {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      background: #6366f1;
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-content strong {
+      color: #1e293b;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .badge-line {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-fb {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .badge-both {
+      background: #f3e8ff;
+      color: #7c3aed;
+    }
+
+    .badge-note {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .note {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      padding: 14px 18px;
+      border-radius: 0 10px 10px 0;
+      margin: 16px 0;
+      font-size: 14px;
+      color: #92400e;
+    }
+
+    .note strong {
+      color: #78350f;
+    }
+
+    .tip {
+      background: #f0fdf4;
+      border-left: 4px solid #22c55e;
+      padding: 14px 18px;
+      border-radius: 0 10px 10px 0;
+      margin: 16px 0;
+      font-size: 14px;
+      color: #166534;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+
+    .comparison-table th {
+      background: #f8fafc;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: #475569;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .comparison-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .comparison-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .status-ok { color: #16a34a; font-weight: 600; }
+    .status-alt { color: #d97706; font-weight: 600; }
+    .status-no { color: #dc2626; font-weight: 600; }
+
+    .flow-diagram {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      text-align: center;
+    }
+
+    .flow-arrow {
+      color: #6366f1;
+      font-size: 20px;
+      margin: 8px 0;
+    }
+
+    .flow-box {
+      display: inline-block;
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 8px 20px;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .flow-box.highlight {
+      border-color: #6366f1;
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+
+    .helper-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .helper-card {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+
+    .helper-card .emoji {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .helper-card .name {
+      font-weight: 600;
+      color: #1e293b;
+      font-size: 14px;
+    }
+
+    .helper-card .desc {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h1>📱 คู่มือการส่งข้อความ</h1>
+      <p>IRIS CRM — ระบบจัดการแชท LINE และ Facebook</p>
+    </div>
+
+    <!-- ส่งข้อความ -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">💬</span> ส่งข้อความ
+        <span class="badge badge-both">LINE + Facebook</span>
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          พิมพ์ข้อความในช่องด้านล่างของหน้าแชท
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          กด <strong>Enter</strong> หรือกดปุ่ม <strong>ส่ง</strong> เพื่อส่งข้อความ
+        </div>
+      </div>
+      <div class="tip">
+        💡 กด <strong>Shift + Enter</strong> เพื่อขึ้นบรรทัดใหม่โดยไม่ส่งข้อความ
+      </div>
+    </div>
+
+    <!-- ส่งรูปภาพ -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">🖼️</span> ส่งรูปภาพ / วิดีโอ
+        <span class="badge badge-both">LINE + Facebook</span>
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          กดปุ่ม <strong>🖼️ รูปภาพ</strong> ในแถบเครื่องมือ
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          เลือกรูปภาพหรือวิดีโอจากเครื่อง (ขนาดไม่เกิน 10 MB)
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          จะมีตัวอย่างรูปแสดงก่อนส่ง → กดปุ่ม <strong>ส่ง</strong>
+        </div>
+      </div>
+      <div class="note">
+        ⚠️ รูปภาพจะถูกย่อขนาดอัตโนมัติเพื่อให้ส่งได้เร็วขึ้น
+      </div>
+    </div>
+
+    <!-- ส่งไฟล์ -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">📎</span> ส่งไฟล์ (PDF, เอกสาร)
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          กดปุ่ม <strong>📎 แนบไฟล์</strong> ในแถบเครื่องมือ
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          เลือกไฟล์ (PDF, Word, Excel, ZIP ฯลฯ)
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          กดปุ่ม <strong>ส่ง</strong>
+        </div>
+      </div>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>ช่องทาง</th>
+            <th>ลูกค้าจะได้รับแบบไหน</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge badge-fb">Facebook</span></td>
+            <td><span class="status-ok">✅ ได้รับไฟล์ เปิดดูได้เลย</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-line">LINE</span></td>
+            <td><span class="status-alt">⚡ ได้รับเป็นลิงก์ กดเพื่อดาวน์โหลด</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        ⚠️ LINE ไม่รองรับการส่งไฟล์โดยตรง ลูกค้าจะได้รับเป็นข้อความพร้อมลิงก์ดาวน์โหลด
+      </div>
+    </div>
+
+    <!-- ส่งสติกเกอร์ -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">😊</span> ส่งสติกเกอร์ LINE
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          กดปุ่ม <strong>😊 สติกเกอร์</strong> ในแถบเครื่องมือ
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          เลือกสติกเกอร์ที่ต้องการ (มี 4 ชุด: Moon, Brown & Friends, Brown Special, Cony Special)
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          กดที่สติกเกอร์เพื่อส่งทันที
+        </div>
+      </div>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>ช่องทาง</th>
+            <th>ลูกค้าจะได้รับแบบไหน</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge badge-line">LINE</span></td>
+            <td><span class="status-ok">✅ ได้รับสติกเกอร์เคลื่อนไหว (เหมือนส่งจาก LINE ปกติ)</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-fb">Facebook</span></td>
+            <td><span class="status-alt">⚡ ได้รับเป็นรูปสติกเกอร์ (ไม่เคลื่อนไหว)</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="tip">
+        💡 ปุ่มสติกเกอร์จะมีเครื่องหมาย <strong style="color:#16a34a">L</strong> สีเขียว เมื่อแชทกับลูกค้า LINE
+      </div>
+    </div>
+
+    <!-- ข้อความด่วน -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">⚡</span> ข้อความด่วน (Quick Reply)
+        <span class="badge badge-both">LINE + Facebook</span>
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          กดปุ่ม <strong>⚡</strong> ในแถบเครื่องมือ
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          ค้นหาหรือเลือกข้อความที่ต้องการ
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          ข้อความจะถูกวางในช่องพิมพ์ → แก้ไขได้ก่อนกดส่ง
+        </div>
+      </div>
+      <div class="tip">
+        💡 เพิ่ม/แก้ไขข้อความด่วนได้ที่เมนู <strong>ตั้งค่า → เทมเพลต</strong>
+      </div>
+    </div>
+
+    <!-- รีแอคชั่น -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">👍</span> รีแอคชั่น (Emoji Reaction)
+        <span class="badge badge-note">เฉพาะแอดมิน</span>
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          เลื่อนเมาส์ไปที่ข้อความ → จะมีปุ่ม 😊 ปรากฏ
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          กดเลือก Emoji ที่ต้องการ (👍 ❤️ 😂 😮 🙏 ✅)
+        </div>
+      </div>
+      <div class="note">
+        ⚠️ รีแอคชั่นจะแสดงเฉพาะในระบบ CRM เท่านั้น ลูกค้าจะ<strong>ไม่เห็น</strong>รีแอคชั่น<br>
+        ใช้สำหรับทำเครื่องหมายข้อความภายในทีมแอดมิน เช่น ✅ = จัดการแล้ว
+      </div>
+    </div>
+
+    <!-- เครื่องมือทั้งหมด -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">🔧</span> เครื่องมือทั้งหมดในหน้าแชท
+      </div>
+      <div class="helper-grid">
+        <div class="helper-card">
+          <div class="emoji">⚡</div>
+          <div class="name">ข้อความด่วน</div>
+          <div class="desc">เลือกข้อความสำเร็จรูป</div>
+        </div>
+        <div class="helper-card">
+          <div class="emoji">🖼️</div>
+          <div class="name">รูปภาพ/วิดีโอ</div>
+          <div class="desc">ส่งรูปหรือวิดีโอ</div>
+        </div>
+        <div class="helper-card">
+          <div class="emoji">📎</div>
+          <div class="name">แนบไฟล์</div>
+          <div class="desc">ส่ง PDF, เอกสาร</div>
+        </div>
+        <div class="helper-card">
+          <div class="emoji">😊</div>
+          <div class="name">สติกเกอร์</div>
+          <div class="desc">ส่งสติกเกอร์ LINE</div>
+        </div>
+        <div class="helper-card">
+          <div class="emoji">🤖</div>
+          <div class="name">AI แนะนำ</div>
+          <div class="desc">ข้อความแนะนำจาก AI</div>
+        </div>
+        <div class="helper-card">
+          <div class="emoji">👍</div>
+          <div class="name">รีแอคชั่น</div>
+          <div class="desc">ทำเครื่องหมายข้อความ</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- สรุป LINE vs Facebook -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">📊</span> สรุปความแตกต่าง LINE กับ Facebook
+      </div>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>ประเภท</th>
+            <th><span class="badge badge-line">LINE</span></th>
+            <th><span class="badge badge-fb">Facebook</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>💬 ข้อความ</td>
+            <td class="status-ok">✅ ส่งได้</td>
+            <td class="status-ok">✅ ส่งได้</td>
+          </tr>
+          <tr>
+            <td>🖼️ รูปภาพ</td>
+            <td class="status-ok">✅ ส่งได้</td>
+            <td class="status-ok">✅ ส่งได้</td>
+          </tr>
+          <tr>
+            <td>🎥 วิดีโอ</td>
+            <td class="status-ok">✅ ส่งได้</td>
+            <td class="status-ok">✅ ส่งได้</td>
+          </tr>
+          <tr>
+            <td>📎 ไฟล์ PDF</td>
+            <td class="status-alt">⚡ ส่งเป็นลิงก์</td>
+            <td class="status-ok">✅ ส่งเป็นไฟล์</td>
+          </tr>
+          <tr>
+            <td>😊 สติกเกอร์</td>
+            <td class="status-ok">✅ สติกเกอร์เคลื่อนไหว</td>
+            <td class="status-alt">⚡ ส่งเป็นรูปภาพ</td>
+          </tr>
+          <tr>
+            <td>⏰ เวลาตอบ</td>
+            <td class="status-ok">✅ ตอบได้ตลอด</td>
+            <td class="status-alt">⚡ ต้องตอบภายใน 24 ชม.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note">
+        ⚠️ <strong>Facebook มีกฎ 24 ชั่วโมง:</strong> ต้องตอบลูกค้าภายใน 24 ชั่วโมงหลังจากลูกค้าส่งข้อความล่าสุด หากเกินเวลา จะไม่สามารถส่งข้อความได้
+      </div>
+    </div>
+
+    <!-- ปัญหาที่พบบ่อย -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">❓</span> ปัญหาที่พบบ่อย
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <strong>Q: ส่งข้อความไม่ได้ ขึ้น "ส่งไม่สำเร็จ"</strong>
+        <p style="margin-top: 4px; color: #64748b;">
+          → ถ้าเป็น Facebook: ตรวจสอบว่าลูกค้าส่งข้อความมาภายใน 24 ชั่วโมงหรือไม่<br>
+          → ถ้าเป็น LINE: ลองส่งใหม่อีกครั้ง อาจเป็นปัญหาการเชื่อมต่อชั่วคราว
+        </p>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <strong>Q: ส่งไฟล์แล้วลูกค้า LINE เปิดไม่ได้</strong>
+        <p style="margin-top: 4px; color: #64748b;">
+          → LINE จะได้รับเป็นลิงก์ ลูกค้าต้องกดลิงก์เพื่อเปิดดูในเบราว์เซอร์
+        </p>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <strong>Q: ส่งสติกเกอร์ให้ลูกค้า Facebook แล้วไม่เคลื่อนไหว</strong>
+        <p style="margin-top: 4px; color: #64748b;">
+          → สติกเกอร์ LINE จะถูกส่งเป็นรูปภาพให้ลูกค้า Facebook ไม่สามารถเคลื่อนไหวได้
+        </p>
+      </div>
+
+      <div>
+        <strong>Q: รูปที่ลูกค้าส่งมาไม่แสดง</strong>
+        <p style="margin-top: 4px; color: #64748b;">
+          → รูปบางรูปอาจหมดอายุ (โดยเฉพาะจาก LINE) ถ้าไม่ถูกบันทึกทันเวลา ให้ขอให้ลูกค้าส่งใหม่
+        </p>
+      </div>
+    </div>
+
+    <div class="footer">
+      IRIS CRM — คู่มือการใช้งานสำหรับแอดมิน<br>
+      อัปเดตล่าสุด: มีนาคม 2569
+    </div>
+
+  </div>
+</body>
+</html>

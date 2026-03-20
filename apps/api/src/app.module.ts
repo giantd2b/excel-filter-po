@@ -15,6 +15,7 @@ import { AdminsModule } from './modules/admins/admins.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { ExternalModule } from './modules/external/external.module';
+import { AgendaModule } from './modules/agenda/agenda.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ExternalModule } from './modules/external/external.module';
     AnalyticsModule,
     KnowledgeModule,
     ExternalModule,
+    AgendaModule,
   ],
 })
 export class AppModule {}

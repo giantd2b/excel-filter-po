@@ -113,6 +113,14 @@ export class InboxGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  emitReactionUpdate(userId: string, messageId: string, reactions: any[]) {
+    this.server.to(`messages:${userId}`).emit('reaction:update', {
+      userId,
+      messageId,
+      reactions,
+    });
+  }
+
   emitSuggestionsUpdate(userId: string, suggestions: string[]) {
     this.server.to(`messages:${userId}`).emit('suggestions:update', {
       userId,
