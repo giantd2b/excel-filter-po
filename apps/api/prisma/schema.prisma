@@ -21,6 +21,7 @@ model Customer {
   channel           String             // e.g. "Line_IRIS", "FB_เติมบุญ"
   channelType       ChannelType        @map("channel_type")
   phoneNumber       String?            @map("phone_number")
+  phoneClean        String?            @map("phone_clean")     // Digits only: 0912345678
   statusMessage     String?            @map("status_message")
 
   // Platform read token (LINE markAsReadToken — never expires)
