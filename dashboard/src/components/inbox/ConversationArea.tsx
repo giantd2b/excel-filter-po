@@ -136,10 +136,10 @@ export function ConversationArea({
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white">
+      <div className="flex items-center justify-between px-5 h-[57px] border-b border-slate-100/80 bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 ring-2 ring-white shadow-sm">
+            <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50 ring-2 ring-white shadow-sm">
               {selectedUser.pictureUrl ? (
                 <img
                   src={selectedUser.pictureUrl}
@@ -155,20 +155,20 @@ export function ConversationArea({
               )}
             </div>
             <div
-              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
+              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-[2px] border-white ${
                 selectedUser.channelType === "line"
-                  ? "bg-emerald-500"
-                  : "bg-blue-500"
+                  ? "bg-emerald-400"
+                  : "bg-blue-400"
               }`}
             />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-800 leading-tight">
+            <h3 className="text-[13px] font-semibold text-slate-800 leading-tight tracking-[-0.01em]">
               {selectedUser.displayName}
             </h3>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span
-                className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-[2px] rounded-[4px] ${
                   selectedUser.channelType === "line"
                     ? "bg-emerald-50 text-emerald-600"
                     : "bg-blue-50 text-blue-600"
@@ -176,7 +176,7 @@ export function ConversationArea({
               >
                 {channelLabel}
               </span>
-              <span className="text-[11px] text-slate-400">{channelName}</span>
+              <span className="text-[11px] text-slate-400 font-medium">{channelName}</span>
             </div>
           </div>
         </div>
@@ -187,7 +187,7 @@ export function ConversationArea({
               setCustomerStatus(selectedUser.id, "FOLLOW_UP");
               onMessageSent();
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-amber-200 text-amber-600 bg-amber-50 hover:bg-amber-100 transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-100 transition-all duration-150"
           >
             <Clock className="w-3 h-3" />
             Follow up
@@ -197,15 +197,18 @@ export function ConversationArea({
               setCustomerStatus(selectedUser.id, "RESOLVED");
               onMessageSent();
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 transition-all duration-150"
           >
             <CheckCircle2 className="w-3 h-3" />
             Resolve
           </button>
           {onToggleInfoPanel && (
+            <div className="w-px h-5 bg-slate-200/60 mx-0.5" />
+          )}
+          {onToggleInfoPanel && (
             <button
               onClick={onToggleInfoPanel}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all duration-150"
               title="Customer info"
             >
               <PanelRightOpen className="w-4 h-4" />
@@ -215,27 +218,27 @@ export function ConversationArea({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 bg-slate-50/50">
+      <div className="flex-1 overflow-y-auto px-6 py-5 bg-slate-50/30">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
-            <p className="text-xs text-slate-400 font-medium">
+            <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin" />
+            <p className="text-[12px] text-slate-400 font-medium">
               Loading messages...
             </p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mb-3">
-              <WifiOff className="w-5 h-5 text-red-400" />
+              <WifiOff className="w-4 h-4 text-red-400" />
             </div>
-            <p className="text-sm font-medium text-slate-600 mb-1">
+            <p className="text-[13px] font-semibold text-slate-600 mb-1">
               Could not load messages
             </p>
-            <p className="text-xs text-slate-400">{error}</p>
+            <p className="text-[12px] text-slate-400">{error}</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full">
-            <p className="text-sm text-slate-400">
+            <p className="text-[13px] text-slate-400">
               No messages yet. Start the conversation!
             </p>
           </div>

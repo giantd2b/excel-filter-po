@@ -100,7 +100,7 @@ export function CustomerInfoPanel({
   };
 
   const formatDate = (ts: number | string) => {
-    if (!ts) return "—";
+    if (!ts) return "\u2014";
     const d = typeof ts === "string" ? new Date(ts) : new Date(ts);
     return d.toLocaleDateString("th-TH", {
       day: "numeric",
@@ -167,7 +167,7 @@ export function CustomerInfoPanel({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full bg-white">
-        <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+        <div className="w-5 h-5 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -175,18 +175,20 @@ export function CustomerInfoPanel({
   if (!details) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-white text-center px-6">
-        <User className="w-8 h-8 text-slate-300 mb-2" />
-        <p className="text-xs text-slate-400">
+        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center mb-2.5">
+          <User className="w-5 h-5 text-slate-300" />
+        </div>
+        <p className="text-[12px] text-slate-400">
           Select a customer to view details
         </p>
       </div>
     );
   }
 
-  const statusColors: Record<string, string> = {
-    OPEN: "bg-blue-50 text-blue-600 border-blue-200",
-    FOLLOW_UP: "bg-amber-50 text-amber-600 border-amber-200",
-    RESOLVED: "bg-emerald-50 text-emerald-600 border-emerald-200",
+  const statusConfig: Record<string, { bg: string; text: string; activeBg: string; activeBorder: string }> = {
+    OPEN: { bg: "bg-white", text: "text-blue-600", activeBg: "bg-blue-50", activeBorder: "border-blue-200" },
+    FOLLOW_UP: { bg: "bg-white", text: "text-amber-600", activeBg: "bg-amber-50", activeBorder: "border-amber-200" },
+    RESOLVED: { bg: "bg-white", text: "text-emerald-600", activeBg: "bg-emerald-50", activeBorder: "border-emerald-200" },
   };
   const statusLabels: Record<string, string> = {
     OPEN: "Open",
@@ -198,7 +200,7 @@ export function CustomerInfoPanel({
     <div className="flex flex-col h-full bg-white overflow-y-auto">
       {/* Profile header */}
       <div className="px-5 py-5 text-center border-b border-slate-100">
-        <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 mx-auto ring-4 ring-white shadow-md">
+        <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50 mx-auto ring-[3px] ring-white shadow-md">
           {details.pictureUrl ? (
             <img
               src={details.pictureUrl}
@@ -211,20 +213,20 @@ export function CustomerInfoPanel({
             </div>
           )}
         </div>
-        <h3 className="text-sm font-semibold text-slate-800 mt-2.5">
+        <h3 className="text-[14px] font-semibold text-slate-800 mt-2.5 tracking-[-0.01em]">
           {details.nickname || details.displayName}
         </h3>
         {details.nickname && (
-          <p className="text-[10px] text-slate-400 italic">({details.displayName})</p>
+          <p className="text-[10px] text-slate-400 italic mt-0.5">({details.displayName})</p>
         )}
         {editingNickname ? (
-          <div className="flex items-center gap-1.5 mt-1.5">
+          <div className="flex items-center justify-center gap-1.5 mt-2">
             <input
               type="text"
               value={nicknameValue}
               onChange={(e) => setNicknameValue(e.target.value)}
               placeholder="ตั้งชื่อเรียก..."
-              className="w-28 text-[11px] px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-28 text-[11px] px-2.5 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/15 focus:border-indigo-300 transition-all"
               autoFocus
             />
             <button
@@ -233,13 +235,13 @@ export function CustomerInfoPanel({
                 setDetails((prev: any) => ({ ...prev, nickname: nicknameValue.trim() || null }));
                 setEditingNickname(false);
               }}
-              className="text-[10px] px-2 py-1 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+              className="text-[10px] px-2 py-1 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 font-medium transition-colors"
             >
               บันทึก
             </button>
             <button
               onClick={() => setEditingNickname(false)}
-              className="text-[10px] text-slate-400 hover:text-slate-600"
+              className="text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
             >
               ยกเลิก
             </button>
@@ -247,49 +249,55 @@ export function CustomerInfoPanel({
         ) : (
           <button
             onClick={() => setEditingNickname(true)}
-            className="text-[10px] text-indigo-500 hover:text-indigo-600 font-medium mt-0.5"
+            className="text-[10px] text-indigo-500 hover:text-indigo-600 font-medium mt-1 transition-colors"
           >
             {details.nickname ? "แก้ไขชื่อเรียก" : "ตั้งชื่อเรียก"}
           </button>
         )}
-        <span
-          className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded mt-1 ${
-            details.channelType === "line" || details.channelType === "LINE"
-              ? "bg-emerald-50 text-emerald-600"
-              : "bg-blue-50 text-blue-600"
-          }`}
-        >
-          {details.channelType === "line" || details.channelType === "LINE"
-            ? "LINE"
-            : "Facebook"}{" "}
-          &middot;{" "}
-          {(details.channel || "").replace("Line_", "").replace("FB_", "")}
-        </span>
+        <div className="mt-1.5">
+          <span
+            className={`inline-flex items-center text-[10px] font-semibold px-2 py-[3px] rounded-md ${
+              details.channelType === "line" || details.channelType === "LINE"
+                ? "bg-emerald-50 text-emerald-600"
+                : "bg-blue-50 text-blue-600"
+            }`}
+          >
+            {details.channelType === "line" || details.channelType === "LINE"
+              ? "LINE"
+              : "Facebook"}{" "}
+            &middot;{" "}
+            {(details.channel || "").replace("Line_", "").replace("FB_", "")}
+          </span>
+        </div>
       </div>
 
       {/* Status & Assignment */}
-      <div className="px-4 py-3 border-b border-slate-100 space-y-2.5">
+      <div className="px-4 py-3.5 border-b border-slate-100 space-y-3">
         {/* Status buttons */}
         <div className="flex gap-1.5">
-          {(["OPEN", "FOLLOW_UP", "RESOLVED"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => handleSetStatus(s)}
-              className={`flex-1 text-[10px] font-semibold py-1.5 rounded-md border transition-all ${
-                details.status === s
-                  ? statusColors[s]
-                  : "bg-white text-slate-400 border-slate-200 hover:border-slate-300"
-              }`}
-            >
-              {statusLabels[s]}
-            </button>
-          ))}
+          {(["OPEN", "FOLLOW_UP", "RESOLVED"] as const).map((s) => {
+            const cfg = statusConfig[s];
+            const isActive = details.status === s;
+            return (
+              <button
+                key={s}
+                onClick={() => handleSetStatus(s)}
+                className={`flex-1 text-[10px] font-semibold py-[6px] rounded-lg border transition-all duration-150 ${
+                  isActive
+                    ? `${cfg.activeBg} ${cfg.text} ${cfg.activeBorder}`
+                    : "bg-white text-slate-400 border-slate-200/80 hover:border-slate-300 hover:text-slate-500"
+                }`}
+              >
+                {statusLabels[s]}
+              </button>
+            );
+          })}
         </div>
 
         {/* Assignment */}
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-slate-400 font-medium">
-            Assign
+          <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-[0.06em]">
+            Assigned
           </span>
           {details.assignedToName ? (
             <div className="flex items-center gap-1.5">
@@ -298,7 +306,7 @@ export function CustomerInfoPanel({
               </span>
               <button
                 onClick={handleUnassign}
-                className="p-0.5 rounded text-slate-400 hover:text-red-500"
+                className="p-0.5 rounded text-slate-300 hover:text-red-500 transition-colors"
                 title="Unassign"
               >
                 <UserX className="w-3 h-3" />
@@ -307,7 +315,7 @@ export function CustomerInfoPanel({
           ) : (
             <button
               onClick={handleAssign}
-              className="flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-600"
+              className="flex items-center gap-1 text-[11px] font-medium text-indigo-500 hover:text-indigo-600 transition-colors"
             >
               <UserCheck className="w-3 h-3" />
               Assign to me
@@ -317,19 +325,19 @@ export function CustomerInfoPanel({
       </div>
 
       {/* Info */}
-      <div className="px-4 py-3 border-b border-slate-100 space-y-2.5">
+      <div className="px-4 py-3.5 border-b border-slate-100 space-y-3">
         {/* Phone */}
         {details.phoneNumber && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Phone className="w-3 h-3 text-slate-400" />
-              <span className="text-[12px] text-slate-700">
+              <Phone className="w-3 h-3 text-slate-300" />
+              <span className="text-[12px] text-slate-700 font-medium tabular-nums">
                 {details.phoneNumber}
               </span>
             </div>
             <button
               onClick={() => copyPhone(details.phoneNumber)}
-              className="p-1 rounded text-slate-400 hover:text-slate-600"
+              className="p-1 rounded-md text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-all duration-150"
             >
               {copiedPhone ? (
                 <Check className="w-3 h-3 text-emerald-500" />
@@ -342,25 +350,25 @@ export function CustomerInfoPanel({
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="bg-slate-50 rounded-lg px-2.5 py-2">
-            <div className="flex items-center gap-1 mb-0.5">
-              <MessageCircle className="w-3 h-3 text-slate-400" />
-              <span className="text-[9px] font-medium text-slate-400 uppercase">
+          <div className="bg-slate-50/80 rounded-lg px-3 py-2.5">
+            <div className="flex items-center gap-1.5 mb-1">
+              <MessageCircle className="w-3 h-3 text-slate-300" />
+              <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-[0.06em]">
                 Messages
               </span>
             </div>
-            <p className="text-base font-bold text-slate-800 tabular-nums">
+            <p className="text-[15px] font-bold text-slate-800 tabular-nums tracking-tight">
               {details.totalMessages?.toLocaleString() || 0}
             </p>
           </div>
-          <div className="bg-slate-50 rounded-lg px-2.5 py-2">
-            <div className="flex items-center gap-1 mb-0.5">
-              <Calendar className="w-3 h-3 text-slate-400" />
-              <span className="text-[9px] font-medium text-slate-400 uppercase">
+          <div className="bg-slate-50/80 rounded-lg px-3 py-2.5">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Calendar className="w-3 h-3 text-slate-300" />
+              <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-[0.06em]">
                 First msg
               </span>
             </div>
-            <p className="text-[12px] font-semibold text-slate-800">
+            <p className="text-[11px] font-semibold text-slate-800">
               {formatDate(details.firstContactAt)}
             </p>
           </div>
@@ -368,17 +376,17 @@ export function CustomerInfoPanel({
       </div>
 
       {/* Tags */}
-      <div className="px-4 py-3 border-b border-slate-100">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1">
-            <Tag className="w-3 h-3 text-slate-400" />
-            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+      <div className="px-4 py-3.5 border-b border-slate-100">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-1.5">
+            <Tag className="w-3 h-3 text-slate-300" />
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.06em]">
               Tags
             </span>
           </div>
           <button
             onClick={() => setShowTagInput(!showTagInput)}
-            className="p-0.5 rounded text-slate-400 hover:text-indigo-500"
+            className="p-0.5 rounded-md text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-all duration-150"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -389,43 +397,43 @@ export function CustomerInfoPanel({
           {details.tags?.map((ct: any) => (
             <span
               key={ct.tag?.id || ct.id}
-              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border"
+              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-[3px] rounded-full border"
               style={{
-                borderColor: ct.tag?.color || ct.color || "#6366f1",
+                borderColor: `${ct.tag?.color || ct.color || "#6366f1"}30`,
                 color: ct.tag?.color || ct.color || "#6366f1",
-                backgroundColor: `${ct.tag?.color || ct.color || "#6366f1"}10`,
+                backgroundColor: `${ct.tag?.color || ct.color || "#6366f1"}08`,
               }}
             >
               {ct.tag?.name || ct.name}
               <button
                 onClick={() => handleRemoveTag(ct.tag?.id || ct.id)}
-                className="hover:opacity-70"
+                className="hover:opacity-60 transition-opacity"
               >
                 <X className="w-2.5 h-2.5" />
               </button>
             </span>
           ))}
           {(!details.tags || details.tags.length === 0) && !showTagInput && (
-            <span className="text-[11px] text-slate-400">No tags</span>
+            <span className="text-[11px] text-slate-300 italic">No tags</span>
           )}
         </div>
 
         {/* Add tag input */}
         {showTagInput && (
-          <div className="flex gap-1.5 mt-2">
+          <div className="flex gap-1.5 mt-2.5">
             <input
               type="text"
               value={newTagName}
               onChange={(e) => setNewTagName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
               placeholder="Tag name..."
-              className="flex-1 text-[11px] px-2 py-1 rounded-md bg-slate-50 border-0 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+              className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-slate-50 border-0 focus:outline-none focus:ring-2 focus:ring-indigo-500/15 transition-all"
               autoFocus
             />
             <button
               onClick={handleAddTag}
               disabled={!newTagName.trim()}
-              className="px-2 py-1 rounded-md bg-indigo-500 text-white text-[10px] font-medium disabled:opacity-50"
+              className="px-2.5 py-1.5 rounded-lg bg-indigo-500 text-white text-[10px] font-medium disabled:opacity-40 hover:bg-indigo-600 transition-colors"
             >
               Add
             </button>
@@ -434,31 +442,31 @@ export function CustomerInfoPanel({
       </div>
 
       {/* Notes */}
-      <div className="px-4 py-3 border-b border-slate-100">
-        <div className="flex items-center gap-1 mb-2">
-          <StickyNote className="w-3 h-3 text-slate-400" />
-          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+      <div className="px-4 py-3.5 border-b border-slate-100">
+        <div className="flex items-center gap-1.5 mb-2.5">
+          <StickyNote className="w-3 h-3 text-slate-300" />
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.06em]">
             Notes
           </span>
-          <span className="text-[9px] text-slate-400 ml-1">
-            {notes.length}/1000
+          <span className="text-[9px] text-slate-300 ml-0.5 tabular-nums">
+            ({notes.length})
           </span>
         </div>
 
         {/* Add note */}
-        <div className="flex gap-1.5 mb-2">
+        <div className="flex gap-1.5 mb-2.5">
           <input
             type="text"
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
             placeholder="Add a note..."
-            className="flex-1 text-[11px] px-2.5 py-1.5 rounded-md bg-slate-50 border-0 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+            className="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-slate-50 border-0 focus:outline-none focus:ring-2 focus:ring-indigo-500/15 transition-all placeholder:text-slate-300"
           />
           <button
             onClick={handleAddNote}
             disabled={!newNote.trim() || addingNote}
-            className="p-1.5 rounded-md bg-indigo-500 text-white disabled:opacity-50"
+            className="p-1.5 rounded-lg bg-indigo-500 text-white disabled:opacity-40 hover:bg-indigo-600 transition-colors"
           >
             {addingNote ? (
               <Loader2 className="w-3 h-3 animate-spin" />
@@ -473,7 +481,7 @@ export function CustomerInfoPanel({
           {notes.map((note: any) => (
             <div
               key={note.id}
-              className="group bg-amber-50/50 rounded-md px-2.5 py-2 relative"
+              className="group bg-amber-50/40 rounded-lg px-2.5 py-2 relative border border-amber-100/40"
             >
               <p className="text-[11px] text-slate-700 leading-relaxed pr-5">
                 {note.text}
@@ -483,14 +491,14 @@ export function CustomerInfoPanel({
               </p>
               <button
                 onClick={() => handleDeleteNote(note.id)}
-                className="absolute top-1.5 right-1.5 p-0.5 rounded text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-2 right-2 p-0.5 rounded text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all duration-150"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
           ))}
           {notes.length === 0 && (
-            <p className="text-[11px] text-slate-400 text-center py-2">
+            <p className="text-[11px] text-slate-300 text-center py-3 italic">
               No notes yet
             </p>
           )}
@@ -499,31 +507,31 @@ export function CustomerInfoPanel({
 
       {/* Recent slips */}
       {details.recentSlips?.length > 0 && (
-        <div className="px-4 py-3">
-          <div className="flex items-center gap-1 mb-2">
-            <CreditCard className="w-3 h-3 text-slate-400" />
-            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="px-4 py-3.5">
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <CreditCard className="w-3 h-3 text-slate-300" />
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.06em]">
               Recent Slips
             </span>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {details.recentSlips.map((slip: any) => (
               <a
                 key={slip.id}
                 href={slip.imageUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 transition-all duration-150 group"
               >
                 <img
                   src={slip.imageUrl}
                   alt="Slip"
-                  className="w-9 h-9 rounded object-cover bg-slate-100"
+                  className="w-10 h-10 rounded-lg object-cover bg-slate-100 ring-1 ring-slate-100"
                   loading="lazy"
                 />
                 <div className="flex-1 min-w-0">
                   {slip.amount && (
-                    <p className="text-[12px] font-semibold text-slate-800">
+                    <p className="text-[12px] font-semibold text-slate-800 tabular-nums">
                       ฿
                       {Number(slip.amount).toLocaleString("th-TH", {
                         minimumFractionDigits: 2,
@@ -532,7 +540,7 @@ export function CustomerInfoPanel({
                   )}
                   <p className="text-[9px] text-slate-400 truncate">
                     {slip.bankName || ""}
-                    {slip.dateTime ? ` · ${slip.dateTime}` : ""}
+                    {slip.dateTime ? ` \u00b7 ${slip.dateTime}` : ""}
                   </p>
                 </div>
               </a>

@@ -48,8 +48,8 @@ export default function InboxPage() {
   const handleMessageSent = useCallback(() => {}, []);
 
   return (
-    <div className="flex h-full bg-white">
-      {/* Channels Sidebar */}
+    <div className="flex h-full bg-white" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Noto Sans Thai', sans-serif" }}>
+      {/* Channels Sidebar — dark, 224px */}
       <div className="w-56 flex-shrink-0">
         <ChannelsSidebar
           selectedChannel={selectedChannel}
@@ -60,7 +60,7 @@ export default function InboxPage() {
         />
       </div>
 
-      {/* Chat List */}
+      {/* Chat List — 320px */}
       <div className="w-80 flex-shrink-0 border-r border-slate-200/60">
         <ChatList
           selectedChannel={selectedChannel}
@@ -70,7 +70,7 @@ export default function InboxPage() {
         />
       </div>
 
-      {/* Conversation Area */}
+      {/* Conversation Area — flex-1 */}
       <div className="flex-1 min-w-0">
         <ConversationArea
           selectedUser={selectedUser}
@@ -79,9 +79,9 @@ export default function InboxPage() {
         />
       </div>
 
-      {/* Customer Info Panel */}
+      {/* Customer Info Panel — 280px */}
       {showInfoPanel && selectedUser && (
-        <div className="w-72 flex-shrink-0 border-l border-slate-200/60">
+        <div className="w-[280px] flex-shrink-0 border-l border-slate-200/60">
           <CustomerInfoPanel userId={selectedUser.id} />
         </div>
       )}

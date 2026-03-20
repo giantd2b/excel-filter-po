@@ -9,9 +9,9 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_BADGE_COLORS: Record<string, string> = {
-  SUPER_ADMIN: "bg-purple-100 text-purple-700",
-  ADMIN: "bg-indigo-100 text-indigo-700",
-  AGENT: "bg-slate-100 text-slate-600",
+  SUPER_ADMIN: "bg-purple-50 text-purple-600 ring-1 ring-purple-500/10",
+  ADMIN: "bg-indigo-50 text-indigo-600 ring-1 ring-indigo-500/10",
+  AGENT: "bg-slate-50 text-slate-500 ring-1 ring-slate-500/10",
 };
 
 export default function Navbar() {
@@ -40,26 +40,35 @@ export default function Navbar() {
     await signOut();
   };
 
+  const isActive = (href: string) =>
+    pathname === href ||
+    (href !== "/dashboard" && pathname?.startsWith(href));
+
   return (
-    <nav className="bg-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <span className="text-xl font-bold text-indigo-600 tracking-tight">
-                IRIS CRM
+    <nav className="bg-white border-b border-slate-200/60 shadow-[0_1px_2px_rgba(0,0,0,0.03)]" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Noto Sans Thai', sans-serif" }}>
+      <div className="w-full px-4 sm:px-6">
+        <div className="flex items-center justify-between h-14">
+          {/* Left: Brand */}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-sm shadow-indigo-500/20">
+                <span className="text-[11px] font-black text-white tracking-tight">IR</span>
+              </div>
+              <span className="text-[15px] font-bold text-slate-800 tracking-tight">
+                IRIS
               </span>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
+
+            {/* Center: Nav links */}
+            <div className="hidden sm:flex items-center gap-0.5">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
                   to={item.href}
-                  className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                    pathname === item.href ||
-                    (item.href !== "/dashboard" && pathname?.startsWith(item.href))
-                      ? "bg-blue-100 text-blue-700"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  className={`inline-flex items-center px-2.5 py-1.5 text-[13px] font-medium rounded-md transition-all duration-150 ${
+                    isActive(item.href)
+                      ? "bg-indigo-50 text-indigo-600"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                   }`}
                 >
                   {item.label}
@@ -67,30 +76,31 @@ export default function Navbar() {
               ))}
             </div>
           </div>
+
+          {/* Right: Profile + Logout */}
           <div className="flex items-center gap-3">
-            {/* Admin profile section */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {admin?.avatar ? (
                 <img
                   src={admin.avatar}
                   alt={admin.name}
-                  className="w-8 h-8 rounded-full object-cover ring-2 ring-white shadow-sm"
+                  className="w-7 h-7 rounded-full object-cover ring-2 ring-white shadow-sm"
                 />
               ) : admin ? (
-                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center ring-2 ring-white shadow-sm">
-                  <span className="text-sm font-semibold text-indigo-600">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center ring-2 ring-white shadow-sm">
+                  <span className="text-[11px] font-semibold text-indigo-600">
                     {admin.name.charAt(0).toUpperCase()}
                   </span>
                 </div>
               ) : null}
-              <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium text-gray-700 leading-tight">
+              <div className="hidden sm:block">
+                <p className="text-[13px] font-medium text-slate-700 leading-tight">
                   {admin?.name || admin?.email}
                 </p>
                 {admin && (
                   <span
-                    className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                      ROLE_BADGE_COLORS[admin.role] || "bg-gray-100 text-gray-600"
+                    className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded-md mt-0.5 ${
+                      ROLE_BADGE_COLORS[admin.role] || "bg-slate-50 text-slate-500"
                     }`}
                   >
                     {ROLE_LABELS[admin.role] || admin.role}
@@ -98,9 +108,10 @@ export default function Navbar() {
                 )}
               </div>
             </div>
+            <div className="w-px h-6 bg-slate-200/60" />
             <button
               onClick={handleSignOut}
-              className="bg-red-500 text-white px-4 py-2 rounded-md text-sm hover:bg-red-600"
+              className="text-[13px] font-medium text-slate-400 hover:text-red-500 px-2.5 py-1.5 rounded-md hover:bg-red-50 transition-all duration-150"
             >
               ออกจากระบบ
             </button>

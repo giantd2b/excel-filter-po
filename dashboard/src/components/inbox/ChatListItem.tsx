@@ -44,13 +44,15 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-all duration-150 border-b border-slate-100/80 ${
-        isSelected ? "bg-indigo-50/80" : "hover:bg-slate-50/80"
+      className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-all duration-150 border-b border-slate-100/60 relative ${
+        isSelected
+          ? "bg-indigo-50/60 border-l-2 border-l-indigo-500"
+          : "hover:bg-slate-50/60 border-l-2 border-l-transparent"
       }`}
     >
       {/* Avatar */}
       <div className="relative flex-shrink-0">
-        <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 ring-2 ring-white shadow-sm">
+        <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-50 ring-2 ring-white shadow-sm">
           {user.pictureUrl ? (
             <img
               src={user.pictureUrl}
@@ -60,18 +62,18 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
               className="object-cover w-full h-full"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm font-semibold">
+            <div className="w-full h-full flex items-center justify-center text-slate-400 text-[13px] font-semibold">
               {user.displayName?.charAt(0)?.toUpperCase() || "?"}
             </div>
           )}
         </div>
-        {/* Channel indicator */}
+        {/* Channel dot indicator — bottom-right */}
         <div
-          className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${
-            user.channelType === "line" ? "bg-emerald-500" : "bg-blue-500"
+          className={`absolute -bottom-px -right-px w-[14px] h-[14px] rounded-full border-[2px] border-white flex items-center justify-center ${
+            user.channelType === "line" ? "bg-emerald-400" : "bg-blue-400"
           }`}
         >
-          <span className="text-[6px] font-black text-white">
+          <span className="text-[5px] font-black text-white leading-none">
             {user.channelType === "line" ? "L" : "f"}
           </span>
         </div>
@@ -82,7 +84,7 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <span
-              className={`text-[13px] truncate ${
+              className={`text-[13px] truncate leading-tight ${
                 hasUnread
                   ? "font-semibold text-slate-900"
                   : "font-medium text-slate-700"
@@ -92,15 +94,15 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
             </span>
             {/* Status icon */}
             {status === "FOLLOW_UP" && (
-              <Clock className="w-3 h-3 text-amber-500 flex-shrink-0" />
+              <Clock className="w-3 h-3 text-amber-400 flex-shrink-0" />
             )}
             {status === "RESOLVED" && (
-              <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+              <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" />
             )}
           </div>
           <span
-            className={`text-[11px] flex-shrink-0 tabular-nums ${
-              hasUnread ? "text-indigo-500 font-semibold" : "text-slate-400"
+            className={`text-[11px] flex-shrink-0 tabular-nums leading-tight ${
+              hasUnread ? "text-indigo-500 font-semibold" : "text-slate-300"
             }`}
           >
             {formatTime(user.lastmessagetime)}
@@ -109,32 +111,32 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
 
         {/* Tags row */}
         {user.tags && user.tags.length > 0 && (
-          <div className="flex gap-1 mt-0.5 overflow-hidden">
+          <div className="flex gap-1 mt-1 overflow-hidden">
             {user.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag.id}
-                className="text-[8px] font-semibold px-1.5 py-0 rounded-full border"
+                className="text-[8px] font-semibold px-1.5 py-[1px] rounded-full"
                 style={{
-                  borderColor: tag.color,
                   color: tag.color,
-                  backgroundColor: `${tag.color}10`,
+                  backgroundColor: `${tag.color}0D`,
+                  border: `1px solid ${tag.color}25`,
                 }}
               >
                 {tag.name}
               </span>
             ))}
             {user.tags.length > 3 && (
-              <span className="text-[8px] text-slate-400">
+              <span className="text-[8px] text-slate-300 self-center">
                 +{user.tags.length - 3}
               </span>
             )}
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 mt-0.5">
+        <div className="flex items-center justify-between gap-2 mt-1">
           <p
-            className={`text-[12px] truncate leading-relaxed ${
-              hasUnread ? "text-slate-600" : "text-slate-400"
+            className={`text-[12px] truncate leading-normal ${
+              hasUnread ? "text-slate-500" : "text-slate-400"
             }`}
           >
             {user.assignedToName && (
@@ -145,7 +147,7 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
             {user.lastMessagePreview || "No messages"}
           </p>
           {hasUnread && (
-            <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-500 text-white text-[10px] font-bold tabular-nums shadow-sm shadow-indigo-500/30">
+            <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-500 text-white text-[10px] font-bold tabular-nums">
               {user.unreadCount > 99 ? "99+" : user.unreadCount}
             </span>
           )}

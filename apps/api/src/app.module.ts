@@ -14,6 +14,7 @@ import { TemplatesModule } from './modules/templates/templates.module';
 import { AdminsModule } from './modules/admins/admins.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { ExternalModule } from './modules/external/external.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
     AdminsModule,
     AnalyticsModule,
     KnowledgeModule,
+    ExternalModule,
   ],
 })
 export class AppModule {}

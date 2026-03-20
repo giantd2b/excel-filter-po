@@ -140,7 +140,8 @@
       "Bash(cp \"C:/Users/OatJirakitt/Downloads/Gemini_Generated_Image_9qp95m9qp95m9qp9.png\" \"C:/Users/OatJirakitt/Documents/GitHub/excel-filter-po/apps/mobile/assets/splash-icon.png\")",
       "WebFetch(domain:linedevth.line.me)",
       "Bash(rm -rf C:/Users/OatJirakitt/Documents/GitHub/excel-filter-po/apps/api/public/*)",
-      "Bash(cp -r C:/Users/OatJirakitt/Documents/GitHub/excel-filter-po/dashboard/dist/* C:/Users/OatJirakitt/Documents/GitHub/excel-filter-po/apps/api/public/)"
+      "Bash(cp -r C:/Users/OatJirakitt/Documents/GitHub/excel-filter-po/dashboard/dist/* C:/Users/OatJirakitt/Documents/GitHub/excel-filter-po/apps/api/public/)",
+      "Bash(node -e \":*)"
     ]
   }
 }
