@@ -82,6 +82,8 @@ export function CustomerInfoPanel({
       return;
     }
     setLoading(true);
+    setJobs([]);
+    setQuotations([]);
     Promise.all([
       getCustomerDetails(userId),
       getCustomerNotes(userId),
