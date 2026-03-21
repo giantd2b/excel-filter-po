@@ -1,15 +1,16 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { ChatUser } from "@/types/inbox";
 import { ChatListItem } from "./ChatListItem";
 import { useConversationsSocket } from "@/hooks/useWebSocket";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSound } from "@/hooks/useSound";
-import { Search, Loader2, Bell, BellOff, Wifi, WifiOff, CheckCheck } from "lucide-react";
-import { bulkMarkAsRead } from "@/lib/api-service";
+import { Search, Loader2, Bell, BellOff, Wifi, WifiOff, CheckCheck, Pin } from "lucide-react";
+import { bulkMarkAsRead, toggleCustomerPin } from "@/lib/api-service";
 
 interface ChatListProps {
   selectedChannel: string | null;
   channelType: "line" | "facebook" | null;
+  filter: string | null;
   selectedUserId: string | null;
   onSelectUser: (user: ChatUser) => void;
 }
@@ -17,11 +18,31 @@ interface ChatListProps {
 export function ChatList({
   selectedChannel,
   channelType,
+  filter,
   selectedUserId,
   onSelectUser,
 }: ChatListProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Debounce search — only hit API after 800ms of no typing
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      // Re-focus after server results load
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }, 800);
+  };
+
+  useEffect(() => {
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, []);
+
 
   const { showNotification, requestPermission, permission } = useNotifications();
   const { playNotificationSound } = useSound();
@@ -41,22 +62,31 @@ export function ChatList({
     [notificationsEnabled, playNotificationSound, showNotification, onSelectUser]
   );
 
-  const { conversations, loading, error, connected } = useConversationsSocket({
+  const { conversations: rawConversations, loading, error, connected } = useConversationsSocket({
     channel: selectedChannel,
     channelType,
+    filter,
     limitCount: 100,
+    search: debouncedSearch || null,
     onNewMessage: handleNewMessage,
   });
 
-  const filteredConversations = conversations.filter((user) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      user.displayName?.toLowerCase().includes(query) ||
-      user.first_name?.toLowerCase().includes(query) ||
-      user.last_name?.toLowerCase().includes(query)
-    );
-  });
+  // Re-focus search input after results load
+  useEffect(() => {
+    if (searchQuery && searchInputRef.current && document.activeElement !== searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [rawConversations]);
+
+  // Client-side filter for instant feedback while debounce waits
+  const conversations = searchQuery && searchQuery !== debouncedSearch
+    ? rawConversations.filter((u) => {
+        const q = searchQuery.toLowerCase();
+        return u.displayName?.toLowerCase().includes(q) ||
+          u.first_name?.toLowerCase().includes(q) ||
+          u.last_name?.toLowerCase().includes(q);
+      })
+    : rawConversations;
 
   const handleToggleNotifications = async () => {
     if (!notificationsEnabled && permission !== "granted") {
@@ -96,15 +126,17 @@ export function ChatList({
               Conversations
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5 tabular-nums">
-              {filteredConversations.length} chats
+              {conversations.length} chats
             </p>
           </div>
           <button
             onClick={async () => {
               if (!confirm("อ่านทั้งหมดแล้ว?")) return;
-              const unreadIds = filteredConversations.filter(c => c.unreadCount > 0).map(c => c.id);
-              if (unreadIds.length === 0) return;
-              await bulkMarkAsRead(unreadIds).catch(() => {});
+              try {
+                await bulkMarkAsRead([], true, selectedChannel || undefined, channelType || undefined);
+                // Refresh conversation list to clear unread badges
+                window.location.reload();
+              } catch {}
             }}
             className="p-1.5 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-brand-50 transition-all duration-150"
             title="อ่านทั้งหมดแล้ว"
@@ -136,10 +168,13 @@ export function ChatList({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Search conversations..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            autoFocus={!!searchQuery}
+            key="search-input"
             className="w-full pl-9 pr-3 py-[7px] text-[13px] bg-slate-50 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/15 focus:bg-white transition-all duration-150 placeholder:text-slate-300"
           />
         </div>
@@ -147,7 +182,7 @@ export function ChatList({
 
       {/* Conversations list */}
       <div className="flex-1 overflow-y-auto">
-        {filteredConversations.length === 0 ? (
+        {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center mb-3">
               <Search className="w-5 h-5 text-slate-300" />
@@ -158,14 +193,49 @@ export function ChatList({
             </p>
           </div>
         ) : (
-          filteredConversations.map((user) => (
-            <ChatListItem
-              key={user.id}
-              user={user}
-              isSelected={selectedUserId === user.id}
-              onClick={() => onSelectUser(user)}
-            />
-          ))
+          (() => {
+            const pinned = conversations.filter((u) => u.isPinned);
+            const unpinned = conversations.filter((u) => !u.isPinned);
+            const handlePinToggle = async (userId: string) => {
+              await toggleCustomerPin(userId).catch(() => {});
+              // Optimistically update local state
+              const updated = conversations.map((u) =>
+                u.id === userId ? { ...u, isPinned: !u.isPinned } : u
+              );
+              // Force re-render by triggering a refetch (conversations come from socket)
+              window.location.reload();
+            };
+            return (
+              <>
+                {pinned.length > 0 && (
+                  <>
+                    <div className="px-4 py-1.5 text-[10px] font-semibold text-brand-400 uppercase tracking-wider bg-brand-50/40 flex items-center gap-1.5">
+                      <Pin className="w-2.5 h-2.5" /> Pinned
+                    </div>
+                    {pinned.map((user) => (
+                      <ChatListItem
+                        key={user.id}
+                        user={user}
+                        isSelected={selectedUserId === user.id}
+                        onClick={() => onSelectUser(user)}
+                        onPinToggle={() => handlePinToggle(user.id)}
+                      />
+                    ))}
+                    <div className="border-b-2 border-brand-100/50" />
+                  </>
+                )}
+                {unpinned.map((user) => (
+                  <ChatListItem
+                    key={user.id}
+                    user={user}
+                    isSelected={selectedUserId === user.id}
+                    onClick={() => onSelectUser(user)}
+                    onPinToggle={() => handlePinToggle(user.id)}
+                  />
+                ))}
+              </>
+            );
+          })()
         )}
       </div>
 

@@ -18,9 +18,10 @@ export class MessagesService {
   ) {}
 
   async getMessages(userId: string, limit = 50) {
+    // Fetch newest messages first, then reverse for chronological display
     const messages = await this.prisma.message.findMany({
       where: { customerId: userId },
-      orderBy: { timestamp: 'asc' },
+      orderBy: { timestamp: 'desc' },
       take: limit,
       include: {
         reactions: {
@@ -28,6 +29,9 @@ export class MessagesService {
         },
       },
     });
+
+    // Reverse to chronological order (oldest first)
+    messages.reverse();
 
     return messages.map((m) => ({
       id: m.id,
@@ -258,6 +262,7 @@ export class MessagesService {
     });
     this.inboxGateway.emitConversationUpdated({
       id: docId,
+      oduserId: oduserId,
       channel,
       lastmessagetime: timestamp,
       lastMessagePreview: status === 'failed' ? `[ส่งไม่สำเร็จ] ${preview}` : preview,

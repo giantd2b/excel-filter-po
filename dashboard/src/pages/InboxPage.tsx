@@ -12,6 +12,7 @@ export default function InboxPage() {
   const [selectedType, setSelectedType] = useState<"line" | "facebook" | null>(
     null
   );
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
 
@@ -29,16 +30,25 @@ export default function InboxPage() {
   const handleSelectAll = useCallback(() => {
     setSelectedChannel(null);
     setSelectedType(null);
+    setSelectedFilter(null);
   }, []);
 
   const handleSelectType = useCallback((type: "line" | "facebook") => {
     setSelectedChannel(null);
     setSelectedType(type);
+    setSelectedFilter(null);
   }, []);
 
   const handleSelectChannel = useCallback((channelId: string) => {
     setSelectedChannel(channelId);
     setSelectedType(null);
+    setSelectedFilter(null);
+  }, []);
+
+  const handleSelectFilter = useCallback((filter: string) => {
+    setSelectedChannel(null);
+    setSelectedType(null);
+    setSelectedFilter(filter);
   }, []);
 
   const handleSelectUser = useCallback((user: ChatUser) => {
@@ -54,9 +64,11 @@ export default function InboxPage() {
         <ChannelsSidebar
           selectedChannel={selectedChannel}
           selectedType={selectedType}
+          selectedFilter={selectedFilter}
           onSelectAll={handleSelectAll}
           onSelectType={handleSelectType}
           onSelectChannel={handleSelectChannel}
+          onSelectFilter={handleSelectFilter}
         />
       </div>
 
@@ -65,6 +77,7 @@ export default function InboxPage() {
         <ChatList
           selectedChannel={selectedChannel}
           channelType={selectedType}
+          filter={selectedFilter}
           selectedUserId={selectedUser?.id || null}
           onSelectUser={handleSelectUser}
         />

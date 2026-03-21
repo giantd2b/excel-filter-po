@@ -16,6 +16,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { ExternalModule } from './modules/external/external.module';
 import { AgendaModule } from './modules/agenda/agenda.module';
+import { QuotationsModule } from './modules/quotations/quotations.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AgendaModule } from './modules/agenda/agenda.module';
     KnowledgeModule,
     ExternalModule,
     AgendaModule,
+    QuotationsModule,
   ],
 })
 export class AppModule {}

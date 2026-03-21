@@ -15,9 +15,18 @@ export class UsersService {
     private readonly inboxStats: InboxStatsService,
   ) {}
 
-  async findAll(limit = 50, startAfter?: string, channel?: string) {
+  async findAll(limit = 50, startAfter?: string, channel?: string, search?: string) {
     const where: any = {};
     if (channel) where.channel = channel;
+    if (search) {
+      where.OR = [
+        { displayName: { contains: search, mode: 'insensitive' } },
+        { nickname: { contains: search, mode: 'insensitive' } },
+        { phoneNumber: { contains: search } },
+        { phoneClean: { contains: search } },
+        { platformUserId: { contains: search } },
+      ];
+    }
 
     const cursor = startAfter ? { id: startAfter } : undefined;
     const skip = startAfter ? 1 : 0;
@@ -307,6 +316,15 @@ export class UsersService {
     };
   }
 
+  async markAllAsRead(where: any) {
+    const result = await this.prisma.customer.updateMany({
+      where,
+      data: { unreadCount: 0 },
+    });
+    this.inboxStats.refreshAndBroadcast();
+    return result.count;
+  }
+
   async setNickname(customerId: string, nickname: string | null) {
     return this.prisma.customer.update({
       where: { id: customerId },
@@ -318,6 +336,17 @@ export class UsersService {
     return this.prisma.customer.update({
       where: { id: customerId },
       data: { status },
+    });
+  }
+
+  async togglePin(customerId: string) {
+    const customer = await this.prisma.customer.findUniqueOrThrow({
+      where: { id: customerId },
+      select: { isPinned: true },
+    });
+    return this.prisma.customer.update({
+      where: { id: customerId },
+      data: { isPinned: !customer.isPinned },
     });
   }
 
@@ -380,5 +409,65 @@ export class UsersService {
       this.logger.warn(`IRIS Jobs lookup failed: ${err.message}`);
       return { jobs: [], matched: false, reason: 'API error' };
     }
+  }
+
+  async backfillJobDates() {
+    const customers = await this.prisma.customer.findMany({
+      where: {
+        phoneNumber: { not: null },
+        nextJobDate: null,
+        tags: {
+          some: { tag: { name: 'ลูกค้าจองงานแล้ว' } },
+        },
+      },
+      select: { id: true, phoneNumber: true, displayName: true },
+    });
+
+    this.logger.log(`Backfilling job dates for ${customers.length} customers`);
+    let updated = 0;
+    let failed = 0;
+
+    const JOBS_API = 'https://iris-job.vercel.app/api/external/lookup';
+    const JOBS_KEY = process.env.IRIS_JOBS_API_KEY || 'iris-jobs-7cba15f1c6f5de3a3365554e6e36eb01fdd4f4b6184288045b709869312d9819';
+
+    for (const c of customers) {
+      const phone = c.phoneNumber!.replace(/\D/g, '');
+      if (phone.length < 9) continue;
+
+      try {
+        const resp = await axios.get(`${JOBS_API}?phone=${phone}`, {
+          headers: { 'X-API-Key': JOBS_KEY },
+          timeout: 5000,
+        });
+
+        const jobs = resp.data?.data || [];
+        if (jobs.length === 0) continue;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const upcomingJobs = jobs
+          .filter((j: any) => j.due && new Date(j.due) >= today)
+          .sort((a: any, b: any) => new Date(a.due).getTime() - new Date(b.due).getTime());
+
+        const nextJob = upcomingJobs[0] || jobs[0];
+        if (nextJob?.due) {
+          await this.prisma.customer.update({
+            where: { id: c.id },
+            data: {
+              nextJobDate: new Date(nextJob.due),
+              nextJobTitle: (nextJob.job || '').substring(0, 100),
+            },
+          });
+          updated++;
+        }
+      } catch {
+        failed++;
+      }
+
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    this.logger.log(`Backfill done: ${updated} updated, ${failed} failed`);
+    return { total: customers.length, updated, failed };
   }
 }

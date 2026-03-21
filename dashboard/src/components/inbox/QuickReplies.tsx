@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { getTemplates, ReplyTemplate } from "@/lib/api-service";
-import { Loader2, X, Search } from "lucide-react";
+import { Loader2, X, Search, Image } from "lucide-react";
 
 interface QuickRepliesProps {
   onSelect: (text: string) => void;
+  onSendWithImages?: (text: string, images: string[]) => void;
   onClose: () => void;
 }
 
-export function QuickReplies({ onSelect, onClose }: QuickRepliesProps) {
+export function QuickReplies({ onSelect, onSendWithImages, onClose }: QuickRepliesProps) {
   const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -28,7 +29,7 @@ export function QuickReplies({ onSelect, onClose }: QuickRepliesProps) {
   // Group by category
   const grouped = filtered.reduce<Record<string, ReplyTemplate[]>>(
     (acc, t) => {
-      const cat = t.category || "\u0e17\u0e31\u0e48\u0e27\u0e44\u0e1b";
+      const cat = t.category || "ทั่วไป";
       if (!acc[cat]) acc[cat] = [];
       acc[cat].push(t);
       return acc;
@@ -36,8 +37,18 @@ export function QuickReplies({ onSelect, onClose }: QuickRepliesProps) {
     {}
   );
 
+  const handleSelect = (t: ReplyTemplate) => {
+    const images = (t as any).images || [];
+    if (images.length > 0 && onSendWithImages) {
+      onSendWithImages(t.text, images);
+      onClose();
+    } else {
+      onSelect(t.text);
+    }
+  };
+
   return (
-    <div className="bg-white border border-slate-200/80 rounded-xl shadow-lg shadow-slate-900/[0.08] max-h-64 overflow-hidden flex flex-col">
+    <div className="bg-white border border-slate-200/80 rounded-xl shadow-lg shadow-slate-900/[0.08] max-h-72 overflow-hidden flex flex-col">
       <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100/80">
         <span className="text-[12px] font-semibold text-slate-700">
           Quick Replies
@@ -87,20 +98,49 @@ export function QuickReplies({ onSelect, onClose }: QuickRepliesProps) {
                   {category}
                 </span>
               </div>
-              {items.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => onSelect(t.text)}
-                  className="w-full text-left px-3.5 py-2.5 hover:bg-brand-50/60 transition-all duration-150 border-b border-slate-50 last:border-0"
-                >
-                  <p className="text-[12px] font-medium text-slate-700">
-                    {t.title}
-                  </p>
-                  <p className="text-[11px] text-slate-400 truncate mt-0.5 leading-relaxed">
-                    {t.text}
-                  </p>
-                </button>
-              ))}
+              {items.map((t) => {
+                const images = (t as any).images || [];
+                const hasImages = images.length > 0;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => handleSelect(t)}
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-brand-50/60 transition-all duration-150 border-b border-slate-50 last:border-0"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[12px] font-medium text-slate-700 flex-1">
+                        {t.title}
+                      </p>
+                      {hasImages && (
+                        <span className="flex items-center gap-0.5 text-[9px] font-semibold text-brand-500 bg-brand-50 px-1.5 py-0.5 rounded">
+                          <Image className="w-2.5 h-2.5" />
+                          {images.length}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5 leading-relaxed">
+                      {t.text}
+                    </p>
+                    {hasImages && (
+                      <div className="flex gap-1 mt-1.5 overflow-x-auto">
+                        {images.slice(0, 4).map((url: string, i: number) => (
+                          <img
+                            key={i}
+                            src={url}
+                            alt=""
+                            className="w-10 h-10 rounded object-cover border border-slate-100 flex-shrink-0"
+                          />
+                        ))}
+                        {images.length > 4 && (
+                          <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-[10px] text-slate-400 font-semibold flex-shrink-0">
+                            +{images.length - 4}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ))
         )}

@@ -1,5 +1,5 @@
 import { ChatUser } from "@/types/inbox";
-import { Clock, CheckCircle2 } from "lucide-react";
+import { Clock, CheckCircle2, Pin } from "lucide-react";
 
 interface ChatListItemProps {
   user: ChatUser & {
@@ -9,9 +9,10 @@ interface ChatListItemProps {
   };
   isSelected: boolean;
   onClick: () => void;
+  onPinToggle?: () => void;
 }
 
-export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
+export function ChatListItem({ user, isSelected, onClick, onPinToggle }: ChatListItemProps) {
   const formatTime = (timestamp: number) => {
     if (!timestamp) return "";
 
@@ -44,7 +45,7 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-all duration-150 border-b border-slate-100/60 relative ${
+      className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-all duration-150 border-b border-slate-100/60 relative group ${
         isSelected
           ? "bg-brand-50/60 border-l-2 border-l-brand-500"
           : "hover:bg-slate-50/60 border-l-2 border-l-transparent"
@@ -100,13 +101,28 @@ export function ChatListItem({ user, isSelected, onClick }: ChatListItemProps) {
               <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" />
             )}
           </div>
-          <span
-            className={`text-[11px] flex-shrink-0 tabular-nums leading-tight ${
-              hasUnread ? "text-brand-500 font-semibold" : "text-slate-300"
-            }`}
-          >
-            {formatTime(user.lastmessagetime)}
-          </span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <span
+              className={`text-[11px] tabular-nums leading-tight ${
+                hasUnread ? "text-brand-500 font-semibold" : "text-slate-300"
+              }`}
+            >
+              {formatTime(user.lastmessagetime)}
+            </span>
+            {onPinToggle && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onPinToggle(); }}
+                className={`p-0.5 rounded transition-all ${
+                  user.isPinned
+                    ? "text-brand-500 opacity-100"
+                    : "text-slate-300 opacity-0 group-hover:opacity-60 hover:!opacity-100"
+                }`}
+                title={user.isPinned ? "Unpin" : "Pin"}
+              >
+                <Pin className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Job date */}

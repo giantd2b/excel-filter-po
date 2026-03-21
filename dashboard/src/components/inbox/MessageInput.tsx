@@ -41,6 +41,7 @@ interface MessageInputProps {
   disabled?: boolean;
   placeholder?: string;
   channelType?: "line" | "facebook";
+  onSendWithImages?: (text: string, images: string[]) => void;
 }
 
 export interface MessageInputHandle {
@@ -52,6 +53,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   disabled = false,
   placeholder = "Type a message...",
   channelType,
+  onSendWithImages,
 }, ref) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -293,6 +295,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
         <div className="px-5 pt-3">
           <QuickReplies
             onSelect={handleTemplateSelect}
+            onSendWithImages={onSendWithImages}
             onClose={() => setShowTemplates(false)}
           />
         </div>

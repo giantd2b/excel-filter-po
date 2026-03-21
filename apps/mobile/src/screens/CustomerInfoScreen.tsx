@@ -22,15 +22,75 @@ export default function CustomerInfoScreen({ route }: any) {
   const [editingNickname, setEditingNickname] = useState(false);
   const [nicknameValue, setNicknameValue] = useState('');
 
+  // Notes
+  const [notes, setNotes] = useState<any[]>([]);
+  const [newNote, setNewNote] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
+
+  // Tags
+  const [newTag, setNewTag] = useState('');
+  const [showTagInput, setShowTagInput] = useState(false);
+
+  // Jobs & Quotations
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [quotations, setQuotations] = useState<any[]>([]);
+
   useEffect(() => {
-    api.get(`/users/${docId}/details`)
-      .then(({ data }) => {
-        setDetails(data);
-        setNicknameValue(data?.nickname || '');
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.get(`/users/${docId}/details`),
+      api.get(`/users/${docId}/notes`).catch(() => ({ data: [] })),
+      api.get(`/users/${docId}/jobs`).catch(() => ({ data: { jobs: [] } })),
+      api.get(`/users/${docId}/quotations`).catch(() => ({ data: { data: [] } })),
+    ]).then(([detailsRes, notesRes, jobsRes, quotesRes]) => {
+      setDetails(detailsRes.data);
+      setNicknameValue(detailsRes.data?.nickname || '');
+      setNotes(Array.isArray(notesRes.data) ? notesRes.data : []);
+      setJobs(jobsRes.data?.jobs || []);
+      setQuotations(quotesRes.data?.data || []);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [docId]);
+
+  const handleAddNote = async () => {
+    if (!newNote.trim()) return;
+    setAddingNote(true);
+    try {
+      const { data } = await api.post(`/users/${docId}/notes`, { text: newNote.trim() });
+      setNotes((prev) => [data, ...prev]);
+      setNewNote('');
+    } catch { Alert.alert('ผิดพลาด'); }
+    setAddingNote(false);
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    Alert.alert('ลบบันทึก', 'ต้องการลบบันทึกนี้หรือไม่?', [
+      { text: 'ยกเลิก', style: 'cancel' },
+      { text: 'ลบ', style: 'destructive', onPress: async () => {
+        await api.delete(`/users/notes/${noteId}`).catch(() => {});
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      }},
+    ]);
+  };
+
+  const handleAddTag = async () => {
+    if (!newTag.trim()) return;
+    try {
+      await api.post(`/users/${docId}/tags`, { name: newTag.trim() });
+      const { data } = await api.get(`/users/${docId}/details`);
+      setDetails(data);
+      setNewTag('');
+      setShowTagInput(false);
+    } catch { Alert.alert('ผิดพลาด'); }
+  };
+
+  const handleRemoveTag = async (tagId: string) => {
+    try {
+      await api.delete(`/users/${docId}/tags/${tagId}`);
+      setDetails((prev: any) => ({
+        ...prev,
+        tags: prev.tags.filter((t: any) => t.tag?.id !== tagId && t.id !== tagId),
+      }));
+    } catch {}
+  };
 
   const saveNickname = async () => {
     try {
@@ -65,7 +125,6 @@ export default function CustomerInfoScreen({ route }: any) {
 
   const customer = details || {};
   const tags = customer.tags?.map((ct: any) => ct.tag) || [];
-  const notes = customer.notes || [];
   const orders = customer.orders || [];
 
   return (
@@ -232,6 +291,134 @@ export default function CustomerInfoScreen({ route }: any) {
               )}
               <Text style={styles.orderDate}>{formatDate(payment.createdAt)}</Text>
             </View>
+          ))}
+        </View>
+      )}
+      {/* Tags */}
+      <View style={styles.section}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={styles.sectionTitle}>แท็ก</Text>
+          <TouchableOpacity onPress={() => setShowTagInput(!showTagInput)}>
+            <Text style={{ fontSize: 12, color: '#6366f1', fontWeight: '600' }}>{showTagInput ? '✕' : '+ เพิ่ม'}</Text>
+          </TouchableOpacity>
+        </View>
+        {showTagInput && (
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+            <TextInput
+              style={[styles.nicknameInput, { flex: 1 }]}
+              value={newTag}
+              onChangeText={setNewTag}
+              placeholder="ชื่อแท็ก..."
+              placeholderTextColor="#94a3b8"
+              onSubmitEditing={handleAddTag}
+            />
+            <TouchableOpacity style={styles.nicknameSaveBtn} onPress={handleAddTag}>
+              <Text style={styles.nicknameSaveBtnText}>เพิ่ม</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={styles.tagsContainer}>
+          {tags.map((tag: any) => (
+            <TouchableOpacity
+              key={tag.id}
+              style={[styles.tag, { backgroundColor: (tag.color || '#6366f1') + '20' }]}
+              onLongPress={() => Alert.alert('ลบแท็ก', `ลบ "${tag.name}"?`, [
+                { text: 'ยกเลิก', style: 'cancel' },
+                { text: 'ลบ', style: 'destructive', onPress: () => handleRemoveTag(tag.id) },
+              ])}
+            >
+              <View style={[styles.tagDot, { backgroundColor: tag.color || '#6366f1' }]} />
+              <Text style={[styles.tagText, { color: tag.color || '#6366f1' }]}>{tag.name}</Text>
+            </TouchableOpacity>
+          ))}
+          {tags.length === 0 && !showTagInput && <Text style={{ fontSize: 12, color: '#94a3b8' }}>ไม่มีแท็ก (กดค้างเพื่อลบ)</Text>}
+        </View>
+      </View>
+
+      {/* Notes */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>บันทึก ({notes.length})</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+          <TextInput
+            style={[styles.nicknameInput, { flex: 1 }]}
+            value={newNote}
+            onChangeText={setNewNote}
+            placeholder="เพิ่มบันทึก..."
+            placeholderTextColor="#94a3b8"
+          />
+          <TouchableOpacity
+            style={[styles.nicknameSaveBtn, addingNote && { opacity: 0.5 }]}
+            onPress={handleAddNote}
+            disabled={addingNote}
+          >
+            <Text style={styles.nicknameSaveBtnText}>บันทึก</Text>
+          </TouchableOpacity>
+        </View>
+        {notes.map((note: any) => (
+          <TouchableOpacity
+            key={note.id}
+            style={styles.noteCard}
+            onLongPress={() => handleDeleteNote(note.id)}
+          >
+            <Text style={styles.noteText}>{note.text || note.content}</Text>
+            <Text style={styles.noteDate}>
+              {formatDate(note.createdAt)} {note.adminName || note.authorName ? `โดย ${note.adminName || note.authorName}` : ''}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* IRIS Jobs */}
+      {jobs.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>งานที่จอง ({jobs.length})</Text>
+          {jobs.map((job: any, idx: number) => (
+            <View key={job.id || idx} style={styles.orderCard}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }}>
+                {job.job || job.detail || 'งานจัดเลี้ยง'}
+              </Text>
+              {job.due && <Text style={{ fontSize: 11, color: '#6366f1', fontWeight: '600', marginTop: 4 }}>📅 {job.due}</Text>}
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                {job.revenue && <Text style={{ fontSize: 11, color: '#64748b' }}>฿{Number(job.revenue).toLocaleString()}</Text>}
+                {job.guest && <Text style={{ fontSize: 11, color: '#64748b' }}>👥 {job.guest} ท่าน</Text>}
+                {job.city && <Text style={{ fontSize: 11, color: '#94a3b8' }}>📍 {job.city}</Text>}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* FlowAccount Quotations */}
+      {quotations.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ใบเสนอราคา ({quotations.length})</Text>
+          {quotations.map((q: any) => (
+            <TouchableOpacity
+              key={q.docNo}
+              style={styles.orderCard}
+              onPress={() => { if (q.editUrl) Linking.openURL(q.editUrl); }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#d97706' }}>{q.docNo}</Text>
+                <View style={{
+                  paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+                  backgroundColor: q.status === 'อนุมัติ' || q.status === 'ดำเนินการแล้ว' ? '#dcfce7'
+                    : q.status === 'ไม่อนุมัติ' ? '#fef2f2' : '#fef3c7',
+                }}>
+                  <Text style={{
+                    fontSize: 9, fontWeight: '700',
+                    color: q.status === 'อนุมัติ' || q.status === 'ดำเนินการแล้ว' ? '#166534'
+                      : q.status === 'ไม่อนุมัติ' ? '#991b1b' : '#92400e',
+                  }}>{q.status}</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{q.project || q.customer}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                <Text style={{ fontSize: 11, color: '#94a3b8' }}>{q.date}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1e293b' }}>฿{Number(q.grandTotal || 0).toLocaleString()}</Text>
+              </View>
+              {q.salesName && <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>👤 {q.salesName}</Text>}
+            </TouchableOpacity>
           ))}
         </View>
       )}

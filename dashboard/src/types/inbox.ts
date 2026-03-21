@@ -15,7 +15,7 @@ export interface Message {
   status?: "sent" | "delivered" | "failed";
   adminId?: string;
   adminName?: string;
-  mediaType?: "image" | "video";
+  mediaType?: "image" | "video" | "sticker";
   mediaUrl?: string;
   previewUrl?: string;
   reactions?: MessageReaction[];
@@ -35,6 +35,9 @@ export interface ChatUser {
   lastMessagePreview: string;
   first_name?: string;
   last_name?: string;
+  nextJobDate?: string | null;
+  nextJobTitle?: string | null;
+  isPinned?: boolean;
 }
 
 export interface Channel {

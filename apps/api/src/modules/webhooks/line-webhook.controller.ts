@@ -6,6 +6,7 @@ import { getLineDestinationChannel } from '../../common/utils/channel-tokens';
 @Controller('webhooks/line')
 export class LineWebhookController {
   private readonly logger = new Logger(LineWebhookController.name);
+  private _loggedEventKeys = false;
 
   constructor(private readonly webhookService: WebhookService) {}
 
@@ -25,8 +26,15 @@ export class LineWebhookController {
     for (const event of events) {
       if (event.type !== 'message') continue;
 
-      const sourceType = event.source?.type; // "user", "group", "room"
+      const sourceType = event.source?.type;
       const msgType = event.message.type;
+
+      // Save markAsReadToken for all LINE message types (token is in event.message)
+      const markToken = event.message?.markAsReadToken;
+      if (markToken && event.source?.userId) {
+        const customerId = `${event.source.userId}__${lineBot}`;
+        this.webhookService.saveMarkAsReadToken(customerId, markToken).catch(() => {});
+      }
 
       // Handle group/room messages
       if (sourceType === 'group' || sourceType === 'room') {

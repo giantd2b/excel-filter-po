@@ -62,12 +62,12 @@ export class InboxGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (room.startsWith('conversations:')) client.leave(room);
     });
 
-    // Join new rooms
+    // Always join 'all' for unread updates + filtered room for conversation updates
     client.join('conversations:all');
     if (data.channel) {
       client.join(`conversations:channel:${data.channel}`);
     }
-    if (data.channelType) {
+    if (data.channelType && !data.channel) {
       client.join(`conversations:type:${data.channelType}`);
     }
 
@@ -195,9 +195,27 @@ export class InboxGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  emitConversationUpdated(conversation: any) {
+  async emitConversationUpdated(conversation: any) {
     const channel = conversation.channel || '';
     const channelType = channel.startsWith('Line_') ? 'line' : 'facebook';
+
+    // Auto-extract oduserId from id if not provided
+    if (!conversation.oduserId && conversation.id?.includes('__')) {
+      conversation.oduserId = conversation.id.split('__')[0];
+    }
+
+    // Auto-fetch unreadCount if not provided
+    if (conversation.unreadCount === undefined && conversation.id) {
+      try {
+        const customer = await this.prisma.customer.findUnique({
+          where: { id: conversation.id },
+          select: { unreadCount: true },
+        });
+        if (customer) {
+          conversation.unreadCount = customer.unreadCount;
+        }
+      } catch {}
+    }
 
     // Broadcast to all conversation subscribers
     this.server.to('conversations:all').emit('conversation:updated', conversation);

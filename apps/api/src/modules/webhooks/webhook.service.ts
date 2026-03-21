@@ -27,6 +27,13 @@ export class WebhookService {
     private readonly aiSuggest: AiSuggestService,
   ) {}
 
+  async saveMarkAsReadToken(customerId: string, token: string) {
+    await this.prisma.customer.update({
+      where: { id: customerId },
+      data: { markAsReadToken: token },
+    }).catch(() => {});
+  }
+
   // ─── LINE Text Message ────────────────────────────────────────
 
   async processLineTextMessage(event: any, accessToken: string, lineBot: string) {
@@ -65,7 +72,7 @@ export class WebhookService {
       const customerId = `${proFile.userId}__${lineBot}`;
 
       // Save markAsReadToken from webhook event (LINE only, never expires)
-      const markAsReadToken = event.markAsReadToken || null;
+      const markAsReadToken = event.message?.markAsReadToken || event.markAsReadToken || null;
 
       // Upsert customer in PostgreSQL
       await this.prisma.customer.upsert({
@@ -597,8 +604,9 @@ export class WebhookService {
         }
       } else if (message.type === 'sticker') {
         messageText = '[สติกเกอร์]';
-        mediaType = 'IMAGE';
+        mediaType = 'STICKER';
         mediaUrl = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${message.stickerId}/iPhone/sticker@2x.png`;
+        previewUrl = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${message.stickerId}/android/sticker.png`;
       } else if (message.type === 'file') {
         messageText = `[ไฟล์: ${message.fileName || 'file'}]`;
         // Download file content

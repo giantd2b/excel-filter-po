@@ -6,8 +6,10 @@ import {
   Loader2,
   Inbox,
   Hash,
+  CalendarClock,
 } from "lucide-react";
 import { getInboxStats } from "@/lib/api-service";
+import { getSocket } from "@/lib/socket";
 
 interface ChannelStats {
   id: string;
@@ -32,17 +34,21 @@ interface InboxStats {
 interface ChannelsSidebarProps {
   selectedChannel: string | null;
   selectedType: "line" | "facebook" | null;
+  selectedFilter: string | null;
   onSelectAll: () => void;
   onSelectType: (type: "line" | "facebook") => void;
   onSelectChannel: (channelId: string) => void;
+  onSelectFilter: (filter: string) => void;
 }
 
 export function ChannelsSidebar({
   selectedChannel,
   selectedType,
+  selectedFilter,
   onSelectAll,
   onSelectType,
   onSelectChannel,
+  onSelectFilter,
 }: ChannelsSidebarProps) {
   const [stats, setStats] = useState<InboxStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,7 +58,26 @@ export function ChannelsSidebar({
   useEffect(() => {
     fetchStats();
     const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
+
+    // Listen for real-time unread updates via WebSocket
+    let socket: any = null;
+    getSocket().then((s) => {
+      socket = s;
+      socket.on('unread:update', () => {
+        fetchStats();
+      });
+      socket.on('conversation:updated', () => {
+        fetchStats();
+      });
+    }).catch(() => {});
+
+    return () => {
+      clearInterval(interval);
+      if (socket) {
+        socket.off('unread:update');
+        socket.off('conversation:updated');
+      }
+    };
   }, []);
 
   const fetchStats = async () => {
@@ -66,7 +91,7 @@ export function ChannelsSidebar({
     }
   };
 
-  const isAllSelected = !selectedChannel && !selectedType;
+  const isAllSelected = !selectedChannel && !selectedType && !selectedFilter;
 
   const Badge = ({ count }: { count: number }) => {
     if (count === 0) return null;
@@ -122,6 +147,21 @@ export function ChannelsSidebar({
             <span>All Conversations</span>
           </div>
           <Badge count={stats?.totalUnread || 0} />
+        </button>
+
+        {/* Upcoming Jobs */}
+        <button
+          onClick={() => onSelectFilter("upcoming_jobs")}
+          className={`w-full flex items-center justify-between px-2.5 py-[7px] rounded-lg text-[13px] font-medium transition-all duration-150 group ${
+            selectedFilter === "upcoming_jobs"
+              ? "bg-amber-50 text-amber-600 shadow-sm"
+              : "hover:bg-white text-slate-700 hover:text-slate-900"
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <CalendarClock className="w-[15px] h-[15px] opacity-70" />
+            <span>งานที่จะถึง</span>
+          </div>
         </button>
 
         {/* LINE Section */}

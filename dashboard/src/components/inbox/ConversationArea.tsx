@@ -35,16 +35,31 @@ export function ConversationArea({
 
   const handleNewMessage = useCallback(() => {
     scrollToBottom();
-  }, []);
+    // Mark as read when new message arrives while chat is open
+    if (selectedUser) {
+      markAsRead(selectedUser.id).catch(() => {});
+    }
+  }, [selectedUser]);
 
   const { messages, loading, error } = useMessagesSocket({
     userId: selectedUser?.id || null,
     onNewMessage: handleNewMessage,
   });
 
+  // Reset prevMessagesLength when switching users
   useEffect(() => {
-    if (messages.length > prevMessagesLength.current) {
-      scrollToBottom();
+    prevMessagesLength.current = 0;
+  }, [selectedUser?.id]);
+
+  useEffect(() => {
+    if (messages.length > 0 && messages.length !== prevMessagesLength.current) {
+      // Use instant scroll on initial load, smooth on new messages
+      const isInitialLoad = prevMessagesLength.current === 0;
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({
+          behavior: isInitialLoad ? "instant" : "smooth",
+        });
+      }, isInitialLoad ? 50 : 100);
     }
     prevMessagesLength.current = messages.length;
   }, [messages.length]);
@@ -61,6 +76,40 @@ export function ConversationArea({
   const handleSuggestionSelect = useCallback((text: string) => {
     messageInputRef.current?.setText(text);
   }, []);
+
+  const handleTemplateSend = useCallback(async (text: string, images?: string[]) => {
+    if (!selectedUser) return;
+    setSending(true);
+    try {
+      // Send text first
+      if (text) {
+        await sendMessage({
+          oduserId: selectedUser.oduserId,
+          docId: selectedUser.id,
+          text,
+          channel: selectedUser.channel,
+        });
+      }
+      // Send each image
+      if (images && images.length > 0) {
+        for (const imageUrl of images) {
+          await sendMessage({
+            oduserId: selectedUser.oduserId,
+            docId: selectedUser.id,
+            mediaType: "image",
+            mediaUrl: imageUrl,
+            previewUrl: imageUrl,
+            channel: selectedUser.channel,
+          });
+        }
+      }
+      onMessageSent();
+    } catch (err) {
+      console.error("Failed to send template:", err);
+    } finally {
+      setSending(false);
+    }
+  }, [selectedUser, onMessageSent]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -269,6 +318,7 @@ export function ConversationArea({
       <MessageInput
         ref={messageInputRef}
         channelType={selectedUser.channelType === 'line' ? 'line' : 'facebook'}
+        onSendWithImages={handleTemplateSend}
         onSend={handleSendMessage}
         disabled={loading || !!error}
         placeholder={`Reply to ${selectedUser.displayName}...`}

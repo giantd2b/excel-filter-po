@@ -11,11 +11,11 @@ export class TemplatesService {
     });
   }
 
-  async create(data: { title: string; text: string; category?: string }) {
+  async create(data: { title: string; text: string; category?: string; images?: string[] }) {
     return this.prisma.replyTemplate.create({ data });
   }
 
-  async update(id: string, data: Partial<{ title: string; text: string; category: string; sortOrder: number }>) {
+  async update(id: string, data: Partial<{ title: string; text: string; category: string; sortOrder: number; images: string[] }>) {
     const existing = await this.prisma.replyTemplate.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Template not found');
     return this.prisma.replyTemplate.update({ where: { id }, data });

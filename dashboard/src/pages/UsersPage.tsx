@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import UserTable, { User } from "@/components/UserTable";
 import SkeletonTable from "@/components/SkeletonTable";
 import { getUsers } from "@/lib/api-service";
@@ -13,9 +13,10 @@ export default function UsersPage() {
   const [channels, setChannels] = useState<string[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [lastId, setLastId] = useState<string | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const fetchUsers = useCallback(
-    async (loadMore = false) => {
+    async (loadMore = false, searchText?: string, channel?: string) => {
       try {
         if (loadMore) {
           setLoadingMore(true);
@@ -23,16 +24,26 @@ export default function UsersPage() {
           setLoading(true);
         }
 
-        const data = await getUsers(20, loadMore ? lastId : null);
+        const data = await getUsers(
+          50,
+          loadMore ? lastId : null,
+          searchText,
+          channel,
+        );
 
         if (loadMore) {
           setUsers((prev) => [...prev, ...data.users]);
         } else {
           setUsers(data.users);
-          const uniqueChannels = [
-            ...new Set(data.users.map((u: User) => u.channel).filter(Boolean)),
-          ] as string[];
-          setChannels(uniqueChannels);
+          if (!searchText && !channel) {
+            const uniqueChannels = [
+              ...new Set(data.users.map((u: User) => u.channel).filter(Boolean)),
+            ] as string[];
+            setChannels((prev) => {
+              const merged = new Set([...prev, ...uniqueChannels]);
+              return Array.from(merged).sort();
+            });
+          }
         }
 
         setHasMore(data.hasMore);
@@ -48,24 +59,39 @@ export default function UsersPage() {
     [lastId]
   );
 
+  // Initial load + fetch channels
   useEffect(() => {
-    fetchUsers();
+    fetchUsers(false, "", "");
   }, []);
+
+  // Debounced search
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setLastId(null);
+      fetchUsers(false, value, channelFilter);
+    }, 400);
+  };
+
+  const handleChannelChange = (value: string) => {
+    setChannelFilter(value);
+    setLastId(null);
+    fetchUsers(false, search, value);
+  };
+
+  const handleClear = () => {
+    setSearch("");
+    setChannelFilter("");
+    setLastId(null);
+    fetchUsers(false, "", "");
+  };
 
   const loadMore = () => {
     if (!loadingMore && hasMore) {
-      fetchUsers(true);
+      fetchUsers(true, search, channelFilter);
     }
   };
-
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      !search ||
-      user.displayName?.toLowerCase().includes(search.toLowerCase()) ||
-      user.userId?.toLowerCase().includes(search.toLowerCase());
-    const matchesChannel = !channelFilter || user.channel === channelFilter;
-    return matchesSearch && matchesChannel;
-  });
 
   if (error) {
     return (
@@ -89,8 +115,8 @@ export default function UsersPage() {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหาชื่อหรือ User ID..."
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="ค้นหาชื่อ, เบอร์โทร, User ID..."
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
           </div>
@@ -100,7 +126,7 @@ export default function UsersPage() {
             </label>
             <select
               value={channelFilter}
-              onChange={(e) => setChannelFilter(e.target.value)}
+              onChange={(e) => handleChannelChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             >
               <option value="">ทั้งหมด</option>
@@ -113,10 +139,7 @@ export default function UsersPage() {
           </div>
           <div className="flex items-end">
             <button
-              onClick={() => {
-                setSearch("");
-                setChannelFilter("");
-              }}
+              onClick={handleClear}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
             >
               ล้างตัวกรอง
@@ -127,7 +150,7 @@ export default function UsersPage() {
 
       {/* Results count */}
       <p className="text-sm text-gray-600 mb-4">
-        แสดง {filteredUsers.length} รายการ
+        แสดง {users.length} รายการ
         {hasMore && " (มีอีก)"}
       </p>
 
@@ -135,9 +158,9 @@ export default function UsersPage() {
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {loading ? (
           <SkeletonTable rows={10} />
-        ) : filteredUsers.length > 0 ? (
+        ) : users.length > 0 ? (
           <>
-            <UserTable users={filteredUsers} />
+            <UserTable users={users} />
             {hasMore && (
               <div className="p-4 text-center border-t">
                 <button

@@ -195,7 +195,7 @@ export default function ChatBubble({ message }: Props) {
       >
         {message.senderName && (
           <Text style={[styles.senderName, isOutgoing && styles.senderNameOutgoing]}>
-            {message.senderName}
+            {isOutgoing ? '👤 ' : ''}{message.senderName}
           </Text>
         )}
         {renderContent()}

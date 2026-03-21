@@ -12,11 +12,13 @@ export class UsersController {
     @Query('limit') limit?: string,
     @Query('startAfter') startAfter?: string,
     @Query('channel') channel?: string,
+    @Query('search') search?: string,
   ) {
     return this.usersService.findAll(
       limit ? parseInt(limit, 10) : 50,
       startAfter,
       channel,
+      search,
     );
   }
 
@@ -66,9 +68,20 @@ export class UsersController {
   }
 
   @Post('bulk-read')
-  async bulkMarkAsRead(@Body() body: { ids: string[] }) {
+  async bulkMarkAsRead(@Body() body: { ids?: string[]; all?: boolean; channel?: string; channelType?: string }) {
+    if (body.all) {
+      // Mark ALL unread as read
+      const where: any = { unreadCount: { gt: 0 } };
+      if (body.channel) where.channel = body.channel;
+      if (body.channelType) where.channelType = body.channelType.toUpperCase();
+
+      const result = await this.usersService.markAllAsRead(where);
+      return { success: true, count: result };
+    }
+
+    // Mark specific IDs
     let count = 0;
-    for (const id of body.ids) {
+    for (const id of (body.ids || [])) {
       await this.usersService.markAsRead(id);
       count++;
     }
@@ -134,5 +147,10 @@ export class UsersController {
     @Body() body: { status: 'OPEN' | 'FOLLOW_UP' | 'RESOLVED' },
   ) {
     return this.usersService.setStatus(id, body.status);
+  }
+
+  @Post(':id/pin')
+  togglePin(@Param('id') id: string) {
+    return this.usersService.togglePin(id);
   }
 }

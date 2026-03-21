@@ -22,6 +22,7 @@ model Customer {
   channelType       ChannelType        @map("channel_type")
   phoneNumber       String?            @map("phone_number")
   phoneClean        String?            @map("phone_clean")     // Digits only: 0912345678
+  additionalPhones  String[]           @default([]) @map("additional_phones") // Extra phone numbers
   statusMessage     String?            @map("status_message")
 
   // Platform read token (LINE markAsReadToken — never expires)
@@ -32,6 +33,7 @@ model Customer {
   nextJobTitle      String?            @map("next_job_title")
 
   // Chat state
+  isPinned          Boolean            @default(false) @map("is_pinned")
   status            ConversationStatus @default(OPEN)
   unreadCount       Int                @default(0) @map("unread_count")
   lastMessageAt     DateTime?          @map("last_message_at")
@@ -136,6 +138,7 @@ enum SenderType {
 enum MediaType {
   IMAGE
   VIDEO
+  STICKER
 }
 
 // ─── CRM: Tags ──────────────────────────────────────────────────────
@@ -186,6 +189,7 @@ model ReplyTemplate {
   title     String
   text      String
   category  String?
+  images    String[] @default([])
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

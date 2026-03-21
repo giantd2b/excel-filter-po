@@ -16,6 +16,8 @@ export interface Conversation {
   status: string;
   assignedToId?: string;
   assignedToName?: string;
+  nextJobDate?: string | null;
+  nextJobTitle?: string | null;
   tags?: Array<{ id: string; name: string; color: string }>;
 }
 
@@ -109,6 +111,9 @@ export default function ConversationItem({ conversation, onPress }: Props) {
         )}
         <Text style={styles.channelName} numberOfLines={1}>
           {formatChannel(conversation.channel)}
+          {conversation.nextJobDate && (
+            <Text style={styles.jobDate}> • 📅 {conversation.nextJobDate}</Text>
+          )}
         </Text>
         <View style={styles.bottomRow}>
           <Text
@@ -211,6 +216,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94a3b8',
     marginBottom: 2,
+  },
+  jobDate: {
+    fontSize: 10,
+    color: '#6366f1',
+    fontWeight: '600',
   },
   bottomRow: {
     flexDirection: 'row',

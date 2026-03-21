@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>คู่มือเทมเพลตข้อความด่วน - IRIS CRM</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Sarabun', sans-serif; background: #f8fafc; color: #334155; line-height: 1.7; }
+    .container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 { font-size: 28px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+    .header p { font-size: 16px; color: #64748b; }
+    .nav { display: flex; gap: 12px; justify-content: center; margin-bottom: 30px; flex-wrap: wrap; }
+    .nav a { padding: 8px 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 20px; color: #475569; text-decoration: none; font-size: 13px; font-weight: 600; }
+    .nav a:hover { background: #eef2ff; border-color: #6366f1; color: #6366f1; }
+    .section { background: #fff; border-radius: 16px; padding: 28px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; }
+    .section-title { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+    .section-title .icon { font-size: 24px; }
+    .step { display: flex; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
+    .step-num { width: 32px; height: 32px; background: #6366f1; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+    .step-content { flex: 1; }
+    .step-content strong { color: #1e293b; }
+    .note { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 16px 0; font-size: 14px; color: #92400e; }
+    .tip { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 16px 0; font-size: 14px; color: #166534; }
+    .info { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 16px 0; font-size: 14px; color: #1e40af; }
+    .img-example { background: #f8fafc; border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid #e2e8f0; }
+    .img-example img { max-width: 100%; border-radius: 8px; }
+    .img-example .caption { font-size: 12px; color: #94a3b8; margin-top: 8px; text-align: center; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .badge-new { background: #dcfce7; color: #166534; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    th { background: #f8fafc; padding: 10px 14px; text-align: left; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+    .footer { text-align: center; margin-top: 40px; color: #94a3b8; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h1>⚡ คู่มือเทมเพลตข้อความด่วน</h1>
+      <p>สร้างข้อความสำเร็จรูปพร้อมรูปภาพ ส่งให้ลูกค้าได้ในคลิกเดียว</p>
+    </div>
+
+    <div class="nav">
+      <a href="/guide/send-message.html">📱 คู่มือส่งข้อความ</a>
+      <a href="/guide/templates.html">⚡ เทมเพลต</a>
+    </div>
+
+    <!-- ข้อความด่วนคืออะไร -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">💡</span> ข้อความด่วนคืออะไร?
+      </div>
+      <p style="font-size: 15px; color: #475569; margin-bottom: 12px;">
+        ข้อความด่วน คือ ข้อความสำเร็จรูปที่เตรียมไว้ล่วงหน้า เพื่อให้แอดมินตอบลูกค้าได้เร็วขึ้นโดยไม่ต้องพิมพ์ซ้ำ
+      </p>
+      <p style="font-size: 15px; color: #475569;">
+        ตัวอย่างเช่น:
+      </p>
+      <ul style="margin: 12px 0 0 20px; color: #475569;">
+        <li>ข้อความทักทายลูกค้า</li>
+        <li>รายละเอียดแพคเกจพร้อมรูปเมนูอาหาร</li>
+        <li>ข้อมูลการชำระเงินพร้อมรูป QR Code</li>
+        <li>ราคาบริการพร้อมรูปตัวอย่างงาน</li>
+      </ul>
+    </div>
+
+    <!-- สร้างเทมเพลต -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">✏️</span> สร้างเทมเพลตใหม่
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          ไปที่เมนู <strong>เทมเพลต</strong> ในแถบเมนูด้านบน
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          กดปุ่ม <strong>+ เพิ่มเทมเพลต</strong> มุมขวาบน
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          กรอกข้อมูล:
+          <ul style="margin-top: 8px;">
+            <li><strong>ชื่อเทมเพลต</strong> — ชื่อสำหรับค้นหา เช่น "เมนูอาหาร", "ราคาแพคเกจ"</li>
+            <li><strong>หมวดหมู่</strong> — จัดกลุ่ม เช่น "ทักทาย", "ชำระเงิน" (ไม่บังคับ)</li>
+            <li><strong>ข้อความ</strong> — เนื้อหาที่จะส่งถึงลูกค้า</li>
+          </ul>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          กดปุ่ม <strong>เพิ่ม</strong> เพื่อบันทึก
+        </div>
+      </div>
+    </div>
+
+    <!-- เพิ่มรูปภาพ -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">🖼️</span> เพิ่มรูปภาพในเทมเพลต
+        <span class="badge badge-new">ใหม่!</span>
+      </div>
+      <p style="font-size: 15px; color: #475569; margin-bottom: 16px;">
+        สามารถแนบรูปภาพหลายรูปในเทมเพลตเดียว เมื่อเลือกใช้เทมเพลต ระบบจะส่งข้อความพร้อมรูปภาพทั้งหมดให้ลูกค้าอัตโนมัติ
+      </p>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          ในหน้าสร้าง/แก้ไขเทมเพลต จะมีส่วน <strong>"รูปภาพ"</strong> ด้านล่างช่องข้อความ
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          กดปุ่ม <strong>เพิ่มรูป</strong> (กรอบเส้นประ) เพื่อเลือกรูปจากเครื่อง
+          <br>— สามารถเลือกหลายรูปพร้อมกันได้
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          รูปจะแสดงเป็นตัวอย่างด้านล่าง
+          <br>— กด <strong>✕</strong> ที่มุมรูปเพื่อลบรูปที่ไม่ต้องการ
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          กด <strong>เพิ่ม</strong> หรือ <strong>บันทึก</strong> เพื่อบันทึกเทมเพลตพร้อมรูป
+        </div>
+      </div>
+
+      <div class="tip">
+        💡 <strong>ตัวอย่างการใช้งาน:</strong>
+        <ul style="margin-top: 6px;">
+          <li>เทมเพลต "เมนูอาหาร" — ข้อความ "เมนูอาหารของทางร้านค่ะ" + รูปเมนู 5 รูป</li>
+          <li>เทมเพลต "ตัวอย่างงาน" — ข้อความ "ตัวอย่างงานที่ผ่านมาค่ะ" + รูปงาน 4 รูป</li>
+          <li>เทมเพลต "การชำระเงิน" — ข้อความรายละเอียดบัญชี + รูป QR Code 1 รูป</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ใช้งานเทมเพลต -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">🚀</span> ใช้งานเทมเพลตในห้องแชท
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          เปิดห้องแชทของลูกค้าที่ต้องการ
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          กดปุ่ม <strong>⚡</strong> ในแถบเครื่องมือด้านล่าง
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          ค้นหาหรือเลือกเทมเพลตที่ต้องการ
+          <br>— เทมเพลตที่มีรูปจะมีป้าย <strong>🖼 จำนวนรูป</strong> แสดงอยู่
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          กดเลือกเทมเพลต:
+          <ul style="margin-top: 6px;">
+            <li><strong>เทมเพลตที่มีรูป</strong> → ระบบส่งข้อความ + รูปทั้งหมดทันที</li>
+            <li><strong>เทมเพลตไม่มีรูป</strong> → ข้อความจะถูกวางในช่องพิมพ์ แก้ไขได้ก่อนส่ง</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="info">
+        ℹ️ เทมเพลตที่มีรูปจะ<strong>ส่งทันที</strong>เมื่อกดเลือก ไม่สามารถแก้ไขก่อนส่งได้
+        <br>หากต้องการแก้ไขข้อความก่อนส่ง ให้ใช้เทมเพลตแบบไม่มีรูป
+      </div>
+    </div>
+
+    <!-- แก้ไข/ลบ -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">📝</span> แก้ไข / ลบเทมเพลต
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          ไปที่เมนู <strong>เทมเพลต</strong>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          เลื่อนเมาส์ไปที่เทมเพลตที่ต้องการ จะมีปุ่มแสดง:
+          <ul style="margin-top: 6px;">
+            <li>✏️ <strong>แก้ไข</strong> — เปลี่ยนข้อความ, เพิ่ม/ลบรูป</li>
+            <li>🗑️ <strong>ลบ</strong> — ลบเทมเพลต (ถามยืนยันก่อนลบ)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note">
+        ⚠️ เทมเพลตที่ลบแล้วไม่สามารถกู้คืนได้ แต่รูปภาพที่อัปโหลดไว้จะยังอยู่ในระบบ
+      </div>
+    </div>
+
+    <!-- ลูกค้าจะเห็นอะไร -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">👀</span> ลูกค้าจะเห็นอะไร?
+      </div>
+      <p style="font-size: 15px; color: #475569; margin-bottom: 16px;">
+        เมื่อแอดมินเลือกเทมเพลตที่มีข้อความ + รูปภาพ 3 รูป ลูกค้าจะได้รับ:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>ลำดับ</th>
+            <th>สิ่งที่ลูกค้าได้รับ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>💬 ข้อความจากเทมเพลต</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>🖼️ รูปภาพที่ 1</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>🖼️ รูปภาพที่ 2</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>🖼️ รูปภาพที่ 3</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="tip">
+        💡 รูปภาพจะถูกส่งทีละรูปตามลำดับ ลูกค้าจะเห็นเป็นข้อความแยกกัน สามารถกดดูรูปขนาดเต็มได้
+      </div>
+    </div>
+
+    <!-- แอปมือถือ -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">📱</span> ใช้งานบนแอปมือถือ
+      </div>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          เปิดห้องแชท กดปุ่ม <strong>+</strong> มุมล่างซ้าย
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          เลือก <strong>💬 ข้อความด่วน</strong>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          ค้นหาหรือเลือกเทมเพลต → กดเพื่อส่งทันที
+        </div>
+      </div>
+
+      <div class="note">
+        ⚠️ บนแอปมือถือ เทมเพลตที่มีรูปจะส่งเฉพาะข้อความ (ไม่ส่งรูป)
+        <br>หากต้องการส่งรูปพร้อมข้อความ ให้ใช้ผ่านเว็บแอปแทน
+      </div>
+    </div>
+
+    <!-- เคล็ดลับ -->
+    <div class="section">
+      <div class="section-title">
+        <span class="icon">✨</span> เคล็ดลับการใช้งาน
+      </div>
+      <ul style="list-style: none; padding: 0;">
+        <li style="padding: 10px 0; border-bottom: 1px solid #f1f5f9;">
+          🏷️ <strong>จัดหมวดหมู่</strong> — แบ่งเทมเพลตเป็นกลุ่ม เช่น "ทักทาย", "ชำระเงิน", "เมนูอาหาร" จะค้นหาง่ายขึ้น
+        </li>
+        <li style="padding: 10px 0; border-bottom: 1px solid #f1f5f9;">
+          📏 <strong>ข้อความสั้นกระชับ</strong> — ลูกค้าชอบข้อความที่อ่านง่าย ไม่ยาวเกินไป
+        </li>
+        <li style="padding: 10px 0; border-bottom: 1px solid #f1f5f9;">
+          🖼️ <strong>รูปคมชัด</strong> — ใช้รูปที่ชัดเจน ขนาดไม่เกิน 10 MB ต่อรูป
+        </li>
+        <li style="padding: 10px 0; border-bottom: 1px solid #f1f5f9;">
+          🔄 <strong>อัปเดตสม่ำเสมอ</strong> — ราคาหรือเมนูเปลี่ยน ให้อัปเดตเทมเพลตด้วย
+        </li>
+        <li style="padding: 10px 0;">
+          📸 <strong>ไม่เกิน 10 รูป</strong> — ใส่รูปมากเกินไปจะทำให้ลูกค้ารับสารเยอะ แนะนำ 3-5 รูปต่อเทมเพลต
+        </li>
+      </ul>
+    </div>
+
+    <div class="footer">
+      IRIS CRM — คู่มือเทมเพลตข้อความด่วน<br>
+      อัปเดตล่าสุด: มีนาคม 2569
+    </div>
+
+  </div>
+</body>
+</html>

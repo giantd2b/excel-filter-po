@@ -24,6 +24,36 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   };
 
   const hasMedia = message.mediaType && message.mediaUrl;
+  const isSticker = message.mediaType === "sticker" ||
+    (message.mediaType === "image" && message.text === "[สติกเกอร์]");
+
+  // Sticker: render without bubble, just the image + timestamp
+  if (isSticker && message.mediaUrl) {
+    return (
+      <div className={`flex ${isOutgoing ? "justify-end" : "justify-start"} mb-2.5`}>
+        <div className="flex flex-col items-center">
+          <img
+            src={message.mediaUrl}
+            alt="sticker"
+            className="w-[120px] h-[120px] object-contain"
+            loading="lazy"
+            onError={(e) => {
+              // Fallback: try android/sticker.png if iPhone version fails
+              const img = e.currentTarget;
+              if (message.previewUrl && img.src !== message.previewUrl) {
+                img.src = message.previewUrl;
+              }
+            }}
+          />
+          <span className={`text-[10px] font-medium tabular-nums mt-0.5 ${
+            isOutgoing ? "text-brand-300" : "text-slate-300"
+          }`}>
+            {formatTime(message.timestamp)}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -82,9 +112,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
           {/* Admin name label */}
           {isOutgoing && message.adminName && (
-            <div className="px-4 pt-2.5 pb-0">
-              <span className="text-[10px] font-medium text-brand-200/80">
-                {message.adminName}
+            <div className="px-4 pt-2 pb-0">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/20 text-white">
+                👤 {message.adminName}
               </span>
             </div>
           )}

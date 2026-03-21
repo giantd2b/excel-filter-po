@@ -47,10 +47,14 @@ interface UsersResult {
 
 export async function getUsers(
   limitCount = 20,
-  lastId?: string | null
+  lastId?: string | null,
+  search?: string,
+  channel?: string,
 ): Promise<UsersResult> {
   const params = new URLSearchParams({ limit: String(limitCount) });
   if (lastId) params.set("startAfter", lastId);
+  if (search) params.set("search", search);
+  if (channel) params.set("channel", channel);
 
   const data = await api.get<any[]>(`/users?${params}`);
 
@@ -202,8 +206,8 @@ export async function markAsRead(userId: string): Promise<void> {
   await api.post(`/users/${userId}/read`, {});
 }
 
-export async function bulkMarkAsRead(ids: string[]): Promise<void> {
-  await api.post("/users/bulk-read", { ids });
+export async function bulkMarkAsRead(ids?: string[], all?: boolean, channel?: string, channelType?: string): Promise<void> {
+  await api.post("/users/bulk-read", { ids, all, channel, channelType });
 }
 
 // ─── Inbox: Send Message (via NestJS API) ───────────────────────────
@@ -311,6 +315,7 @@ export interface ReplyTemplate {
   title: string;
   text: string;
   category?: string;
+  images?: string[];
   order?: number;
 }
 
@@ -474,4 +479,46 @@ export async function setCustomerStatus(
   status: "OPEN" | "FOLLOW_UP" | "RESOLVED"
 ) {
   return api.post(`/users/${customerId}/status`, { status });
+}
+
+export async function toggleCustomerPin(customerId: string) {
+  return api.post(`/users/${customerId}/pin`, {});
+}
+
+// ─── Quotations Pipeline ──────────────────────────────────────────
+
+export async function getQuotationPipeline(params: {
+  status?: string;
+  search?: string;
+  matched?: string;
+  dateFrom?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.search) qs.set("search", params.search);
+  if (params.matched) qs.set("matched", params.matched);
+  if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
+  if (params.page) qs.set("page", String(params.page));
+  if (params.limit) qs.set("limit", String(params.limit));
+  return api.get<any>(`/quotations/pipeline?${qs}`);
+}
+
+export async function getQuotationStats() {
+  return api.get<any>("/quotations/stats");
+}
+
+export async function syncQuotations() {
+  return api.get<any>("/quotations/sync");
+}
+
+export async function getUnmatchedCandidates(page = 1, limit = 20) {
+  return api.get<any>(`/quotations/unmatched-candidates?page=${page}&limit=${limit}`);
+}
+
+export async function linkCustomerToQuote(phone: string, customerId: string, docNo?: string) {
+  const params = new URLSearchParams({ phone, customerId });
+  if (docNo) params.set("docNo", docNo);
+  return api.post<any>(`/quotations/link-customer?${params}`, {});
 }

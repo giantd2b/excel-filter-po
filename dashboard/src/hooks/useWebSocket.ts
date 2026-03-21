@@ -9,6 +9,8 @@ import { ChatUser, Message, getChannelType } from "@/types/inbox";
 interface UseConversationsSocketOptions {
   channel?: string | null;
   channelType?: "line" | "facebook" | null;
+  filter?: string | null;
+  search?: string | null;
   limitCount?: number;
   onNewMessage?: (user: ChatUser) => void;
 }
@@ -16,6 +18,8 @@ interface UseConversationsSocketOptions {
 export function useConversationsSocket({
   channel,
   channelType,
+  filter,
+  search,
   limitCount = 50,
   onNewMessage,
 }: UseConversationsSocketOptions) {
@@ -34,6 +38,8 @@ export function useConversationsSocket({
       const params = new URLSearchParams({ limit: String(limitCount) });
       if (channel) params.set("channel", channel);
       if (channelType) params.set("channelType", channelType);
+      if (filter) params.set("filter", filter);
+      if (search) params.set("search", search);
 
       const data = await api.get<any[]>(
         `/inbox/conversations?${params}`
@@ -55,6 +61,7 @@ export function useConversationsSocket({
         assignedToName: u.assignedToName,
         nextJobDate: u.nextJobDate || null,
         nextJobTitle: u.nextJobTitle || null,
+        isPinned: u.isPinned || false,
         tags: u.tags || [],
       }));
 
@@ -65,7 +72,7 @@ export function useConversationsSocket({
     } finally {
       setLoading(false);
     }
-  }, [channel, channelType, limitCount]);
+  }, [channel, channelType, filter, search, limitCount]);
 
   useEffect(() => {
     fetchInitial();
@@ -96,7 +103,7 @@ export function useConversationsSocket({
             const updated: ChatUser = {
               ...(idx >= 0 ? prev[idx] : ({} as ChatUser)),
               id: data.id,
-              oduserId: data.oduserId || data.id,
+              oduserId: data.oduserId || prev[idx]?.oduserId || data.id,
               displayName: data.displayName || prev[idx]?.displayName || "ไม่ระบุชื่อ",
               pictureUrl: data.pictureUrl || prev[idx]?.pictureUrl || "",
               profile_pic: data.profile_pic || prev[idx]?.profile_pic || "",
@@ -106,6 +113,8 @@ export function useConversationsSocket({
               unreadCount: data.unreadCount ?? prev[idx]?.unreadCount ?? 0,
               lastMessagePreview: data.lastMessagePreview || prev[idx]?.lastMessagePreview || "",
               timestamp: data.timestamp || prev[idx]?.timestamp || 0,
+              nextJobDate: data.nextJobDate || prev[idx]?.nextJobDate || null,
+              nextJobTitle: data.nextJobTitle || prev[idx]?.nextJobTitle || null,
             };
 
             // Notify new message
@@ -120,6 +129,11 @@ export function useConversationsSocket({
               next = [...prev];
               next[idx] = updated;
             } else {
+              // Only add new conversation if it matches current filter
+              const matchesChannel = !channel || updated.channel === channel;
+              const matchesType = !channelType || updated.channelType === channelType;
+              const matchesFilter = !filter || (filter === "upcoming_jobs" ? !!updated.nextJobDate : true);
+              if (!matchesChannel || !matchesType || !matchesFilter) return prev;
               next = [updated, ...prev];
             }
 
@@ -136,7 +150,7 @@ export function useConversationsSocket({
     return () => {
       socketRef.current?.off("conversation:updated");
     };
-  }, [channel, channelType, limitCount, fetchInitial]);
+  }, [channel, channelType, search, limitCount, fetchInitial]);
 
   return { conversations, loading, error, connected };
 }
@@ -178,6 +192,7 @@ export function useMessagesSocket({
           type: m.type || "incoming",
           sender: m.sender || "user",
           timestamp: m.timestamp || 0,
+          adminName: m.adminName,
           status: m.status,
           adminId: m.adminId,
           mediaType: m.mediaType,
@@ -204,6 +219,7 @@ export function useMessagesSocket({
             previewUrl: data.message.previewUrl,
             status: data.message.status,
             adminId: data.message.adminId,
+            adminName: data.message.adminName,
           };
           setMessages((prev) => {
             if (prev.some((m) => m.id === msg.id)) return prev;

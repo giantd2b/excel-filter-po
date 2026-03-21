@@ -146,7 +146,12 @@
       "Bash(do)",
       "Bash(sed -i 's/indigo-500/brand-500/g; s/indigo-600/brand-600/g; s/indigo-400/brand-400/g; s/indigo-300/brand-300/g; s/indigo-200/brand-200/g; s/indigo-100/brand-100/g; s/indigo-50/brand-50/g' \"$f\")",
       "Bash(done)",
-      "Bash(VITE_API_URL=https://harmonious-presence-production.up.railway.app/api npm run dev)"
+      "Bash(VITE_API_URL=https://harmonious-presence-production.up.railway.app/api npm run dev)",
+      "Bash(npx ts-node:*)",
+      "Bash(find /c/Users/OatJirakitt/Documents/GitHub/excel-filter-po/dashboard -name ChatList.tsx -o -name ChannelsSidebar.tsx -o -name *inbox*)",
+      "Bash(find /c/Users/OatJirakitt/Documents/GitHub/excel-filter-po/dashboard/src -name *api* -o -name *service*)",
+      "Bash(grep -r quotation /c/Users/OatJirakitt/Documents/GitHub/excel-filter-po --include=*.ts --include=*.tsx --include=*.js -n)",
+      "Bash(find /c/Users/OatJirakitt/Documents/GitHub/excel-filter-po -name .env* -o -name README*)"
     ]
   }
 }

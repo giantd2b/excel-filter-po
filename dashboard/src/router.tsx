@@ -15,6 +15,8 @@ import AnalyticsPage from "@/pages/AnalyticsPage";
 import KnowledgePage from "@/pages/KnowledgePage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
 import AgendaGeneratorPage from "@/pages/AgendaGeneratorPage";
+import QuotationsPage from "@/pages/QuotationsPage";
+import QuoteMatchPage from "@/pages/QuoteMatchPage";
 
 export const router = createBrowserRouter([
   {
@@ -82,6 +84,14 @@ export const router = createBrowserRouter([
       {
         path: "agenda",
         element: <AgendaGeneratorPage />,
+      },
+      {
+        path: "quotations",
+        element: <QuotationsPage />,
+      },
+      {
+        path: "quote-match",
+        element: <QuoteMatchPage />,
       },
     ],
   },

@@ -13,10 +13,21 @@ export class ConversationsController {
     @Query('channelType') channelType?: string,
     @Query('status') status?: string,
     @Query('assignedTo') assignedTo?: string,
+    @Query('filter') filter?: string,
+    @Query('search') search?: string,
     @Query('limit') limitStr?: string,
   ) {
     const limitCount = limitStr ? parseInt(limitStr, 10) : 50;
     const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { displayName: { contains: search, mode: 'insensitive' } },
+        { nickname: { contains: search, mode: 'insensitive' } },
+        { phoneNumber: { contains: search } },
+        { phoneClean: { contains: search } },
+      ];
+    }
 
     if (channel) {
       where.channel = channel;
@@ -34,9 +45,20 @@ export class ConversationsController {
       where.assignedToId = assignedTo;
     }
 
+    // Filter: upcoming jobs — customers with nextJobDate >= today
+    if (filter === 'upcoming_jobs') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      where.nextJobDate = { gte: today };
+    }
+
+    const orderBy = filter === 'upcoming_jobs'
+      ? [{ isPinned: 'desc' as const }, { nextJobDate: 'asc' as const }]
+      : [{ isPinned: 'desc' as const }, { lastMessageAt: 'desc' as const }];
+
     const customers = await this.prisma.customer.findMany({
       where,
-      orderBy: { lastMessageAt: 'desc' },
+      orderBy,
       take: limitCount,
       include: {
         tags: { include: { tag: true } },
@@ -55,6 +77,7 @@ export class ConversationsController {
       lastmessagetime: c.lastMessageAt ? c.lastMessageAt.getTime() : 0,
       unreadCount: c.unreadCount,
       lastMessagePreview: c.lastMessagePreview || '',
+      isPinned: c.isPinned,
       status: c.status,
       assignedToId: c.assignedToId,
       assignedToName: c.assignedToName,

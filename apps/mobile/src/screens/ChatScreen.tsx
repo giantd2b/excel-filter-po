@@ -46,6 +46,7 @@ export default function ChatScreen({ route }: any) {
   const [sending, setSending] = useState(false);
   const [showHelper, setShowHelper] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [showStickers, setShowStickers] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [pendingImage, setPendingImage] = useState<{
@@ -257,6 +258,24 @@ export default function ChatScreen({ route }: any) {
       });
     } catch (err: any) {
       Alert.alert('ส่งไฟล์ไม่สำเร็จ', err.message);
+    } finally {
+      setSending(false);
+    }
+  }, [userId, docId, channel]);
+
+  const handleSendSticker = useCallback(async (packageId: string, stickerId: string) => {
+    setShowStickers(false);
+    setSending(true);
+    try {
+      await api.post('/messages/send', {
+        oduserId: userId,
+        docId,
+        stickerId,
+        stickerPackageId: packageId,
+        channel,
+      });
+    } catch (err: any) {
+      Alert.alert('ส่งสติกเกอร์ไม่สำเร็จ', err.message);
     } finally {
       setSending(false);
     }
@@ -524,6 +543,19 @@ export default function ChatScreen({ route }: any) {
               style={styles.helperItem}
               onPress={() => {
                 setShowHelper(false);
+                setShowStickers(true);
+              }}
+            >
+              <View style={[styles.helperIcon, { backgroundColor: '#f0fdf4' }]}>
+                <Text style={styles.helperIconText}>😊</Text>
+              </View>
+              <Text style={styles.helperLabel}>สติกเกอร์</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.helperItem}
+              onPress={() => {
+                setShowHelper(false);
                 setShowQuickReplies(true);
               }}
             >
@@ -604,6 +636,48 @@ export default function ChatScreen({ route }: any) {
               <Text style={styles.helperLabel}>มอบหมาย</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      )}
+
+      {/* Sticker picker */}
+      {showStickers && (
+        <View style={styles.stickerPanel}>
+          <View style={styles.quickRepliesHeader}>
+            <Text style={styles.quickRepliesTitle}>
+              {isLine ? 'LINE สติกเกอร์' : 'สติกเกอร์ (ส่งเป็นรูปภาพ)'}
+            </Text>
+            <TouchableOpacity onPress={() => setShowStickers(false)}>
+              <Text style={styles.quickRepliesClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={{ maxHeight: 220 }}>
+            {[
+              { name: 'Moon', packageId: '11537', ids: ['52002734','52002735','52002736','52002737','52002738','52002739','52002740','52002741','52002742','52002743','52002744','52002745'] },
+              { name: 'Brown & Friends', packageId: '11538', ids: ['51626494','51626495','51626496','51626497','51626498','51626499','51626500','51626501','51626502','51626503','51626504','51626505'] },
+              { name: 'Brown Special', packageId: '6325', ids: ['10979904','10979905','10979906','10979907','10979908','10979909','10979910','10979911','10979912','10979913','10979914','10979915'] },
+              { name: 'Cony Special', packageId: '6359', ids: ['11069848','11069849','11069850','11069851','11069852','11069853','11069854','11069855','11069856','11069857','11069858','11069859'] },
+            ].map((set) => (
+              <View key={set.name} style={{ marginBottom: 12 }}>
+                <Text style={styles.quickRepliesCategory}>{set.name}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 12 }}>
+                  {set.ids.map((sid) => (
+                    <TouchableOpacity
+                      key={sid}
+                      onPress={() => handleSendSticker(set.packageId, sid)}
+                      disabled={sending}
+                      style={{ width: 56, height: 56, padding: 4 }}
+                    >
+                      <Image
+                        source={{ uri: `https://stickershop.line-scdn.net/stickershop/v1/sticker/${sid}/iPhone/sticker@2x.png` }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </ScrollView>
         </View>
       )}
 
@@ -774,6 +848,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94a3b8',
     marginLeft: 8,
+  },
+  // Sticker panel
+  stickerPanel: {
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
   },
   // Helper panel
   helperPanel: {

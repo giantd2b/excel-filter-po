@@ -5,12 +5,14 @@ import React, {
   useEffect,
   useCallback,
 } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import {
   auth,
   signInWithEmailAndPassword,
   signOut,
 } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { connectSocket, disconnectSocket } from '../services/socket';
 
 interface AdminUser {
   uid: string;
@@ -44,8 +46,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
         });
+
+        // Store token for API calls
+        firebaseUser.getIdToken().then((token) => {
+          SecureStore.setItemAsync('firebaseToken', token).catch(() => {});
+        }).catch(() => {});
+
+        // Connect WebSocket for real-time updates
+        connectSocket().catch(() => {});
       } else {
         setUser(null);
+        SecureStore.deleteItemAsync('firebaseToken').catch(() => {});
+        try { disconnectSocket(); } catch {}
       }
       setLoading(false);
     });
@@ -57,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    try { disconnectSocket(); } catch {}
     await signOut(auth);
   }, []);
 
