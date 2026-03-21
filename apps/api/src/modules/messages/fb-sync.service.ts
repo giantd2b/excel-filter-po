@@ -138,13 +138,31 @@ export class FbSyncService {
             if (existingByText) continue;
           }
 
+          // Check media-only messages by mediaType + timestamp (within 10 seconds)
+          const attachments = msg.attachments?.data || [];
+          if (!msg.message && attachments.length > 0) {
+            const att = attachments[0];
+            const isImage = att.mime_type?.startsWith('image/') || att.type === 'image';
+            const isVideo = att.mime_type?.startsWith('video/') || att.type === 'video';
+            if (isImage || isVideo) {
+              const existingByMedia = await this.prisma.message.findFirst({
+                where: {
+                  customerId,
+                  type: 'OUTGOING',
+                  mediaType: isImage ? 'IMAGE' : 'VIDEO',
+                  timestamp: { gte: BigInt(timestamp - 10000), lte: BigInt(timestamp + 10000) },
+                },
+              });
+              if (existingByMedia) continue;
+            }
+          }
+
           // Determine content
           let text = msg.message || null;
           let mediaType: 'IMAGE' | 'VIDEO' | null = null;
           let mediaUrl: string | null = null;
 
           // Check attachments
-          const attachments = msg.attachments?.data || [];
           if (attachments.length > 0) {
             const att = attachments[0];
             if (att.mime_type?.startsWith('image/') || att.type === 'image') {
@@ -286,11 +304,28 @@ export class FbSyncService {
         });
         if (exists) continue;
 
+        // Check media-only messages by mediaType + timestamp (within 10 seconds)
+        const attachments = msg.attachments?.data || [];
+        if (!msg.message && attachments.length > 0) {
+          const att = attachments[0];
+          const isImage = att.mime_type?.startsWith('image/') || att.type === 'image';
+          const isVideo = att.mime_type?.startsWith('video/') || att.type === 'video';
+          if (isImage || isVideo) {
+            const existingByMedia = await this.prisma.message.findFirst({
+              where: {
+                customerId: targetCustomerId,
+                type: 'OUTGOING',
+                mediaType: isImage ? 'IMAGE' : 'VIDEO',
+                timestamp: { gte: BigInt(timestamp - 10000), lte: BigInt(timestamp + 10000) },
+              },
+            });
+            if (existingByMedia) continue;
+          }
+        }
+
         let text = msg.message || '[ข้อความ]';
         let mediaType: 'IMAGE' | 'VIDEO' | null = null;
         let mediaUrl: string | null = null;
-
-        const attachments = msg.attachments?.data || [];
         if (attachments.length > 0) {
           const att = attachments[0];
           if (att.type === 'image' || att.mime_type?.startsWith('image/')) {
