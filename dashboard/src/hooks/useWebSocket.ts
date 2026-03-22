@@ -198,6 +198,9 @@ export function useMessagesSocket({
           mediaType: m.mediaType,
           mediaUrl: m.mediaUrl,
           previewUrl: m.previewUrl,
+          quoteToken: m.quoteToken,
+          replyToId: m.replyToId,
+          replyTo: m.replyTo,
         }));
         setMessages(mapped);
         setLoading(false);
@@ -220,9 +223,24 @@ export function useMessagesSocket({
             status: data.message.status,
             adminId: data.message.adminId,
             adminName: data.message.adminName,
+            replyToId: data.message.replyToId,
           };
           setMessages((prev) => {
             if (prev.some((m) => m.id === msg.id)) return prev;
+            // Resolve replyTo from existing messages
+            if (msg.replyToId) {
+              const original = prev.find((m) => m.id === msg.replyToId);
+              if (original) {
+                msg.replyTo = {
+                  id: original.id,
+                  text: original.text,
+                  type: original.type,
+                  sender: original.sender,
+                  mediaType: original.mediaType,
+                  adminName: original.adminName,
+                };
+              }
+            }
             return [...prev, msg];
           });
           if (msg.type === "incoming") {
