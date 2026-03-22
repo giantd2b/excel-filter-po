@@ -14,7 +14,7 @@ import {
   WifiOff,
   Clock,
   CheckCircle2,
-  RotateCcw,
+  ChevronUp,
 } from "lucide-react";
 import { setCustomerStatus } from "@/lib/api-service";
 
@@ -32,6 +32,7 @@ export function ConversationArea({
   const [, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
   const prevMessagesLength = useRef(0);
 
@@ -43,7 +44,7 @@ export function ConversationArea({
     }
   }, [selectedUser]);
 
-  const { messages, loading, error } = useMessagesSocket({
+  const { messages, loading, loadingMore, hasMore, loadMore, error } = useMessagesSocket({
     userId: selectedUser?.id || null,
     onNewMessage: handleNewMessage,
   });
@@ -273,7 +274,7 @@ export function ConversationArea({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-5 bg-slate-50/30">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-6 py-5 bg-slate-50/30">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <div className="w-6 h-6 border-2 border-slate-200 border-t-brand-500 rounded-full animate-spin" />
@@ -299,6 +300,32 @@ export function ConversationArea({
           </div>
         ) : (
           <>
+            {hasMore && (
+              <div className="flex justify-center mb-4">
+                <button
+                  onClick={async () => {
+                    const container = messagesContainerRef.current;
+                    const prevScrollHeight = container?.scrollHeight || 0;
+                    await loadMore();
+                    // Preserve scroll position after prepending older messages
+                    requestAnimationFrame(() => {
+                      if (container) {
+                        container.scrollTop = container.scrollHeight - prevScrollHeight;
+                      }
+                    });
+                  }}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all duration-150 shadow-sm disabled:opacity-50"
+                >
+                  {loadingMore ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <ChevronUp className="w-3 h-3" />
+                  )}
+                  {loadingMore ? "กำลังโหลด..." : "โหลดข้อความเก่า"}
+                </button>
+              </div>
+            )}
             {messages.map((msg, index) => (
               <div key={msg.id}>
                 {shouldShowDateDivider(msg, messages[index - 1] || null) && (

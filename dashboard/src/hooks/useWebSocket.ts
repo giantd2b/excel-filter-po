@@ -174,6 +174,27 @@ export function useConversationsSocket({
 
 // ─── Messages (replaces useMessagesListener) ─────────────────────────
 
+const MESSAGES_PAGE_SIZE = 50;
+
+function mapMessage(m: any): Message {
+  return {
+    id: m.id,
+    text: m.text || "",
+    type: m.type || "incoming",
+    sender: m.sender || "user",
+    timestamp: m.timestamp || 0,
+    adminName: m.adminName,
+    status: m.status,
+    adminId: m.adminId,
+    mediaType: m.mediaType,
+    mediaUrl: m.mediaUrl,
+    previewUrl: m.previewUrl,
+    quoteToken: m.quoteToken,
+    replyToId: m.replyToId,
+    replyTo: m.replyTo,
+  };
+}
+
 interface UseMessagesSocketOptions {
   userId: string | null;
   onNewMessage?: (message: Message) => void;
@@ -185,15 +206,43 @@ export function useMessagesSocket({
 }: UseMessagesSocketOptions) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const onNewMessageRef = useRef(onNewMessage);
   onNewMessageRef.current = onNewMessage;
   const socketRef = useRef<Socket | null>(null);
 
+  const loadMore = useCallback(async () => {
+    if (!userId || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const oldest = messages[0];
+      if (!oldest) return;
+      const data = await api.get<any[]>(
+        `/messages/${userId}?limit=${MESSAGES_PAGE_SIZE}&before=${oldest.timestamp}`
+      );
+      const older = data.map(mapMessage);
+      if (older.length < MESSAGES_PAGE_SIZE) setHasMore(false);
+      if (older.length > 0) {
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newMsgs = older.filter((m) => !existingIds.has(m.id));
+          return [...newMsgs, ...prev];
+        });
+      }
+    } catch (err: any) {
+      console.error("Failed to load more messages:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [userId, loadingMore, hasMore, messages]);
+
   useEffect(() => {
     if (!userId) {
       setMessages([]);
       setLoading(false);
+      setHasMore(false);
       return;
     }
 
@@ -240,28 +289,14 @@ export function useMessagesSocket({
 
     (async () => {
       try {
-        // Fetch history via REST
+        // Fetch recent messages via REST
         setLoading(true);
-        const data = await api.get<any[]>(`/messages/${userId}?limit=200`);
+        const data = await api.get<any[]>(`/messages/${userId}?limit=${MESSAGES_PAGE_SIZE}`);
         if (cancelled) return;
 
-        const mapped: Message[] = data.map((m: any) => ({
-          id: m.id,
-          text: m.text || "",
-          type: m.type || "incoming",
-          sender: m.sender || "user",
-          timestamp: m.timestamp || 0,
-          adminName: m.adminName,
-          status: m.status,
-          adminId: m.adminId,
-          mediaType: m.mediaType,
-          mediaUrl: m.mediaUrl,
-          previewUrl: m.previewUrl,
-          quoteToken: m.quoteToken,
-          replyToId: m.replyToId,
-          replyTo: m.replyTo,
-        }));
+        const mapped = data.map(mapMessage);
         setMessages(mapped);
+        setHasMore(mapped.length >= MESSAGES_PAGE_SIZE);
         setLoading(false);
 
         // Subscribe to real-time
@@ -289,7 +324,7 @@ export function useMessagesSocket({
     };
   }, [userId]);
 
-  return { messages, loading, error };
+  return { messages, loading, loadingMore, hasMore, loadMore, error };
 }
 
 // ─── Unread Count (replaces useTotalUnreadListener) ──────────────────

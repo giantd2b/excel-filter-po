@@ -2,13 +2,49 @@ import { useEffect, useRef } from "react";
 import { getSocket } from "@/lib/socket";
 import { useAuth } from "@/context/AuthContext";
 
+// Shared AudioContext — created once, reused across all notifications
+let sharedAudioCtx: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  try {
+    if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+      sharedAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return sharedAudioCtx;
+  } catch {
+    return null;
+  }
+}
+
+function playSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  // Resume if suspended (browsers require user gesture)
+  if (ctx.state === "suspended") {
+    ctx.resume().catch(() => {});
+  }
+
+  try {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.frequency.value = 880;
+    oscillator.type = "sine";
+    gain.gain.value = 0.3;
+    oscillator.start();
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    oscillator.stop(ctx.currentTime + 0.3);
+  } catch {}
+}
+
 /**
  * Global notification listener — runs on ALL pages, not just Inbox.
  * Plays sound + shows browser notification when new incoming message arrives.
  */
 export function useGlobalNotifications() {
   const { user } = useAuth();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const setupDone = useRef(false);
 
   useEffect(() => {
@@ -65,23 +101,6 @@ export function useGlobalNotifications() {
         // Socket not ready
       }
     })();
-
-    function playSound() {
-      try {
-        // Use Web Audio API for a simple notification beep
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const oscillator = ctx.createOscillator();
-        const gain = ctx.createGain();
-        oscillator.connect(gain);
-        gain.connect(ctx.destination);
-        oscillator.frequency.value = 880;
-        oscillator.type = "sine";
-        gain.gain.value = 0.3;
-        oscillator.start();
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-        oscillator.stop(ctx.currentTime + 0.3);
-      } catch {}
-    }
 
     return () => {
       setupDone.current = false;

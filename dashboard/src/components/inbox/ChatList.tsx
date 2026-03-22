@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { ChatUser } from "@/types/inbox";
 import { ChatListItem } from "./ChatListItem";
 import { useConversationsSocket } from "@/hooks/useWebSocket";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSound } from "@/hooks/useSound";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Search, Loader2, Bell, BellOff, Wifi, WifiOff, CheckCheck, Pin } from "lucide-react";
 import { bulkMarkAsRead, toggleCustomerPin } from "@/lib/api-service";
 
@@ -180,60 +181,12 @@ export function ChatList({
       </div>
 
       {/* Conversations list */}
-      <div className="flex-1 overflow-y-auto">
-        {conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-6">
-            <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center mb-3">
-              <Search className="w-5 h-5 text-slate-300" />
-            </div>
-            <p className="text-[13px] font-medium text-slate-500">No chats found</p>
-            <p className="text-[12px] text-slate-400 mt-1">
-              Try a different search term
-            </p>
-          </div>
-        ) : (
-          (() => {
-            const pinned = conversations.filter((u) => u.isPinned);
-            const unpinned = conversations.filter((u) => !u.isPinned);
-            const handlePinToggle = async (userId: string) => {
-              await toggleCustomerPin(userId).catch(() => {});
-              setConversations(prev => prev.map(u =>
-                u.id === userId ? { ...u, isPinned: !u.isPinned } : u
-              ));
-            };
-            return (
-              <>
-                {pinned.length > 0 && (
-                  <>
-                    <div className="px-4 py-1.5 text-[10px] font-semibold text-brand-400 uppercase tracking-wider bg-brand-50/40 flex items-center gap-1.5">
-                      <Pin className="w-2.5 h-2.5" /> Pinned
-                    </div>
-                    {pinned.map((user) => (
-                      <ChatListItem
-                        key={user.id}
-                        user={user}
-                        isSelected={selectedUserId === user.id}
-                        onClick={() => onSelectUser(user)}
-                        onPinToggle={() => handlePinToggle(user.id)}
-                      />
-                    ))}
-                    <div className="border-b-2 border-brand-100/50" />
-                  </>
-                )}
-                {unpinned.map((user) => (
-                  <ChatListItem
-                    key={user.id}
-                    user={user}
-                    isSelected={selectedUserId === user.id}
-                    onClick={() => onSelectUser(user)}
-                    onPinToggle={() => handlePinToggle(user.id)}
-                  />
-                ))}
-              </>
-            );
-          })()
-        )}
-      </div>
+      <VirtualizedChatList
+        conversations={conversations}
+        selectedUserId={selectedUserId}
+        onSelectUser={onSelectUser}
+        setConversations={setConversations}
+      />
 
       {/* Status bar */}
       <div className="px-4 py-2 border-t border-slate-100/80">
@@ -254,6 +207,120 @@ export function ChatList({
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Virtualized Chat List ───────────────────────────────────────────
+
+type ListItem =
+  | { type: "pinned-header" }
+  | { type: "pinned-divider" }
+  | { type: "user"; user: ChatUser };
+
+function VirtualizedChatList({
+  conversations,
+  selectedUserId,
+  onSelectUser,
+  setConversations,
+}: {
+  conversations: ChatUser[];
+  selectedUserId: string | null;
+  onSelectUser: (user: ChatUser) => void;
+  setConversations: React.Dispatch<React.SetStateAction<ChatUser[]>>;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const handlePinToggle = useCallback(async (userId: string) => {
+    await toggleCustomerPin(userId).catch(() => {});
+    setConversations(prev => prev.map(u =>
+      u.id === userId ? { ...u, isPinned: !u.isPinned } : u
+    ));
+  }, [setConversations]);
+
+  const items: ListItem[] = useMemo(() => {
+    const pinned = conversations.filter((u) => u.isPinned);
+    const unpinned = conversations.filter((u) => !u.isPinned);
+    const result: ListItem[] = [];
+
+    if (pinned.length > 0) {
+      result.push({ type: "pinned-header" });
+      for (const u of pinned) result.push({ type: "user", user: u });
+      result.push({ type: "pinned-divider" });
+    }
+    for (const u of unpinned) result.push({ type: "user", user: u });
+    return result;
+  }, [conversations]);
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => {
+      const item = items[index];
+      if (item.type === "pinned-header") return 28;
+      if (item.type === "pinned-divider") return 2;
+      return 76; // ChatListItem estimated height
+    },
+    overscan: 10,
+  });
+
+  if (conversations.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+        <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center mb-3">
+          <Search className="w-5 h-5 text-slate-300" />
+        </div>
+        <p className="text-[13px] font-medium text-slate-500">No chats found</p>
+        <p className="text-[12px] text-slate-400 mt-1">
+          Try a different search term
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={parentRef} className="flex-1 overflow-y-auto">
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: "100%",
+          position: "relative",
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const item = items[virtualRow.index];
+          return (
+            <div
+              key={virtualRow.index}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              {item.type === "pinned-header" && (
+                <div className="px-4 py-1.5 text-[10px] font-semibold text-brand-400 uppercase tracking-wider bg-brand-50/40 flex items-center gap-1.5">
+                  <Pin className="w-2.5 h-2.5" /> Pinned
+                </div>
+              )}
+              {item.type === "pinned-divider" && (
+                <div className="border-b-2 border-brand-100/50" />
+              )}
+              {item.type === "user" && (
+                <ChatListItem
+                  user={item.user}
+                  isSelected={selectedUserId === item.user.id}
+                  onClick={() => onSelectUser(item.user)}
+                  onPinToggle={() => handlePinToggle(item.user.id)}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

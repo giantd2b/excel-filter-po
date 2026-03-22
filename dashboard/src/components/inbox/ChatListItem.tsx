@@ -62,6 +62,7 @@ export const ChatListItem = memo(function ChatListItem({ user, isSelected, onCli
               alt={user.displayName}
               width={40}
               height={40}
+              loading="lazy"
               className="object-cover w-full h-full"
             />
           ) : (
