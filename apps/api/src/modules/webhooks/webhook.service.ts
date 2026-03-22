@@ -340,6 +340,9 @@ export class WebhookService {
         },
       });
 
+      // Resolve FB reply_to.mid to our message ID
+      const fbReplyToMid = message.reply_to?.mid || null;
+
       // Save message to PostgreSQL (primary)
       await this.prisma.message.create({
         data: {
@@ -349,6 +352,7 @@ export class WebhookService {
           type: 'INCOMING',
           sender: 'USER',
           timestamp: BigInt(timeOfMessage),
+          replyToId: fbReplyToMid,
         },
       });
 

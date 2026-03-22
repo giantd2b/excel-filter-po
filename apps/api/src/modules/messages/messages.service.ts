@@ -186,14 +186,18 @@ export class MessagesService {
     const platformText = (effectiveMediaType === 'file' || stickerId) ? undefined : text;
     this.logger.log(`sendMessage: channel=${channel}, mediaType=${effectiveMediaType}, mediaUrl=${mediaUrl ? 'YES' : 'NO'}, sticker=${stickerId || 'NO'}, text=${(text || '').substring(0, 30)}`);
 
-    // Look up quoteToken if replying to a message
+    // Look up quoteToken / FB mid if replying to a message
     let quoteToken: string | null = null;
-    if (replyToId && isLine) {
+    let replyToMid: string | null = null;
+    if (replyToId) {
       const replyMsg = await this.prisma.message.findUnique({
         where: { id: replyToId },
-        select: { quoteToken: true },
+        select: { id: true, quoteToken: true },
       });
-      quoteToken = replyMsg?.quoteToken || null;
+      if (replyMsg) {
+        quoteToken = replyMsg.quoteToken || null;
+        replyToMid = replyMsg.id; // For FB, the message ID is the mid
+      }
     }
 
     try {
@@ -206,7 +210,7 @@ export class MessagesService {
         const fbMediaUrl = stickerId
           ? `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`
           : mediaUrl;
-        await this.sendFacebookMessage(oduserId, platformText, fbMediaType, fbMediaUrl, channel);
+        await this.sendFacebookMessage(oduserId, platformText, fbMediaType, fbMediaUrl, channel, replyToMid);
         sendMethod = 'facebook';
       }
       status = 'sent';
@@ -406,12 +410,12 @@ export class MessagesService {
     mediaType?: string,
     mediaUrl?: string,
     channel?: string,
+    replyToMid?: string | null,
   ) {
     const pageToken = getFacebookPageToken(channel!);
 
     // Send media/file first if present
     if (mediaType && mediaUrl) {
-      // Facebook attachment types: image, video, audio, file
       const fbType = mediaType === 'file' ? 'file' : mediaType;
       await axios({
         url: 'https://graph.facebook.com/v18.0/me/messages',
@@ -425,6 +429,7 @@ export class MessagesService {
               payload: { url: mediaUrl, is_reusable: true },
             },
           },
+          ...(replyToMid && { reply_to: { mid: replyToMid } }),
         },
       });
     }
@@ -438,6 +443,7 @@ export class MessagesService {
         data: {
           recipient: { id: userId },
           message: { text },
+          ...(replyToMid && { reply_to: { mid: replyToMid } }),
         },
       });
     }
