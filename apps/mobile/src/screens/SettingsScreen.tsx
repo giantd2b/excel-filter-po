@@ -11,6 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
@@ -316,6 +317,32 @@ export default function SettingsScreen() {
             <Text style={styles.infoLabel}>แอปพลิเคชัน</Text>
             <Text style={styles.infoValue}>IRIS CRM</Text>
           </View>
+          <TouchableOpacity
+            style={styles.clearCacheBtn}
+            onPress={() => {
+              Alert.alert('ล้างแคช', 'ต้องการล้างแคชรูปภาพและข้อความหรือไม่?', [
+                { text: 'ยกเลิก', style: 'cancel' },
+                {
+                  text: 'ล้างแคช',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      // Clear image cache
+                      // Clear message cache
+                      const keys = await AsyncStorage.getAllKeys();
+                      const chatKeys = keys.filter((k) => k.startsWith('chat_msgs_'));
+                      if (chatKeys.length > 0) await AsyncStorage.multiRemove(chatKeys);
+                      Alert.alert('สำเร็จ', 'ล้างแคชเรียบร้อยแล้ว');
+                    } catch {
+                      Alert.alert('ผิดพลาด', 'ไม่สามารถล้างแคชได้');
+                    }
+                  },
+                },
+              ]);
+            }}
+          >
+            <Text style={styles.clearCacheText}>ล้างแคช</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Logout */}
@@ -412,6 +439,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 15, color: '#475569' },
   infoValue: { fontSize: 15, color: '#1e293b', fontWeight: '500' },
+  // Clear cache
+  clearCacheBtn: {
+    marginTop: 12, backgroundColor: '#f1f5f9', borderRadius: 10,
+    paddingVertical: 12, alignItems: 'center',
+  },
+  clearCacheText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
   // Logout
   logoutButton: {
     backgroundColor: '#fff', borderRadius: 16, padding: 16,
