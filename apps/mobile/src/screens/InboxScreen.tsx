@@ -103,7 +103,7 @@ export default function InboxScreen({ navigation }: any) {
     setRefreshing(false);
   }, [fetchConversations]);
 
-  const handlePress = (conversation: Conversation) => {
+  const handlePress = useCallback((conversation: Conversation) => {
     navigation.navigate('Chat', {
       userId: conversation.oduserId,
       docId: conversation.id,
@@ -113,7 +113,7 @@ export default function InboxScreen({ navigation }: any) {
       channelType: conversation.channelType,
       unreadCount: conversation.unreadCount || 0,
     });
-  };
+  }, [navigation]);
 
   // Get unique channel names for the picker
   const channelNames = useMemo(() => {
@@ -157,6 +157,12 @@ export default function InboxScreen({ navigation }: any) {
     if (channelFilter === 'facebook') return 'Facebook';
     return formatChannelName(channelFilter);
   }, [channelFilter]);
+
+  const keyExtractor = useCallback((item: Conversation) => item.id, []);
+
+  const renderItem = useCallback(({ item }: { item: Conversation }) => (
+    <ConversationItem conversation={item} onPress={handlePress} />
+  ), [handlePress]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -239,10 +245,8 @@ export default function InboxScreen({ navigation }: any) {
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ConversationItem conversation={item} onPress={handlePress} />
-          )}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

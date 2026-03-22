@@ -28,7 +28,7 @@ export async function connectSocket(): Promise<Socket> {
     auth: { token },
     transports: ['websocket'],
     reconnection: true,
-    reconnectionAttempts: Infinity,
+    reconnectionAttempts: 50,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 30000,
     timeout: 10000,

@@ -23,6 +23,16 @@ import api from '../services/api';
 import ChatBubble from '../components/ChatBubble';
 import { useMessages, type Message } from '../hooks/useMessages';
 
+function formatDateDivider(timestamp: number): string {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return 'วันนี้';
+  if (date.toDateString() === yesterday.toDateString()) return 'เมื่อวาน';
+  return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 interface ReplyTemplate {
   id: string;
   title: string;
@@ -340,37 +350,38 @@ export default function ChatScreen({ route }: any) {
     setShowQuickReplies(false);
   }, []);
 
-  const filteredMessages = messageSearch.trim()
-    ? messages.filter((m) => m.text?.toLowerCase().includes(messageSearch.toLowerCase()))
-    : messages;
+  const messageKeyExtractor = useCallback((item: Message) => item.id, []);
 
-  const formatDateDivider = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === today.toDateString()) return 'วันนี้';
-    if (date.toDateString() === yesterday.toDateString()) return 'เมื่อวาน';
-    return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
+  const dismissPanels = useCallback(() => {
+    setShowHelper(false);
+    setShowQuickReplies(false);
+  }, []);
+
+  const filteredMessages = React.useMemo(() => {
+    if (!messageSearch.trim()) return messages;
+    const q = messageSearch.toLowerCase();
+    return messages.filter((m) => m.text?.toLowerCase().includes(q));
+  }, [messages, messageSearch]);
 
   const unreadRef = useRef(initialUnread);
+  const filteredMessagesRef = useRef(filteredMessages);
+  filteredMessagesRef.current = filteredMessages;
+
+  const handleReply = useCallback((m: Message) => setReplyTo(m), []);
 
   const renderMessage = useCallback(
     ({ item, index }: { item: Message; index: number }) => {
-      const nextItem = filteredMessages[index + 1];
+      const nextItem = filteredMessagesRef.current[index + 1];
       const showDivider =
         nextItem &&
         new Date(item.timestamp).toDateString() !== new Date(nextItem.timestamp).toDateString();
 
-      // Show unread divider: in inverted list, unread messages are at the top (lowest indices)
-      // Show divider after the last unread incoming message
       const showUnread = unreadRef.current > 0 && index === unreadRef.current - 1 &&
         item.direction === 'incoming';
 
       return (
-        <>
-          <ChatBubble message={item} onReply={(m) => setReplyTo(m)} />
+        <View>
+          <ChatBubble message={item} onReply={handleReply} />
           {showUnread && (
             <View style={styles.unreadDivider}>
               <View style={styles.unreadDividerLine} />
@@ -385,10 +396,10 @@ export default function ChatScreen({ route }: any) {
               <View style={styles.dateDividerLine} />
             </View>
           )}
-        </>
+        </View>
       );
     },
-    [filteredMessages],
+    [handleReply],
   );
 
   return (
@@ -463,14 +474,11 @@ export default function ChatScreen({ route }: any) {
         <FlatList
           ref={flatListRef}
           data={filteredMessages}
-          keyExtractor={(item) => item.id}
+          keyExtractor={messageKeyExtractor}
           renderItem={renderMessage}
           inverted
           contentContainerStyle={styles.messageList}
-          onTouchStart={() => {
-            setShowHelper(false);
-            setShowQuickReplies(false);
-          }}
+          onTouchStart={dismissPanels}
           onEndReached={hasMore ? loadMore : undefined}
           onEndReachedThreshold={0.3}
           initialNumToRender={15}
@@ -705,9 +713,9 @@ export default function ChatScreen({ route }: any) {
                   }));
                   buttons.push({
                     text: 'ยกเลิกมอบหมาย',
-                    onPress: () => api.post(`/users/${docId}/unassign`).catch(() => {}),
+                    onPress: async () => { await api.post(`/users/${docId}/unassign`).catch(() => {}); },
                   });
-                  buttons.push({ text: 'ปิด', onPress: () => {} });
+                  buttons.push({ text: 'ปิด', onPress: async () => {} });
                   Alert.alert('มอบหมายให้', 'เลือกแอดมิน', buttons);
                 } catch {
                   Alert.alert('ผิดพลาด', 'ไม่สามารถโหลดรายชื่อแอดมินได้');

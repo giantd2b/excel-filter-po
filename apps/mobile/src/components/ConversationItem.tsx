@@ -55,7 +55,7 @@ function formatChannel(channel?: string): string {
     .replace('fb_', 'FB ');
 }
 
-export default function ConversationItem({ conversation, onPress }: Props) {
+const ConversationItem = React.memo(function ConversationItem({ conversation, onPress }: Props) {
   const {
     displayName,
     pictureUrl,
@@ -136,7 +136,9 @@ export default function ConversationItem({ conversation, onPress }: Props) {
       </View>
     </TouchableOpacity>
   );
-}
+});
+
+export default ConversationItem;
 
 const styles = StyleSheet.create({
   container: {

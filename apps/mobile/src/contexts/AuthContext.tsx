@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import {
@@ -73,8 +74,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOut(auth);
   }, []);
 
+  const contextValue = useMemo(
+    () => ({ user, loading, login, logout }),
+    [user, loading, login, logout]
+  );
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

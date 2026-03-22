@@ -118,6 +118,7 @@ function HomeTabs() {
         name="Dashboard"
         component={DashboardScreen}
         options={{
+          lazy: true,
           title: 'แดชบอร์ด',
           tabBarIcon: ({ color, size }) => (
             <Text style={{ fontSize: size, color }}>📊</Text>
@@ -128,6 +129,7 @@ function HomeTabs() {
         name="SlipReport"
         component={SlipReportScreen}
         options={{
+          lazy: true,
           title: 'สลิป',
           tabBarIcon: ({ color, size }) => (
             <Text style={{ fontSize: size, color }}>🧾</Text>
@@ -138,6 +140,7 @@ function HomeTabs() {
         name="Settings"
         component={SettingsScreen}
         options={{
+          lazy: true,
           title: 'ตั้งค่า',
           tabBarIcon: ({ color, size }) => (
             <Text style={{ fontSize: size, color }}>⚙️</Text>

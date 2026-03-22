@@ -156,11 +156,14 @@ export function useMessages(userId: string | null) {
     }
   }, [userId]);
 
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
   const loadMore = useCallback(async () => {
-    if (!userId || loadingMore || !hasMore || messages.length === 0) return;
+    if (!userId || loadingMore || !hasMore || messagesRef.current.length === 0) return;
     setLoadingMore(true);
     try {
-      const oldestTimestamp = messages[messages.length - 1]?.timestamp;
+      const oldestTimestamp = messagesRef.current[messagesRef.current.length - 1]?.timestamp;
       const { data } = await api.get(`/messages/${userId}`, {
         params: { limit: PAGE_SIZE, before: oldestTimestamp },
       });
@@ -182,7 +185,7 @@ export function useMessages(userId: string | null) {
     } finally {
       if (mountedRef.current) setLoadingMore(false);
     }
-  }, [userId, loadingMore, hasMore, messages]);
+  }, [userId, loadingMore, hasMore]);
 
   useEffect(() => {
     mountedRef.current = true;

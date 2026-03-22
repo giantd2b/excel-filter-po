@@ -15,17 +15,24 @@ const api = axios.create({
  * If the cached token is still valid, Firebase SDK returns it from cache.
  * Otherwise it refreshes automatically.
  */
+let cachedToken: string | null = null;
+
 async function getFreshToken(): Promise<string | null> {
   const currentUser = auth.currentUser;
   if (currentUser) {
     try {
       const idToken = await currentUser.getIdToken(/* forceRefresh */ false);
-      await SecureStore.setItemAsync('firebaseToken', idToken);
+      // Only write to SecureStore when token actually changes
+      if (idToken !== cachedToken) {
+        cachedToken = idToken;
+        SecureStore.setItemAsync('firebaseToken', idToken).catch(() => {});
+      }
       return idToken;
     } catch {
       // Firebase SDK refresh failed, try stored token
     }
   }
+  if (cachedToken) return cachedToken;
   return SecureStore.getItemAsync('firebaseToken');
 }
 

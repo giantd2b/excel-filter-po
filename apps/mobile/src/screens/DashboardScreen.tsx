@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -67,20 +67,20 @@ export default function DashboardScreen() {
     fetchData(selectedMonth);
   }, [selectedMonth]);
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchData(selectedMonth);
     setRefreshing(false);
-  };
+  }, [fetchData, selectedMonth]);
 
-  const changeMonth = (dir: number) => {
-    setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + dir, 1));
-  };
+  const changeMonth = useCallback((dir: number) => {
+    setSelectedMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + dir, 1));
+  }, []);
 
   const formatChannel = (ch: string) =>
     ch.replace('Line_', 'LINE ').replace('FB_', 'FB ').replace('fb_', 'FB ');
 
-  const diffBadge = (current: number, previous: number) => {
+  const diffBadge = useCallback((current: number, previous: number) => {
     const diff = current - previous;
     if (diff === 0) return null;
     const pct = previous > 0 ? Math.round((diff / previous) * 100) : 0;
@@ -90,17 +90,19 @@ export default function DashboardScreen() {
         {isUp ? '▲' : '▼'} {Math.abs(diff).toLocaleString()} {pct ? `(${isUp ? '+' : ''}${pct}%)` : ''}
       </Text>
     );
-  };
+  }, []);
 
-  // Generate month picker options (last 12 months)
-  const monthOptions = Array.from({ length: 12 }, (_, i) => {
+  const monthOptions = useMemo(() => Array.from({ length: 12 }, (_, i) => {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
     d.setDate(1);
     return d;
-  });
+  }), []);
 
-  const channels = stats?.channels ? Object.entries(stats.channels).sort((a, b) => b[1] - a[1]) : [];
+  const channels = useMemo(
+    () => stats?.channels ? Object.entries(stats.channels).sort((a, b) => b[1] - a[1]) : [],
+    [stats]
+  );
 
   if (loading) {
     return (

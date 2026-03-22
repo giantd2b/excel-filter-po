@@ -1,4 +1,4 @@
-import React, { useState, useRef, memo } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,17 @@ function ChatBubble({ message, onReply }: Props) {
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const soundRef = useRef<any>(null);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.stopAsync?.().catch(() => {});
+        soundRef.current.unloadAsync?.().catch(() => {});
+        soundRef.current = null;
+      }
+    };
+  }, []);
 
   // Swipe to reply
   const swipeX = useRef(new Animated.Value(0)).current;
@@ -145,7 +156,7 @@ function ChatBubble({ message, onReply }: Props) {
               try {
                 const { sound } = await Audio.Sound.createAsync({ uri: message.mediaUrl });
                 soundRef.current = sound;
-                sound.setOnPlaybackStatusUpdate((status) => {
+                sound.setOnPlaybackStatusUpdate((status: any) => {
                   if (status.isLoaded && status.didJustFinish) {
                     setAudioPlaying(false);
                     sound.unloadAsync();
@@ -338,9 +349,10 @@ function ChatBubble({ message, onReply }: Props) {
 
 export default memo(ChatBubble);
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/;
+
 function LinkifiedText({ text, style, linkStyle, selectable }: { text: string; style: any; linkStyle: any; selectable?: boolean }) {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const parts = text.split(urlRegex);
+  const parts = text.split(URL_REGEX);
 
   if (parts.length === 1) {
     return <Text style={style} selectable={selectable}>{text}</Text>;
@@ -349,7 +361,7 @@ function LinkifiedText({ text, style, linkStyle, selectable }: { text: string; s
   return (
     <Text style={style} selectable={selectable}>
       {parts.map((part, i) =>
-        urlRegex.test(part) ? (
+        URL_REGEX.test(part) ? (
           <Text
             key={i}
             style={linkStyle}
