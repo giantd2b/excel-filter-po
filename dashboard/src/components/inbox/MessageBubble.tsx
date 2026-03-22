@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Message } from "@/types/inbox";
-import { Check, CheckCheck, AlertCircle, X, FileDown, Volume2, SmilePlus } from "lucide-react";
+import { Check, CheckCheck, AlertCircle, X, FileDown, Volume2, SmilePlus, Reply } from "lucide-react";
 import { api } from "@/lib/api-client";
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "🙏", "✅"];
 
 interface MessageBubbleProps {
   message: Message;
+  onReply?: (message: Message) => void;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onReply }: MessageBubbleProps) {
   const isOutgoing = message.type === "outgoing";
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showReactions, setShowReactions] = useState(false);
@@ -67,6 +68,23 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               : "bg-white text-slate-800 rounded-2xl rounded-bl-md border border-slate-100/80 shadow-sm shadow-slate-900/[0.03]"
           }`}
         >
+          {/* Reply quote */}
+          {message.replyTo && (
+            <div className={`mx-3 mt-2 mb-1 px-3 py-1.5 rounded-lg border-l-2 ${
+              isOutgoing
+                ? "bg-white/10 border-white/30"
+                : "bg-slate-50 border-slate-300"
+            }`}>
+              <p className={`text-[10px] font-semibold ${isOutgoing ? "text-brand-200" : "text-slate-500"}`}>
+                {message.replyTo.sender === "admin" ? (message.replyTo.adminName || "Admin") : "ลูกค้า"}
+              </p>
+              <p className={`text-[11px] truncate ${isOutgoing ? "text-brand-100" : "text-slate-400"}`}>
+                {message.replyTo.mediaType ? `[${message.replyTo.mediaType === "image" ? "รูปภาพ" : "วิดีโอ"}]` : ""}
+                {message.replyTo.text || ""}
+              </p>
+            </div>
+          )}
+
           {/* Media content */}
           {hasMedia && message.mediaType === "image" && (
             <button
@@ -158,15 +176,25 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </div>
         </div>
 
-        {/* React button - shows on hover */}
-        <button
-          onClick={() => setShowReactions(!showReactions)}
-          className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 self-center ${
-            isOutgoing ? "order-first mr-1" : "ml-1"
-          }`}
-        >
-          <SmilePlus className="w-3.5 h-3.5" />
-        </button>
+        {/* Reply + React buttons - shows on hover */}
+        <div className={`opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 self-center ${
+          isOutgoing ? "order-first mr-1" : "ml-1"
+        }`}>
+          {onReply && (
+            <button
+              onClick={() => onReply(message)}
+              className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+            >
+              <Reply className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button
+            onClick={() => setShowReactions(!showReactions)}
+            className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+          >
+            <SmilePlus className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
         {/* Reaction picker */}
         {showReactions && (

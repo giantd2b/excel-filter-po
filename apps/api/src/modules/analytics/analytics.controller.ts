@@ -31,4 +31,17 @@ export class AnalyticsController {
   ) {
     return this.analyticsService.getAdminPerformanceStats(startDate, endDate);
   }
+
+  @Get('customers')
+  getCustomerAnalytics(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.analyticsService.getCustomerAnalytics(startDate, endDate);
+  }
+
+  @Get('dashboard')
+  getDashboard() {
+    return this.analyticsService.getDashboardStats();
+  }
 }

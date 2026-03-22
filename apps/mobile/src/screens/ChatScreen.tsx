@@ -45,6 +45,7 @@ export default function ChatScreen({ route }: any) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showHelper, setShowHelper] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
@@ -98,8 +99,10 @@ export default function ChatScreen({ route }: any) {
     if (!trimmed || sending) return;
 
     const tempId = addOptimistic({ text: trimmed });
+    const currentReplyToId = replyTo?.id;
     setText('');
     setShowQuickReplies(false);
+    setReplyTo(null);
 
     try {
       await api.post('/messages/send', {
@@ -107,6 +110,7 @@ export default function ChatScreen({ route }: any) {
         docId,
         text: trimmed,
         channel,
+        ...(currentReplyToId ? { replyToId: currentReplyToId } : {}),
       });
     } catch (err: any) {
       markFailed(tempId);
@@ -349,7 +353,7 @@ export default function ChatScreen({ route }: any) {
 
       return (
         <>
-          <ChatBubble message={item} />
+          <ChatBubble message={item} onReply={(m) => setReplyTo(m)} />
           {showDivider && (
             <View style={styles.dateDivider}>
               <View style={styles.dateDividerLine} />
@@ -737,6 +741,24 @@ export default function ChatScreen({ route }: any) {
         </View>
       )}
 
+      {/* Reply bar */}
+      {replyTo && (
+        <View style={styles.replyBar}>
+          <View style={styles.replyBarContent}>
+            <Text style={styles.replyBarName}>
+              {replyTo.direction === 'outgoing' ? (replyTo.senderName || 'Admin') : 'ลูกค้า'}
+            </Text>
+            <Text style={styles.replyBarText} numberOfLines={1}>
+              {replyTo.type !== 'text' ? `[${replyTo.type === 'image' ? 'รูปภาพ' : replyTo.type}] ` : ''}
+              {replyTo.text || ''}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => setReplyTo(null)} style={styles.replyBarClose}>
+            <Text style={{ color: '#94a3b8', fontSize: 16 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Input bar */}
       <View style={[styles.inputBar, { paddingBottom: insets.bottom || 8 }]}>
         <TouchableOpacity
@@ -1074,6 +1096,34 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+  },
+  // Reply bar
+  replyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  replyBarContent: {
+    flex: 1,
+    borderLeftWidth: 2,
+    borderLeftColor: '#6366f1',
+    paddingLeft: 10,
+  },
+  replyBarName: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6366f1',
+  },
+  replyBarText: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  replyBarClose: {
+    padding: 8,
   },
   // Input bar
   inputBar: {

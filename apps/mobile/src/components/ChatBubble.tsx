@@ -22,6 +22,7 @@ const MAX_BUBBLE_WIDTH = SCREEN_WIDTH * 0.72;
 
 interface Props {
   message: Message;
+  onReply?: (message: Message) => void;
 }
 
 function formatMessageTime(timestamp: number): string {
@@ -33,7 +34,7 @@ function formatMessageTime(timestamp: number): string {
   });
 }
 
-function ChatBubble({ message }: Props) {
+function ChatBubble({ message, onReply }: Props) {
   const isOutgoing = message.direction === 'outgoing';
   const [showFullImage, setShowFullImage] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -183,8 +184,10 @@ function ChatBubble({ message }: Props) {
   const isMedia = ['image', 'video', 'sticker'].includes(message.type);
 
   const handleLongPress = () => {
-    if (!message.text && !message.mediaUrl) return;
     const options: any[] = [];
+    if (onReply) {
+      options.push({ text: 'ตอบกลับ', onPress: () => onReply(message) });
+    }
     if (message.text) {
       options.push({
         text: 'คัดลอกข้อความ',
@@ -219,6 +222,17 @@ function ChatBubble({ message }: Props) {
           message.status === 'sending' && { opacity: 0.6 },
         ]}
       >
+        {message.replyTo && (
+          <View style={[styles.replyQuote, isOutgoing ? styles.replyQuoteOutgoing : styles.replyQuoteIncoming]}>
+            <Text style={[styles.replyQuoteName, isOutgoing && { color: '#c7d2fe' }]}>
+              {message.replyTo.sender === 'admin' ? (message.replyTo.adminName || 'Admin') : 'ลูกค้า'}
+            </Text>
+            <Text style={[styles.replyQuoteText, isOutgoing && { color: '#a5b4fc' }]} numberOfLines={1}>
+              {message.replyTo.mediaType ? `[${message.replyTo.mediaType === 'image' ? 'รูปภาพ' : 'วิดีโอ'}] ` : ''}
+              {message.replyTo.text || ''}
+            </Text>
+          </View>
+        )}
         {message.senderName && (
           <Text style={[styles.senderName, isOutgoing && styles.senderNameOutgoing]}>
             {isOutgoing ? '👤 ' : ''}{message.senderName}
@@ -329,6 +343,30 @@ const styles = StyleSheet.create({
   bubbleMedia: {
     padding: 3,
     overflow: 'hidden',
+  },
+  replyQuote: {
+    borderLeftWidth: 2,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  replyQuoteIncoming: {
+    backgroundColor: '#e2e8f0',
+    borderLeftColor: '#94a3b8',
+  },
+  replyQuoteOutgoing: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderLeftColor: 'rgba(255,255,255,0.4)',
+  },
+  replyQuoteName: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#6366f1',
+  },
+  replyQuoteText: {
+    fontSize: 11,
+    color: '#64748b',
   },
   senderName: {
     fontSize: 11,

@@ -341,4 +341,305 @@ export class AnalyticsService {
       })),
     };
   }
+
+  async getDashboardStats() {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+    const monthAgo = new Date(today); monthAgo.setDate(today.getDate() - 30);
+    const prevMonthStart = new Date(today); prevMonthStart.setDate(today.getDate() - 60);
+
+    const [
+      totalCustomers,
+      totalMessages,
+      todayMessages,
+      yesterdayMessages,
+      weekMessages,
+      monthMessages,
+      prevMonthMessages,
+      newCustomersToday,
+      newCustomersWeek,
+      newCustomersMonth,
+      newCustomersPrevMonth,
+      unreadCount,
+      followUpCount,
+      pendingQuotes,
+    ] = await Promise.all([
+      this.prisma.customer.count(),
+      this.prisma.message.count(),
+      this.prisma.message.count({ where: { timestamp: { gte: today.getTime() } } }),
+      this.prisma.message.count({ where: { timestamp: { gte: yesterday.getTime(), lt: today.getTime() } } }),
+      this.prisma.message.count({ where: { timestamp: { gte: weekAgo.getTime() } } }),
+      this.prisma.message.count({ where: { timestamp: { gte: monthAgo.getTime() } } }),
+      this.prisma.message.count({ where: { timestamp: { gte: prevMonthStart.getTime(), lt: monthAgo.getTime() } } }),
+      this.prisma.customer.count({ where: { firstContactAt: { gte: today } } }),
+      this.prisma.customer.count({ where: { firstContactAt: { gte: weekAgo } } }),
+      this.prisma.customer.count({ where: { firstContactAt: { gte: monthAgo } } }),
+      this.prisma.customer.count({ where: { firstContactAt: { gte: prevMonthStart, lt: monthAgo } } }),
+      this.prisma.customer.count({ where: { unreadCount: { gt: 0 } } }),
+      this.prisma.customer.count({ where: { status: 'FOLLOW_UP' } }),
+      this.prisma.customer.count({ where: { tags: { some: { tag: { name: 'ลูกค้าจองงานแล้ว' } } }, nextJobDate: { gte: today } } }),
+    ]);
+
+    // Messages per day (last 14 days)
+    const dailyMessages = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        TO_CHAR(TO_TIMESTAMP(timestamp / 1000), 'YYYY-MM-DD') as date,
+        COUNT(*) FILTER (WHERE type = 'INCOMING') as incoming,
+        COUNT(*) FILTER (WHERE type = 'OUTGOING') as outgoing
+      FROM messages
+      WHERE timestamp >= ${weekAgo.getTime() - 7 * 86400000}
+      GROUP BY date
+      ORDER BY date
+    `;
+
+    // New customers per day (last 14 days)
+    const dailyNewCustomers = await this.prisma.$queryRaw<any[]>`
+      SELECT DATE(first_contact_at) as date, COUNT(*) as count
+      FROM customers
+      WHERE first_contact_at >= ${new Date(today.getTime() - 14 * 86400000)}
+      GROUP BY DATE(first_contact_at)
+      ORDER BY date
+    `;
+
+    // Top channels by activity (last 30 days)
+    const channelActivity = await this.prisma.$queryRaw<any[]>`
+      SELECT c.channel, c.channel_type,
+        COUNT(DISTINCT c.id) as customers,
+        COUNT(m.id) as messages
+      FROM customers c
+      LEFT JOIN messages m ON m.customer_id = c.id AND m.timestamp >= ${monthAgo.getTime()}
+      WHERE c.last_message_at >= ${monthAgo}
+      GROUP BY c.channel, c.channel_type
+      ORDER BY messages DESC
+    `;
+
+    // Upcoming jobs this week
+    const upcomingJobs = await this.prisma.customer.findMany({
+      where: {
+        nextJobDate: { gte: today, lte: new Date(today.getTime() + 7 * 86400000) },
+      },
+      select: {
+        id: true,
+        displayName: true,
+        nickname: true,
+        nextJobDate: true,
+        nextJobTitle: true,
+        channel: true,
+        channelType: true,
+      },
+      orderBy: { nextJobDate: 'asc' },
+      take: 10,
+    });
+
+    // Recent customers needing attention (unread > 0, sorted by oldest unread)
+    const needsAttention = await this.prisma.customer.findMany({
+      where: { unreadCount: { gt: 0 } },
+      select: {
+        id: true,
+        displayName: true,
+        nickname: true,
+        unreadCount: true,
+        lastMessageAt: true,
+        channel: true,
+        channelType: true,
+        pictureUrl: true,
+      },
+      orderBy: { lastMessageAt: 'asc' },
+      take: 10,
+    });
+
+    const msgGrowth = prevMonthMessages > 0
+      ? Math.round(((monthMessages - prevMonthMessages) / prevMonthMessages) * 100)
+      : 0;
+    const custGrowth = newCustomersPrevMonth > 0
+      ? Math.round(((newCustomersMonth - newCustomersPrevMonth) / newCustomersPrevMonth) * 100)
+      : 0;
+
+    return {
+      overview: {
+        totalCustomers,
+        totalMessages,
+        todayMessages,
+        yesterdayMessages,
+        weekMessages,
+        monthMessages,
+        msgGrowth,
+        newCustomersToday,
+        newCustomersWeek,
+        newCustomersMonth,
+        custGrowth,
+        unreadCount,
+        followUpCount,
+        pendingQuotes,
+      },
+      dailyMessages: dailyMessages.map((d: any) => ({
+        date: d.date,
+        incoming: Number(d.incoming),
+        outgoing: Number(d.outgoing),
+      })),
+      dailyNewCustomers: dailyNewCustomers.map((d: any) => ({
+        date: d.date instanceof Date ? d.date.toISOString().split('T')[0] : String(d.date).split('T')[0],
+        count: Number(d.count),
+      })),
+      channelActivity: channelActivity.map((c: any) => ({
+        channel: c.channel,
+        channelType: c.channel_type === 'LINE' ? 'line' : 'facebook',
+        customers: Number(c.customers),
+        messages: Number(c.messages),
+      })),
+      upcomingJobs: upcomingJobs.map((j) => ({
+        id: j.id,
+        displayName: j.nickname || j.displayName,
+        jobDate: j.nextJobDate?.toISOString().split('T')[0],
+        jobTitle: j.nextJobTitle,
+        channel: j.channel,
+        channelType: j.channelType === 'LINE' ? 'line' : 'facebook',
+      })),
+      needsAttention: needsAttention.map((c) => ({
+        id: c.id,
+        displayName: c.nickname || c.displayName,
+        unreadCount: c.unreadCount,
+        lastMessageAt: c.lastMessageAt?.toISOString(),
+        channel: c.channel,
+        channelType: c.channelType === 'LINE' ? 'line' : 'facebook',
+        pictureUrl: c.pictureUrl,
+      })),
+    };
+  }
+
+  async getCustomerAnalytics(startDate: string, endDate: string) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    // 1. New customers per day
+    const newCustomersDaily = await this.prisma.$queryRaw<any[]>`
+      SELECT DATE(first_contact_at) as date, COUNT(*) as count
+      FROM customers
+      WHERE first_contact_at BETWEEN ${start} AND ${end}
+      GROUP BY DATE(first_contact_at)
+      ORDER BY date
+    `;
+
+    // 2. Customers by channel type
+    const byChannelType = await this.prisma.$queryRaw<any[]>`
+      SELECT channel_type, COUNT(*) as count
+      FROM customers
+      WHERE first_contact_at BETWEEN ${start} AND ${end}
+      GROUP BY channel_type
+    `;
+
+    // 3. Customers by channel
+    const byChannel = await this.prisma.$queryRaw<any[]>`
+      SELECT channel, COUNT(*) as count
+      FROM customers
+      WHERE first_contact_at BETWEEN ${start} AND ${end}
+      GROUP BY channel
+      ORDER BY count DESC
+    `;
+
+    // 4. Top customers by message count (in period)
+    const topCustomers = await this.prisma.$queryRaw<any[]>`
+      SELECT c.id, c.display_name, c.nickname, c.channel, c.channel_type, c.picture_url,
+             COUNT(m.id) as message_count,
+             MIN(m.timestamp) as first_msg,
+             MAX(m.timestamp) as last_msg
+      FROM customers c
+      JOIN messages m ON m.customer_id = c.id
+      WHERE m.timestamp BETWEEN ${start.getTime()} AND ${end.getTime()}
+        AND m.type = 'INCOMING'
+      GROUP BY c.id, c.display_name, c.nickname, c.channel, c.channel_type, c.picture_url
+      ORDER BY message_count DESC
+      LIMIT 20
+    `;
+
+    // 5. Customer status breakdown
+    const byStatus = await this.prisma.$queryRaw<any[]>`
+      SELECT status, COUNT(*) as count
+      FROM customers
+      WHERE last_message_at BETWEEN ${start} AND ${end}
+      GROUP BY status
+    `;
+
+    // 6. Customers with tags breakdown
+    const tagStats = await this.prisma.$queryRaw<any[]>`
+      SELECT t.name, t.color, COUNT(ct.customer_id) as count
+      FROM tags t
+      JOIN customer_tags ct ON ct.tag_id = t.id
+      JOIN customers c ON c.id = ct.customer_id
+      WHERE c.last_message_at BETWEEN ${start} AND ${end}
+      GROUP BY t.id, t.name, t.color
+      ORDER BY count DESC
+      LIMIT 15
+    `;
+
+    // 7. Returning vs new (customers who messaged in period but first contact was before)
+    const returningCount = await this.prisma.customer.count({
+      where: {
+        lastMessageAt: { gte: start, lte: end },
+        firstContactAt: { lt: start },
+      },
+    });
+    const newCount = await this.prisma.customer.count({
+      where: {
+        firstContactAt: { gte: start, lte: end },
+      },
+    });
+
+    // 8. Total active in period
+    const activeCount = await this.prisma.customer.count({
+      where: {
+        lastMessageAt: { gte: start, lte: end },
+      },
+    });
+
+    // 9. Customers with phone number
+    const withPhone = await this.prisma.customer.count({
+      where: {
+        lastMessageAt: { gte: start, lte: end },
+        phoneNumber: { not: null },
+      },
+    });
+
+    return {
+      summary: {
+        active: activeCount,
+        new: newCount,
+        returning: returningCount,
+        withPhone,
+        phoneRate: activeCount > 0 ? Math.round((withPhone / activeCount) * 100) : 0,
+      },
+      newCustomersDaily: newCustomersDaily.map((d: any) => ({
+        date: d.date instanceof Date ? d.date.toISOString().split('T')[0] : String(d.date).split('T')[0],
+        count: Number(d.count),
+      })),
+      byChannelType: byChannelType.map((c: any) => ({
+        type: c.channel_type,
+        count: Number(c.count),
+      })),
+      byChannel: byChannel.map((c: any) => ({
+        channel: c.channel,
+        count: Number(c.count),
+      })),
+      topCustomers: topCustomers.map((c: any) => ({
+        id: c.id,
+        displayName: c.nickname || c.display_name,
+        channel: c.channel,
+        channelType: c.channel_type === 'LINE' ? 'line' : 'facebook',
+        pictureUrl: c.picture_url,
+        messageCount: Number(c.message_count),
+      })),
+      byStatus: byStatus.map((s: any) => ({
+        status: s.status,
+        count: Number(s.count),
+      })),
+      tagStats: tagStats.map((t: any) => ({
+        name: t.name,
+        color: t.color,
+        count: Number(t.count),
+      })),
+    };
+  }
 }

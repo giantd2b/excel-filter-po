@@ -208,6 +208,47 @@ export class FbSyncService {
   }
 
   /**
+   * Remove duplicate fb_sync_ media messages where the original already exists.
+   */
+  async cleanupDuplicateMedia(): Promise<{ deleted: number }> {
+    // Find fb_sync_ messages that are duplicates of existing messages
+    const duplicates = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT sync_msg.id
+      FROM messages AS sync_msg
+      WHERE sync_msg.id LIKE 'fb_sync_%'
+        AND sync_msg.media_type IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM messages AS orig
+          WHERE orig.id NOT LIKE 'fb_sync_%'
+            AND orig.customer_id = sync_msg.customer_id
+            AND orig.type = 'OUTGOING'
+            AND orig.media_type = sync_msg.media_type
+            AND orig."timestamp" BETWEEN sync_msg."timestamp" - 10000 AND sync_msg."timestamp" + 10000
+        )
+    `;
+
+    if (duplicates.length === 0) {
+      this.logger.log('No duplicate media messages found');
+      return { deleted: 0 };
+    }
+
+    const ids = duplicates.map((d) => d.id);
+    this.logger.log(`Found ${ids.length} duplicate fb_sync media messages, deleting...`);
+
+    // Delete reactions first (cascade should handle it, but be safe)
+    await this.prisma.messageReaction.deleteMany({
+      where: { messageId: { in: ids } },
+    });
+
+    const result = await this.prisma.message.deleteMany({
+      where: { id: { in: ids } },
+    });
+
+    this.logger.log(`Deleted ${result.count} duplicate media messages`);
+    return { deleted: result.count };
+  }
+
+  /**
    * Manual trigger — sync all pages now (called via API endpoint).
    */
   async syncNow(): Promise<{ synced: number }> {

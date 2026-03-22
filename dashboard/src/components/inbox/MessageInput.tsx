@@ -42,10 +42,13 @@ interface MessageInputProps {
   placeholder?: string;
   channelType?: "line" | "facebook";
   onSendWithImages?: (text: string, images: string[]) => void;
+  replyToId?: string;
+  onSent?: () => void;
 }
 
 export interface MessageInputHandle {
   setText: (text: string) => void;
+  focus?: () => void;
 }
 
 export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(function MessageInput({
@@ -54,6 +57,8 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   placeholder = "Type a message...",
   channelType,
   onSendWithImages,
+  replyToId,
+  onSent,
 }, ref) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -67,6 +72,9 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   useImperativeHandle(ref, () => ({
     setText: (newText: string) => {
       setText(newText);
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    },
+    focus: () => {
       setTimeout(() => textareaRef.current?.focus(), 0);
     },
   }));

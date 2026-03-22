@@ -7,6 +7,15 @@ import {
   unsubscribeMessages,
 } from '../services/socket';
 
+export interface ReplyTo {
+  id: string;
+  text?: string;
+  type: string;
+  sender: string;
+  mediaType?: string;
+  adminName?: string;
+}
+
 export interface Message {
   id: string;
   text?: string;
@@ -18,6 +27,9 @@ export interface Message {
   timestamp: number;
   senderName?: string;
   status?: string;
+  quoteToken?: string;
+  replyToId?: string;
+  replyTo?: ReplyTo;
 }
 
 const PAGE_SIZE = 30;
@@ -52,6 +64,9 @@ function mapMessage(m: any): Message {
     timestamp: m.timestamp,
     senderName: m.adminName,
     status: m.status,
+    quoteToken: m.quoteToken,
+    replyToId: m.replyToId,
+    replyTo: m.replyTo || undefined,
   };
 }
 

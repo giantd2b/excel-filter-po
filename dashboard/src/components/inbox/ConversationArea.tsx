@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChatUser, Message } from "@/types/inbox";
+import { X } from "lucide-react";
 import { MessageBubble, DateDivider } from "./MessageBubble";
 import { MessageInput, MessageInputHandle } from "./MessageInput";
 import { AISuggestions } from "./AISuggestions";
@@ -29,6 +30,7 @@ export function ConversationArea({
   onToggleInfoPanel,
 }: ConversationAreaProps) {
   const [, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
   const prevMessagesLength = useRef(0);
@@ -153,8 +155,10 @@ export function ConversationArea({
         previewUrl,
         channel: selectedUser.channel,
         ...(sticker ? { stickerId: sticker.stickerId, stickerPackageId: sticker.packageId } : {}),
+        ...(replyTo ? { replyToId: replyTo.id } : {}),
       });
 
+      setReplyTo(null);
       onMessageSent();
     } catch (err) {
       console.error("Failed to send:", err);
@@ -300,7 +304,10 @@ export function ConversationArea({
                 {shouldShowDateDivider(msg, messages[index - 1] || null) && (
                   <DateDivider timestamp={msg.timestamp} />
                 )}
-                <MessageBubble message={msg} />
+                <MessageBubble message={msg} onReply={(m) => {
+                  setReplyTo(m);
+                  messageInputRef.current?.focus?.();
+                }} />
               </div>
             ))}
             <div ref={messagesEndRef} />
@@ -314,6 +321,24 @@ export function ConversationArea({
         onSelect={handleSuggestionSelect}
       />
 
+      {/* Reply bar */}
+      {replyTo && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-t border-slate-100">
+          <div className="flex-1 border-l-2 border-brand-400 pl-3">
+            <p className="text-[10px] font-semibold text-brand-500">
+              {replyTo.type === "outgoing" ? (replyTo.adminName || "Admin") : "ลูกค้า"}
+            </p>
+            <p className="text-[11px] text-slate-500 truncate">
+              {replyTo.mediaType ? `[${replyTo.mediaType === "image" ? "รูปภาพ" : "วิดีโอ"}] ` : ""}
+              {replyTo.text || ""}
+            </p>
+          </div>
+          <button onClick={() => setReplyTo(null)} className="p-1 rounded hover:bg-slate-200 text-slate-400">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <MessageInput
         ref={messageInputRef}
@@ -321,7 +346,9 @@ export function ConversationArea({
         onSendWithImages={handleTemplateSend}
         onSend={handleSendMessage}
         disabled={loading || !!error}
-        placeholder={`Reply to ${selectedUser.displayName}...`}
+        placeholder={replyTo ? `ตอบกลับข้อความ...` : `Reply to ${selectedUser.displayName}...`}
+        replyToId={replyTo?.id}
+        onSent={() => setReplyTo(null)}
       />
     </div>
   );

@@ -17,15 +17,21 @@ export class MessagesService {
     private readonly inboxGateway: InboxGateway,
   ) {}
 
-  async getMessages(userId: string, limit = 50) {
+  async getMessages(userId: string, limit = 50, before?: number) {
     // Fetch newest messages first, then reverse for chronological display
     const messages = await this.prisma.message.findMany({
-      where: { customerId: userId },
+      where: {
+        customerId: userId,
+        ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
+      },
       orderBy: { timestamp: 'desc' },
       take: limit,
       include: {
         reactions: {
           select: { emoji: true, adminName: true, adminId: true },
+        },
+        replyTo: {
+          select: { id: true, text: true, type: true, sender: true, mediaType: true, adminName: true },
         },
       },
     });
@@ -45,6 +51,16 @@ export class MessagesService {
       mediaType: m.mediaType?.toLowerCase() || undefined,
       mediaUrl: m.mediaUrl,
       previewUrl: m.previewUrl,
+      quoteToken: m.quoteToken,
+      replyToId: m.replyToId,
+      replyTo: m.replyTo ? {
+        id: m.replyTo.id,
+        text: m.replyTo.text,
+        type: m.replyTo.type === 'OUTGOING' ? 'outgoing' : 'incoming',
+        sender: m.replyTo.sender === 'ADMIN' ? 'admin' : 'user',
+        mediaType: m.replyTo.mediaType?.toLowerCase() || undefined,
+        adminName: m.replyTo.adminName,
+      } : undefined,
       reactions: m.reactions || [],
     }));
   }
@@ -135,8 +151,9 @@ export class MessagesService {
     channel: string;
     adminId?: string;
     adminName?: string;
+    replyToId?: string;
   }) {
-    const { oduserId, docId, text, mediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, channel, adminId, adminName } = data;
+    const { oduserId, docId, text, mediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, channel, adminId, adminName, replyToId } = data;
 
     if (!oduserId || !docId || !channel) {
       throw new BadRequestException('Missing required fields: oduserId, docId, channel');
@@ -169,9 +186,19 @@ export class MessagesService {
     const platformText = (effectiveMediaType === 'file' || stickerId) ? undefined : text;
     this.logger.log(`sendMessage: channel=${channel}, mediaType=${effectiveMediaType}, mediaUrl=${mediaUrl ? 'YES' : 'NO'}, sticker=${stickerId || 'NO'}, text=${(text || '').substring(0, 30)}`);
 
+    // Look up quoteToken if replying to a message
+    let quoteToken: string | null = null;
+    if (replyToId && isLine) {
+      const replyMsg = await this.prisma.message.findUnique({
+        where: { id: replyToId },
+        select: { quoteToken: true },
+      });
+      quoteToken = replyMsg?.quoteToken || null;
+    }
+
     try {
       if (isLine) {
-        const messages = this.buildLineMessages(platformText, effectiveMediaType, mediaUrl, previewUrl, stickerId, stickerPackageId);
+        const messages = this.buildLineMessages(platformText, effectiveMediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, quoteToken);
         sendMethod = await this.sendLineMessage(oduserId, messages, channel);
       } else {
         // For Facebook: convert LINE sticker to image
@@ -214,6 +241,7 @@ export class MessagesService {
           mediaType: stickerId ? 'IMAGE' : effectiveMediaType === 'image' ? 'IMAGE' : effectiveMediaType === 'video' ? 'VIDEO' : null,
           mediaUrl: stickerUrl || mediaUrl || null,
           previewUrl: previewUrl || null,
+          replyToId: replyToId || null,
         },
       }),
       this.prisma.customer.update({
@@ -259,6 +287,7 @@ export class MessagesService {
       adminName: adminName || null,
       mediaType: stickerId ? 'image' : (effectiveMediaType || undefined),
       mediaUrl: stickerUrl || mediaUrl || undefined,
+      replyToId: replyToId || undefined,
     });
     this.inboxGateway.emitConversationUpdated({
       id: docId,
@@ -287,6 +316,7 @@ export class MessagesService {
     previewUrl?: string,
     stickerId?: string,
     stickerPackageId?: string,
+    quoteToken?: string | null,
   ): any[] {
     const messages: any[] = [];
 
@@ -295,6 +325,7 @@ export class MessagesService {
         type: 'sticker',
         packageId: stickerPackageId,
         stickerId: stickerId,
+        ...(quoteToken && { quoteToken }),
       });
     }
 
@@ -303,25 +334,26 @@ export class MessagesService {
         type: 'image',
         originalContentUrl: mediaUrl,
         previewImageUrl: previewUrl || mediaUrl,
+        ...(quoteToken && { quoteToken }),
       });
     } else if (mediaType === 'video' && mediaUrl) {
       messages.push({
         type: 'video',
         originalContentUrl: mediaUrl,
         previewImageUrl: previewUrl || mediaUrl,
+        ...(quoteToken && { quoteToken }),
       });
     } else if (mediaType === 'file' && mediaUrl) {
-      // LINE doesn't support file type in messaging API
-      // Send as text with link instead
       const fileName = decodeURIComponent(mediaUrl.split('/').pop() || 'file');
       messages.push({
         type: 'text',
         text: `📎 ไฟล์: ${fileName}\n${mediaUrl}`,
+        ...(quoteToken && { quoteToken }),
       });
     }
 
     if (text && !(mediaType === 'file' && mediaUrl)) {
-      messages.push({ type: 'text', text });
+      messages.push({ type: 'text', text, ...(quoteToken && { quoteToken }) });
     }
 
     return messages;

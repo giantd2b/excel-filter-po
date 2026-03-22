@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { api } from "@/lib/api-client";
-import { Clock, MessageSquare, ArrowDownUp, Users, BarChart3, Timer, Zap, TrendingUp } from "lucide-react";
+import { Clock, MessageSquare, ArrowDownUp, Users, BarChart3, Timer, Zap, TrendingUp, UserPlus, Phone, Tag, Hash } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -111,9 +111,11 @@ export default function AnalyticsPage() {
   const [endDate, setEndDate] = useState(formatDate(today));
   const [channel, setChannel] = useState("");
 
+  const [activeTab, setActiveTab] = useState<"performance" | "customers">("performance");
   const [rtData, setRtData] = useState<ResponseTimeData | null>(null);
   const [volData, setVolData] = useState<VolumeData | null>(null);
   const [adminData, setAdminData] = useState<AdminPerfData | null>(null);
+  const [custData, setCustData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -132,7 +134,7 @@ export default function AnalyticsPage() {
     setError("");
     try {
       const channelParam = channel ? `&channel=${encodeURIComponent(channel)}` : "";
-      const [rt, vol, admin] = await Promise.all([
+      const [rt, vol, admin, cust] = await Promise.all([
         api.get<ResponseTimeData>(
           `/analytics/response-time?startDate=${startDate}&endDate=${endDate}${channelParam}`
         ),
@@ -142,10 +144,14 @@ export default function AnalyticsPage() {
         api.get<AdminPerfData>(
           `/analytics/admin-performance?startDate=${startDate}&endDate=${endDate}`
         ),
+        api.get<any>(
+          `/analytics/customers?startDate=${startDate}&endDate=${endDate}`
+        ),
       ]);
       setRtData(rt);
       setVolData(vol);
       setAdminData(admin);
+      setCustData(cust);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "ไม่สามารถโหลดข้อมูลได้");
@@ -199,8 +205,34 @@ export default function AnalyticsPage() {
         </div>
       )}
 
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6">
+        <button
+          onClick={() => setActiveTab("performance")}
+          className={`px-4 py-2 text-[13px] font-semibold rounded-lg transition-all ${
+            activeTab === "performance"
+              ? "bg-brand-500 text-white"
+              : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+          }`}
+        >
+          ประสิทธิภาพ
+        </button>
+        <button
+          onClick={() => setActiveTab("customers")}
+          className={`px-4 py-2 text-[13px] font-semibold rounded-lg transition-all ${
+            activeTab === "customers"
+              ? "bg-brand-500 text-white"
+              : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+          }`}
+        >
+          ลูกค้า
+        </button>
+      </div>
+
       {loading ? (
         <LoadingSkeleton />
+      ) : activeTab === "customers" ? (
+        <CustomerAnalytics data={custData} />
       ) : (
         <>
           {/* Summary Cards */}
@@ -611,6 +643,175 @@ function LoadingSkeleton() {
             <div className="h-4 bg-gray-200 rounded w-24" />
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Customer Analytics Component ──────────────────────────────────
+
+function CustomerAnalytics({ data }: { data: any }) {
+  if (!data) return <p className="text-slate-400 text-center py-10">ไม่มีข้อมูล</p>;
+
+  const { summary, newCustomersDaily, byChannelType, byChannel, topCustomers, byStatus, tagStats } = data;
+  const maxDaily = Math.max(...(newCustomersDaily || []).map((d: any) => d.count), 1);
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <SummaryCard icon={<Users className="w-5 h-5" />} label="ลูกค้าที่แชท" value={summary.active.toLocaleString()} color="blue" />
+        <SummaryCard icon={<UserPlus className="w-5 h-5" />} label="ลูกค้าใหม่" value={summary.new.toLocaleString()} color="green" />
+        <SummaryCard icon={<TrendingUp className="w-5 h-5" />} label="ลูกค้าเก่ากลับมา" value={summary.returning.toLocaleString()} color="purple" />
+        <SummaryCard icon={<Phone className="w-5 h-5" />} label="มีเบอร์โทร" value={`${summary.withPhone} (${summary.phoneRate}%)`} color="indigo" />
+        <SummaryCard icon={<Hash className="w-5 h-5" />} label="LINE / Facebook" value={`${byChannelType?.find((c: any) => c.type === 'LINE')?.count || 0} / ${byChannelType?.find((c: any) => c.type === 'FACEBOOK')?.count || 0}`} color="blue" />
+      </div>
+
+      {/* New Customers Chart */}
+      {newCustomersDaily?.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-6">
+          <h3 className="text-[14px] font-bold text-slate-800 mb-4">ลูกค้าใหม่รายวัน</h3>
+          <div className="flex items-end gap-[2px] h-40">
+            {newCustomersDaily.map((d: any, i: number) => (
+              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1 group relative">
+                <div className="absolute -top-6 bg-slate-800 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-10">
+                  {formatThaiDate(d.date)}: {d.count} คน
+                </div>
+                <div
+                  className="w-full bg-brand-400 rounded-t hover:bg-brand-500 transition-colors"
+                  style={{ height: `${(d.count / maxDaily) * 100}%`, minHeight: d.count > 0 ? '4px' : '0' }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between mt-2">
+            <span className="text-[10px] text-slate-400">{newCustomersDaily[0]?.date ? formatThaiDate(newCustomersDaily[0].date) : ''}</span>
+            <span className="text-[10px] text-slate-400">{newCustomersDaily.length > 0 ? formatThaiDate(newCustomersDaily[newCustomersDaily.length - 1].date) : ''}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* By Channel */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-6">
+          <h3 className="text-[14px] font-bold text-slate-800 mb-4">ลูกค้าใหม่ตามช่องทาง</h3>
+          <div className="space-y-2">
+            {byChannel?.map((c: any) => {
+              const maxCount = Math.max(...byChannel.map((x: any) => x.count), 1);
+              return (
+                <div key={c.channel} className="flex items-center gap-3">
+                  <span className="text-[12px] text-slate-600 w-32 truncate">{c.channel.replace('Line_', '').replace('FB_', '')}</span>
+                  <div className="flex-1 h-5 bg-slate-50 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${c.channel.startsWith('Line_') ? 'bg-emerald-400' : 'bg-blue-400'}`}
+                      style={{ width: `${(c.count / maxCount) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-[12px] font-semibold text-slate-700 w-12 text-right tabular-nums">{c.count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tags */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-6">
+          <h3 className="text-[14px] font-bold text-slate-800 mb-4">แท็กลูกค้า</h3>
+          {tagStats?.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {tagStats.map((t: any) => (
+                <span
+                  key={t.name}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold"
+                  style={{
+                    color: t.color,
+                    backgroundColor: `${t.color}15`,
+                    border: `1px solid ${t.color}30`,
+                  }}
+                >
+                  {t.name}
+                  <span className="text-[10px] opacity-70">({t.count})</span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[12px] text-slate-300">ไม่มีแท็ก</p>
+          )}
+        </div>
+      </div>
+
+      {/* Status breakdown */}
+      {byStatus?.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-6">
+          <h3 className="text-[14px] font-bold text-slate-800 mb-4">สถานะลูกค้า</h3>
+          <div className="flex gap-4">
+            {byStatus.map((s: any) => {
+              const statusColors: Record<string, string> = {
+                OPEN: 'bg-blue-100 text-blue-700',
+                FOLLOW_UP: 'bg-amber-100 text-amber-700',
+                RESOLVED: 'bg-emerald-100 text-emerald-700',
+              };
+              const statusLabels: Record<string, string> = {
+                OPEN: 'เปิด',
+                FOLLOW_UP: 'ติดตาม',
+                RESOLVED: 'แก้ไขแล้ว',
+              };
+              return (
+                <div key={s.status} className={`flex-1 rounded-xl px-4 py-3 text-center ${statusColors[s.status] || 'bg-slate-100 text-slate-600'}`}>
+                  <p className="text-2xl font-bold tabular-nums">{s.count.toLocaleString()}</p>
+                  <p className="text-[11px] font-medium mt-1">{statusLabels[s.status] || s.status}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Top Customers */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-6">
+        <h3 className="text-[14px] font-bold text-slate-800 mb-4">ลูกค้าที่แชทมากสุด (Top 20)</h3>
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <th className="text-left py-2 px-3 text-[11px] font-semibold text-slate-400 uppercase">#</th>
+              <th className="text-left py-2 px-3 text-[11px] font-semibold text-slate-400 uppercase">ลูกค้า</th>
+              <th className="text-left py-2 px-3 text-[11px] font-semibold text-slate-400 uppercase">ช่องทาง</th>
+              <th className="text-right py-2 px-3 text-[11px] font-semibold text-slate-400 uppercase">ข้อความ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topCustomers?.map((c: any, i: number) => (
+              <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                <td className="py-2.5 px-3 text-[12px] text-slate-400 font-semibold">{i + 1}</td>
+                <td className="py-2.5 px-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full overflow-hidden bg-slate-100 flex-shrink-0">
+                      {c.pictureUrl ? (
+                        <img src={c.pictureUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-400 font-bold">
+                          {c.displayName?.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[13px] font-medium text-slate-700">{c.displayName}</span>
+                  </div>
+                </td>
+                <td className="py-2.5 px-3">
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    c.channelType === 'line' ? 'bg-emerald-50 text-emerald-500' : 'bg-blue-50 text-blue-500'
+                  }`}>
+                    {c.channelType === 'line' ? 'LINE' : 'FB'}
+                  </span>
+                  <span className="text-[11px] text-slate-400 ml-1.5">{c.channel?.replace('Line_', '').replace('FB_', '')}</span>
+                </td>
+                <td className="py-2.5 px-3 text-right">
+                  <span className="text-[13px] font-bold text-slate-700 tabular-nums">{c.messageCount.toLocaleString()}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

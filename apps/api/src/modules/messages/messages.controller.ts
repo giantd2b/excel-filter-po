@@ -35,8 +35,13 @@ export class MessagesController {
   getMessages(
     @Param('userId') userId: string,
     @Query('limit') limit?: string,
+    @Query('before') before?: string,
   ) {
-    return this.messagesService.getMessages(userId, limit ? parseInt(limit, 10) : 50);
+    return this.messagesService.getMessages(
+      userId,
+      limit ? parseInt(limit, 10) : 50,
+      before ? parseInt(before, 10) : undefined,
+    );
   }
 
   @Post('upload')
@@ -147,6 +152,7 @@ export class MessagesController {
     return this.fbSyncService.syncNow();
   }
 
+
   @Post('fb-sync/full')
   syncFacebookFull(@Req() req: any) {
     // Run in background, return immediately
@@ -168,6 +174,7 @@ export class MessagesController {
       mediaUrl?: string;
       previewUrl?: string;
       channel: string;
+      replyToId?: string;
     },
   ) {
     return this.messagesService.sendMessage({

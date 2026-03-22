@@ -6,6 +6,15 @@ export interface MessageReaction {
   adminId?: string;
 }
 
+export interface ReplyTo {
+  id: string;
+  text?: string;
+  type: "incoming" | "outgoing";
+  sender: "user" | "admin";
+  mediaType?: string;
+  adminName?: string;
+}
+
 export interface Message {
   id: string;
   text?: string;
@@ -18,6 +27,9 @@ export interface Message {
   mediaType?: "image" | "video" | "sticker";
   mediaUrl?: string;
   previewUrl?: string;
+  quoteToken?: string;
+  replyToId?: string;
+  replyTo?: ReplyTo;
   reactions?: MessageReaction[];
 }
 

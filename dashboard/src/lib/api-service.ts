@@ -222,6 +222,7 @@ interface SendMessageParams {
   stickerId?: string;
   stickerPackageId?: string;
   channel: string;
+  replyToId?: string;
 }
 
 interface SendMessageResult {

@@ -98,6 +98,12 @@ model Message {
   mediaUrl      String?     @map("media_url")
   previewUrl    String?     @map("preview_url")
 
+  // Quote reply
+  quoteToken    String?     @map("quote_token")
+  replyToId     String?     @map("reply_to_id")
+  replyTo       Message?    @relation("ReplyTo", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies       Message[]   @relation("ReplyTo")
+
   createdAt     DateTime    @default(now()) @map("created_at")
 
   customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)

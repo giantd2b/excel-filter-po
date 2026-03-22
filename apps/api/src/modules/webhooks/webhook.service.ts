@@ -113,6 +113,7 @@ export class WebhookService {
           type: 'INCOMING',
           sender: 'USER',
           timestamp: BigInt(messageTime),
+          quoteToken: message.quoteToken || null,
         },
       });
 
@@ -139,6 +140,7 @@ export class WebhookService {
         type: 'incoming',
         sender: 'user',
         timestamp: messageTime,
+        quoteToken: message.quoteToken || null,
       });
       this.inboxGateway.emitConversationUpdated({
         id: customerId,
@@ -205,6 +207,7 @@ export class WebhookService {
           timestamp: BigInt(messageTime),
           mediaType: 'IMAGE',
           mediaUrl: imageUrl,
+          quoteToken: message.quoteToken || null,
         },
       });
 
@@ -604,9 +607,8 @@ export class WebhookService {
         }
       } else if (message.type === 'sticker') {
         messageText = '[สติกเกอร์]';
-        mediaType = 'STICKER';
+        mediaType = 'IMAGE';
         mediaUrl = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${message.stickerId}/iPhone/sticker@2x.png`;
-        previewUrl = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${message.stickerId}/android/sticker.png`;
       } else if (message.type === 'file') {
         messageText = `[ไฟล์: ${message.fileName || 'file'}]`;
         // Download file content
