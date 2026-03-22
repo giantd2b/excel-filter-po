@@ -11,6 +11,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 let Audio: any = null;
@@ -41,6 +43,31 @@ function ChatBubble({ message, onReply }: Props) {
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const soundRef = useRef<any>(null);
+
+  // Swipe to reply
+  const swipeX = useRef(new Animated.Value(0)).current;
+  const swipeTriggered = useRef(false);
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        !!onReply && Math.abs(gs.dx) > 10 && Math.abs(gs.dx) > Math.abs(gs.dy),
+      onPanResponderMove: (_, gs) => {
+        // Only allow swipe right (positive dx)
+        const dx = Math.max(0, Math.min(gs.dx, 80));
+        swipeX.setValue(dx);
+        if (dx >= 60 && !swipeTriggered.current) {
+          swipeTriggered.current = true;
+        }
+      },
+      onPanResponderRelease: () => {
+        if (swipeTriggered.current && onReply) {
+          onReply(message);
+        }
+        swipeTriggered.current = false;
+        Animated.spring(swipeX, { toValue: 0, useNativeDriver: true, tension: 40, friction: 6 }).start();
+      },
+    })
+  ).current;
 
   const renderContent = () => {
     switch (message.type) {
@@ -204,6 +231,12 @@ function ChatBubble({ message, onReply }: Props) {
     Alert.alert('ข้อความ', undefined, options);
   };
 
+  const replyIconOpacity = swipeX.interpolate({
+    inputRange: [0, 40, 60],
+    outputRange: [0, 0.5, 1],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View
       style={[
@@ -211,6 +244,16 @@ function ChatBubble({ message, onReply }: Props) {
         isOutgoing ? styles.wrapperOutgoing : styles.wrapperIncoming,
       ]}
     >
+      {/* Swipe reply icon */}
+      {onReply && (
+        <Animated.View style={[styles.swipeReplyIcon, { opacity: replyIconOpacity }]}>
+          <Text style={{ fontSize: 16, color: '#6366f1' }}>↩</Text>
+        </Animated.View>
+      )}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{ transform: [{ translateX: swipeX }] }}
+      >
       <TouchableOpacity
         activeOpacity={0.8}
         onLongPress={handleLongPress}
@@ -224,13 +267,18 @@ function ChatBubble({ message, onReply }: Props) {
       >
         {message.replyTo && (
           <View style={[styles.replyQuote, isOutgoing ? styles.replyQuoteOutgoing : styles.replyQuoteIncoming]}>
-            <Text style={[styles.replyQuoteName, isOutgoing && { color: '#c7d2fe' }]}>
-              {message.replyTo.sender === 'admin' ? (message.replyTo.adminName || 'Admin') : 'ลูกค้า'}
-            </Text>
-            <Text style={[styles.replyQuoteText, isOutgoing && { color: '#a5b4fc' }]} numberOfLines={1}>
-              {message.replyTo.mediaType ? `[${message.replyTo.mediaType === 'image' ? 'รูปภาพ' : 'วิดีโอ'}] ` : ''}
-              {message.replyTo.text || ''}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.replyQuoteName, isOutgoing && { color: '#c7d2fe' }]}>
+                  {message.replyTo.sender === 'admin' ? (message.replyTo.adminName || 'Admin') : 'ลูกค้า'}
+                </Text>
+                <Text style={[styles.replyQuoteText, isOutgoing && { color: '#a5b4fc' }]} numberOfLines={1}>
+                  {message.replyTo.mediaType === 'image' ? '🖼 รูปภาพ' :
+                   message.replyTo.mediaType === 'video' ? '🎬 วิดีโอ' : ''}
+                  {message.replyTo.text || ''}
+                </Text>
+              </View>
+            </View>
           </View>
         )}
         {message.senderName && (
@@ -257,6 +305,8 @@ function ChatBubble({ message, onReply }: Props) {
           )
         )}
       </View>
+
+      </Animated.View>
 
       {/* Full-screen image viewer with pinch-to-zoom */}
       {showFullImage && message.mediaUrl && (
@@ -343,6 +393,18 @@ const styles = StyleSheet.create({
   bubbleMedia: {
     padding: 3,
     overflow: 'hidden',
+  },
+  swipeReplyIcon: {
+    position: 'absolute',
+    left: -24,
+    top: '50%' as any,
+    marginTop: -12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#eef2ff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   replyQuote: {
     borderLeftWidth: 2,

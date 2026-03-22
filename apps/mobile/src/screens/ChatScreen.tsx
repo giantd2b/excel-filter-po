@@ -39,6 +39,7 @@ export default function ChatScreen({ route }: any) {
     pictureUrl,
     channel,
     channelType,
+    unreadCount: initialUnread = 0,
   } = route.params;
 
   const navigation = useNavigation<any>();
@@ -353,17 +354,30 @@ export default function ChatScreen({ route }: any) {
     return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
+  const unreadRef = useRef(initialUnread);
+
   const renderMessage = useCallback(
     ({ item, index }: { item: Message; index: number }) => {
-      // In inverted list, index 0 = newest. Show divider below when next (older) message has different date.
       const nextItem = filteredMessages[index + 1];
       const showDivider =
         nextItem &&
         new Date(item.timestamp).toDateString() !== new Date(nextItem.timestamp).toDateString();
 
+      // Show unread divider: in inverted list, unread messages are at the top (lowest indices)
+      // Show divider after the last unread incoming message
+      const showUnread = unreadRef.current > 0 && index === unreadRef.current - 1 &&
+        item.direction === 'incoming';
+
       return (
         <>
           <ChatBubble message={item} onReply={(m) => setReplyTo(m)} />
+          {showUnread && (
+            <View style={styles.unreadDivider}>
+              <View style={styles.unreadDividerLine} />
+              <Text style={styles.unreadDividerText}>ข้อความใหม่</Text>
+              <View style={styles.unreadDividerLine} />
+            </View>
+          )}
           {showDivider && (
             <View style={styles.dateDivider}>
               <View style={styles.dateDividerLine} />
@@ -886,6 +900,29 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     color: '#94a3b8',
+  },
+  // Unread divider
+  unreadDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+    paddingHorizontal: 16,
+  },
+  unreadDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#6366f1',
+  },
+  unreadDividerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6366f1',
+    marginHorizontal: 10,
+    backgroundColor: '#eef2ff',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    overflow: 'hidden',
   },
   // Date dividers
   dateDivider: {

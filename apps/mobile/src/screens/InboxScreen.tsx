@@ -111,6 +111,7 @@ export default function InboxScreen({ navigation }: any) {
       pictureUrl: conversation.pictureUrl,
       channel: conversation.channel,
       channelType: conversation.channelType,
+      unreadCount: conversation.unreadCount || 0,
     });
   };
 
