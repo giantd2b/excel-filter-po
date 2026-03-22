@@ -72,12 +72,12 @@ export function ChatList({
     onNewMessage: handleNewMessage,
   });
 
-  // Re-focus search input after results load
+  // Re-focus search input after debounced search results load
   useEffect(() => {
-    if (searchQuery && searchInputRef.current && document.activeElement !== searchInputRef.current) {
+    if (debouncedSearch && searchInputRef.current && document.activeElement !== searchInputRef.current) {
       searchInputRef.current.focus();
     }
-  }, [rawConversations]);
+  }, [debouncedSearch]);
 
   // Client-side filter for instant feedback while debounce waits
   const conversations = searchQuery && searchQuery !== debouncedSearch

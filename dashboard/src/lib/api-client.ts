@@ -31,22 +31,25 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path),
+  get: <T>(path: string, signal?: AbortSignal) =>
+    request<T>(path, { signal }),
 
-  post: <T>(path: string, body: unknown) =>
+  post: <T>(path: string, body: unknown, signal?: AbortSignal) =>
     request<T>(path, {
       method: "POST",
       body: JSON.stringify(body),
+      signal,
     }),
 
-  put: <T>(path: string, body: unknown) =>
+  put: <T>(path: string, body: unknown, signal?: AbortSignal) =>
     request<T>(path, {
       method: "PUT",
       body: JSON.stringify(body),
+      signal,
     }),
 
-  delete: <T>(path: string) =>
-    request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string, signal?: AbortSignal) =>
+    request<T>(path, { method: "DELETE", signal }),
 
   upload: async <T>(path: string, formData: FormData): Promise<T> => {
     const user = auth.currentUser;

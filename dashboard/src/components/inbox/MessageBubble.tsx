@@ -96,6 +96,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onReply }: M
                 alt="Shared image"
                 className="w-full max-h-80 object-cover cursor-pointer group-hover:opacity-[0.92] transition-opacity duration-150"
                 loading="lazy"
+                style={{ aspectRatio: "4/3" }}
               />
             </button>
           )}

@@ -38,7 +38,7 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Noto Sans Thai', sans-serif" }}>
+    <div className="h-screen flex flex-col bg-slate-50 font-sans">
       <Navbar />
       {isInbox ? (
         <main className="flex-1 overflow-hidden">

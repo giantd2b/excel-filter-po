@@ -58,7 +58,7 @@ export default function InboxPage() {
   const handleMessageSent = useCallback(() => {}, []);
 
   return (
-    <div className="flex h-full bg-white" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Noto Sans Thai', sans-serif" }}>
+    <div className="flex h-full bg-white font-sans">
       {/* Channels Sidebar — dark, 224px */}
       <div className="w-56 flex-shrink-0">
         <ChannelsSidebar

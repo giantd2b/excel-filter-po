@@ -29,7 +29,7 @@ export function ConversationArea({
   onMessageSent,
   onToggleInfoPanel,
 }: ConversationAreaProps) {
-  const [, setSending] = useState(false);
+  const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -38,11 +38,7 @@ export function ConversationArea({
 
   const handleNewMessage = useCallback(() => {
     scrollToBottom();
-    // Mark as read when new message arrives while chat is open
-    if (selectedUser) {
-      markAsRead(selectedUser.id).catch(() => {});
-    }
-  }, [selectedUser]);
+  }, []);
 
   const { messages, loading, loadingMore, hasMore, loadMore, error } = useMessagesSocket({
     userId: selectedUser?.id || null,

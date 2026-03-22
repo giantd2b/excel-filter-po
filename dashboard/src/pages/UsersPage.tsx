@@ -15,6 +15,9 @@ export default function UsersPage() {
   const [lastId, setLastId] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
+  const lastIdRef = useRef<string | null>(null);
+  lastIdRef.current = lastId;
+
   const fetchUsers = useCallback(
     async (loadMore = false, searchText?: string, channel?: string) => {
       try {
@@ -26,7 +29,7 @@ export default function UsersPage() {
 
         const data = await getUsers(
           50,
-          loadMore ? lastId : null,
+          loadMore ? lastIdRef.current : null,
           searchText,
           channel,
         );
@@ -56,7 +59,7 @@ export default function UsersPage() {
         setLoadingMore(false);
       }
     },
-    [lastId]
+    []
   );
 
   // Initial load + fetch channels

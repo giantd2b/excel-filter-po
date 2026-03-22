@@ -182,8 +182,10 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-5">
           <h3 className="text-[13px] font-bold text-slate-800 mb-3">ช่องทาง (30 วัน)</h3>
           <div className="space-y-2">
-            {(data.channelActivity || []).slice(0, 8).map((c: any) => {
-              const maxMsgs = Math.max(...data.channelActivity.map((x: any) => x.messages), 1);
+            {(() => {
+              const channels = (data.channelActivity || []).slice(0, 8);
+              const maxMsgs = Math.max(...(data.channelActivity || []).map((x: any) => x.messages), 1);
+              return channels.map((c: any) => {
               return (
                 <div key={c.channel} className="flex items-center gap-2">
                   <span className={`text-[9px] font-bold px-1 py-[1px] rounded w-6 text-center ${
@@ -201,7 +203,8 @@ export default function DashboardPage() {
                   <span className="text-[10px] font-semibold text-slate-500 w-10 text-right tabular-nums">{c.messages.toLocaleString()}</span>
                 </div>
               );
-            })}
+            });
+            })()}
           </div>
         </div>
 

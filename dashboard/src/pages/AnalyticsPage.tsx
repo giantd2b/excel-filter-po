@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { api } from "@/lib/api-client";
-import { Clock, MessageSquare, ArrowDownUp, Users, BarChart3, Timer, Zap, TrendingUp, UserPlus, Phone, Tag, Hash } from "lucide-react";
+import { Clock, MessageSquare, ArrowDownUp, Users, BarChart3, Timer, Zap, TrendingUp, UserPlus, Phone, Hash } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -125,40 +125,60 @@ export default function AnalyticsPage() {
     return volData.byChannel.map((c) => c.channel);
   }, [volData]);
 
-  useEffect(() => {
-    fetchAll();
-  }, [startDate, endDate, channel]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const abortRef = useRef<AbortController>();
 
-  const fetchAll = async () => {
-    setLoading(true);
-    setError("");
-    try {
+  useEffect(() => {
+    // Debounce: wait 300ms after last change before fetching
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(() => {
+      // Abort previous in-flight request
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      setLoading(true);
+      setError("");
+
       const channelParam = channel ? `&channel=${encodeURIComponent(channel)}` : "";
-      const [rt, vol, admin, cust] = await Promise.all([
+      Promise.all([
         api.get<ResponseTimeData>(
-          `/analytics/response-time?startDate=${startDate}&endDate=${endDate}${channelParam}`
+          `/analytics/response-time?startDate=${startDate}&endDate=${endDate}${channelParam}`,
+          controller.signal
         ),
         api.get<VolumeData>(
-          `/analytics/volume?startDate=${startDate}&endDate=${endDate}`
+          `/analytics/volume?startDate=${startDate}&endDate=${endDate}`,
+          controller.signal
         ),
         api.get<AdminPerfData>(
-          `/analytics/admin-performance?startDate=${startDate}&endDate=${endDate}`
+          `/analytics/admin-performance?startDate=${startDate}&endDate=${endDate}`,
+          controller.signal
         ),
         api.get<any>(
-          `/analytics/customers?startDate=${startDate}&endDate=${endDate}`
+          `/analytics/customers?startDate=${startDate}&endDate=${endDate}`,
+          controller.signal
         ),
-      ]);
-      setRtData(rt);
-      setVolData(vol);
-      setAdminData(admin);
-      setCustData(cust);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "ไม่สามารถโหลดข้อมูลได้");
-    } finally {
-      setLoading(false);
-    }
-  };
+      ])
+        .then(([rt, vol, admin, cust]) => {
+          setRtData(rt);
+          setVolData(vol);
+          setAdminData(admin);
+          setCustData(cust);
+        })
+        .catch((err: any) => {
+          if (err.name === "AbortError") return;
+          console.error(err);
+          setError(err.message || "ไม่สามารถโหลดข้อมูลได้");
+        })
+        .finally(() => setLoading(false));
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
+  }, [startDate, endDate, channel]);
 
   return (
     <div>

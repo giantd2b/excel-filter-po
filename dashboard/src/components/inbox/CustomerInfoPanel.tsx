@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   getCustomerDetails,
   getCustomerNotes,
@@ -74,6 +74,9 @@ export function CustomerInfoPanel({
   const [quotations, setQuotations] = useState<any[]>([]);
   const [quotationsLoading, setQuotationsLoading] = useState(false);
 
+  // Cache tags across conversation switches
+  const tagsCacheRef = useRef<any[] | null>(null);
+
   useEffect(() => {
     if (!userId) {
       setDetails(null);
@@ -81,36 +84,53 @@ export function CustomerInfoPanel({
       setJobs([]);
       return;
     }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
     setLoading(true);
     setJobs([]);
     setQuotations([]);
+
+    // Use cached tags if available, otherwise fetch
+    const tagsPromise = tagsCacheRef.current
+      ? Promise.resolve(tagsCacheRef.current)
+      : getAllTags();
+
     Promise.all([
       getCustomerDetails(userId),
       getCustomerNotes(userId),
-      getAllTags(),
+      tagsPromise,
     ])
       .then(([d, n, t]) => {
+        if (cancelled) return;
         setDetails(d);
+        tagsCacheRef.current = t;
         // Auto-fetch jobs if customer has phone
         if (d?.phoneNumber) {
           setJobsLoading(true);
           getCustomerJobs(userId)
-            .then((res) => setJobs(res.jobs || []))
-            .catch(() => setJobs([]))
-            .finally(() => setJobsLoading(false));
+            .then((res) => { if (!cancelled) setJobs(res.jobs || []); })
+            .catch(() => { if (!cancelled) setJobs([]); })
+            .finally(() => { if (!cancelled) setJobsLoading(false); });
         }
         // Auto-fetch quotations from FlowAccount
         setQuotationsLoading(true);
         api.get<{ data: any[]; total: number }>(`/users/${userId}/quotations`)
-          .then((res) => setQuotations(res.data || []))
-          .catch(() => setQuotations([]))
-          .finally(() => setQuotationsLoading(false));
+          .then((res) => { if (!cancelled) setQuotations(res.data || []); })
+          .catch(() => { if (!cancelled) setQuotations([]); })
+          .finally(() => { if (!cancelled) setQuotationsLoading(false); });
         setNotes(n);
         setAllTags(t);
         setNicknameValue(d?.nickname || "");
       })
-      .catch(() => setDetails(null))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!cancelled) setDetails(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [userId]);
 
   const refresh = async () => {

@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { getTemplates, ReplyTemplate } from "@/lib/api-service";
 import { Loader2, X, Search, Image } from "lucide-react";
 
+// Module-level cache — persists across mount/unmount cycles
+let cachedTemplates: ReplyTemplate[] | null = null;
+
 interface QuickRepliesProps {
   onSelect: (text: string) => void;
   onSendWithImages?: (text: string, images: string[]) => void;
@@ -9,13 +12,14 @@ interface QuickRepliesProps {
 }
 
 export function QuickReplies({ onSelect, onSendWithImages, onClose }: QuickRepliesProps) {
-  const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [templates, setTemplates] = useState<ReplyTemplate[]>(cachedTemplates || []);
+  const [loading, setLoading] = useState(!cachedTemplates);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    if (cachedTemplates) return;
     getTemplates()
-      .then(setTemplates)
+      .then((t) => { cachedTemplates = t; setTemplates(t); })
       .catch(() => setTemplates([]))
       .finally(() => setLoading(false));
   }, []);

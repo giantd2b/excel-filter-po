@@ -6,6 +6,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["-apple-system", "BlinkMacSystemFont", "'Noto Sans Thai'", "sans-serif"],
+      },
       colors: {
         brand: {
           50: '#fdf6f1',
