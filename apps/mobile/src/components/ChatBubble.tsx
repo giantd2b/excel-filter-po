@@ -1,4 +1,4 @@
-import React, { useState, useRef, memo } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,7 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 let Audio: any = null;
 try { Audio = require('expo-av').Audio; } catch {}
 import type { Message } from '../hooks/useMessages';
@@ -33,7 +31,7 @@ function formatMessageTime(timestamp: number): string {
   });
 }
 
-function ChatBubble({ message }: Props) {
+export default function ChatBubble({ message }: Props) {
   const isOutgoing = message.direction === 'outgoing';
   const [showFullImage, setShowFullImage] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -181,26 +179,6 @@ function ChatBubble({ message }: Props) {
 
   const isMedia = ['image', 'video', 'sticker'].includes(message.type);
 
-  const handleLongPress = () => {
-    if (!message.text && !message.mediaUrl) return;
-    const options: string[] = [];
-    if (message.text) options.push('คัดลอกข้อความ');
-    if (message.mediaUrl) options.push('เปิดลิงก์สื่อ');
-    options.push('ยกเลิก');
-
-    Alert.alert('ข้อความ', undefined, options.map((label) => ({
-      text: label,
-      style: label === 'ยกเลิก' ? 'cancel' as const : 'default' as const,
-      onPress: () => {
-        if (label === 'คัดลอกข้อความ' && message.text) {
-          Clipboard.setStringAsync(message.text);
-        } else if (label === 'เปิดลิงก์สื่อ' && message.mediaUrl) {
-          Linking.openURL(message.mediaUrl);
-        }
-      },
-    })));
-  };
-
   return (
     <View
       style={[
@@ -208,15 +186,11 @@ function ChatBubble({ message }: Props) {
         isOutgoing ? styles.wrapperOutgoing : styles.wrapperIncoming,
       ]}
     >
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onLongPress={handleLongPress}
-        delayLongPress={400}
+      <View
         style={[
           styles.bubble,
           isOutgoing ? styles.bubbleOutgoing : styles.bubbleIncoming,
           isMedia && styles.bubbleMedia,
-          message.status === 'sending' && { opacity: 0.6 },
         ]}
       >
         {message.senderName && (
@@ -225,28 +199,24 @@ function ChatBubble({ message }: Props) {
           </Text>
         )}
         {renderContent()}
-      </TouchableOpacity>
+      </View>
       <View style={[styles.metaRow, isOutgoing ? styles.metaRowOutgoing : styles.metaRowIncoming]}>
         <Text style={styles.timestamp}>
           {formatMessageTime(message.timestamp)}
         </Text>
         {isOutgoing && (
-          message.status === 'sending' ? (
-            <ActivityIndicator size={8} color="#94a3b8" style={{ marginLeft: 2 }} />
-          ) : (
-            <Text style={[
-              styles.statusIcon,
-              message.status === 'failed' && styles.statusFailed,
-            ]}>
-              {message.status === 'failed' ? '!' : message.status === 'delivered' ? '✓✓' : '✓'}
-            </Text>
-          )
+          <Text style={[
+            styles.statusIcon,
+            message.status === 'failed' && styles.statusFailed,
+          ]}>
+            {message.status === 'failed' ? '!' : message.status === 'delivered' ? '✓✓' : '✓'}
+          </Text>
         )}
       </View>
 
       {/* Full-screen image viewer with pinch-to-zoom */}
-      {showFullImage && message.mediaUrl && (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setShowFullImage(false)}>
+      {message.mediaUrl && (
+        <Modal visible={showFullImage} transparent animationType="fade" onRequestClose={() => setShowFullImage(false)}>
           <View style={styles.lightboxOverlay}>
             <TouchableOpacity style={styles.lightboxClose} onPress={() => setShowFullImage(false)}>
               <Text style={styles.lightboxCloseText}>✕</Text>
@@ -271,8 +241,6 @@ function ChatBubble({ message }: Props) {
     </View>
   );
 }
-
-export default memo(ChatBubble);
 
 function LinkifiedText({ text, style, linkStyle }: { text: string; style: any; linkStyle: any }) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;

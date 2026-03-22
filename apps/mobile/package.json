@@ -16,7 +16,6 @@
     "@react-navigation/native-stack": "^7.3.0",
     "axios": "^1.7.9",
     "expo": "~55.0.6",
-    "expo-clipboard": "~55.0.9",
     "expo-constants": "~55.0.9",
     "expo-device": "~55.0.10",
     "expo-document-picker": "~55.0.9",
