@@ -42,10 +42,14 @@ export async function connectSocket(): Promise<Socket> {
     }
   });
 
+  let lastTokenRefresh = 0;
   socket.on('connect_error', async (err) => {
     console.log('[Socket] Connection error:', err.message);
-    // Refresh token on auth errors
+    // Refresh token on auth errors, but throttle to once per 30s
     if (err.message.includes('auth') || err.message.includes('token') || err.message.includes('401')) {
+      const now = Date.now();
+      if (now - lastTokenRefresh < 30000) return;
+      lastTokenRefresh = now;
       try {
         const freshToken = await auth.currentUser?.getIdToken(true);
         if (freshToken && socket) {

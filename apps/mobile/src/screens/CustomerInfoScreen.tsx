@@ -36,18 +36,21 @@ export default function CustomerInfoScreen({ route }: any) {
   const [quotations, setQuotations] = useState<any[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
       api.get(`/users/${docId}/details`),
       api.get(`/users/${docId}/notes`).catch(() => ({ data: [] })),
       api.get(`/users/${docId}/jobs`).catch(() => ({ data: { jobs: [] } })),
       api.get(`/users/${docId}/quotations`).catch(() => ({ data: { data: [] } })),
     ]).then(([detailsRes, notesRes, jobsRes, quotesRes]) => {
+      if (cancelled) return;
       setDetails(detailsRes.data);
       setNicknameValue(detailsRes.data?.nickname || '');
       setNotes(Array.isArray(notesRes.data) ? notesRes.data : []);
       setJobs(jobsRes.data?.jobs || []);
       setQuotations(quotesRes.data?.data || []);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [docId]);
 
   const handleAddNote = async () => {

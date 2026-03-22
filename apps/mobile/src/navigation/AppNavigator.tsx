@@ -7,6 +7,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 import api from '../services/api';
+import { getSocket } from '../services/socket';
 
 import LoginScreen from '../screens/LoginScreen';
 import InboxScreen from '../screens/InboxScreen';
@@ -29,16 +30,21 @@ const stackHeaderStyle = {
 function InboxBadge() {
   const [unread, setUnread] = useState(0);
 
-  useFocusEffect(
-    useCallback(() => {
-      api
-        .get('/inbox/stats')
-        .then(({ data }) => {
-          setUnread(data.totalUnread || 0);
-        })
-        .catch(() => {});
-    }, []),
-  );
+  // Fetch once on mount, then listen via WebSocket
+  useEffect(() => {
+    api.get('/inbox/stats')
+      .then(({ data }) => setUnread(data.totalUnread || 0))
+      .catch(() => {});
+
+    const socket = getSocket();
+    const handleUnread = (data: any) => {
+      if (data?.totalUnread !== undefined) {
+        setUnread(data.totalUnread);
+      }
+    };
+    socket?.on('unread:update', handleUnread);
+    return () => { socket?.off('unread:update', handleUnread); };
+  }, []);
 
   if (unread <= 0) return null;
 

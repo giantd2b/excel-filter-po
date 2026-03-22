@@ -23,6 +23,13 @@ import api from '../services/api';
 import ChatBubble from '../components/ChatBubble';
 import { useMessages, type Message } from '../hooks/useMessages';
 
+const STICKER_PACKS = [
+  { name: 'Moon', packageId: '11537', ids: ['52002734','52002735','52002736','52002737','52002738','52002739','52002740','52002741','52002742','52002743','52002744','52002745'] },
+  { name: 'Brown & Friends', packageId: '11538', ids: ['51626494','51626495','51626496','51626497','51626498','51626499','51626500','51626501','51626502','51626503','51626504','51626505'] },
+  { name: 'Brown Special', packageId: '6325', ids: ['10979904','10979905','10979906','10979907','10979908','10979909','10979910','10979911','10979912','10979913','10979914','10979915'] },
+  { name: 'Cony Special', packageId: '6359', ids: ['11069848','11069849','11069850','11069851','11069852','11069853','11069854','11069855','11069856','11069857','11069858','11069859'] },
+];
+
 function formatDateDivider(timestamp: number): string {
   const date = new Date(timestamp);
   const today = new Date();
@@ -357,6 +364,22 @@ export default function ChatScreen({ route }: any) {
     setShowQuickReplies(false);
   }, []);
 
+  const groupedTemplates = React.useMemo(() => {
+    const filtered = templates.filter(
+      (t) =>
+        !templateSearch.trim() ||
+        t.title.toLowerCase().includes(templateSearch.toLowerCase()) ||
+        t.text.toLowerCase().includes(templateSearch.toLowerCase())
+    );
+    const grouped = filtered.reduce<Record<string, ReplyTemplate[]>>((acc, t) => {
+      const cat = t.category || 'ทั่วไป';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(t);
+      return acc;
+    }, {});
+    return Object.entries(grouped);
+  }, [templates, templateSearch]);
+
   const filteredMessages = React.useMemo(() => {
     if (!messageSearch.trim()) return messages;
     const q = messageSearch.toLowerCase();
@@ -502,8 +525,8 @@ export default function ChatScreen({ route }: any) {
       {pendingImages.length > 0 && (
         <View style={styles.previewBar}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexShrink: 1 }}>
-            {pendingImages.map((img, idx) => (
-              <View key={idx} style={{ position: 'relative', marginRight: 8 }}>
+            {pendingImages.map((img) => (
+              <View key={img.uri} style={{ position: 'relative', marginRight: 8 }}>
                 <Image
                   source={{ uri: img.uri }}
                   style={styles.previewImage}
@@ -511,7 +534,7 @@ export default function ChatScreen({ route }: any) {
                 />
                 <TouchableOpacity
                   style={styles.previewRemove}
-                  onPress={() => setPendingImages((prev) => prev.filter((_, i) => i !== idx))}
+                  onPress={() => setPendingImages((prev) => prev.filter((p) => p.uri !== img.uri))}
                   disabled={sending}
                 >
                   <Text style={styles.previewRemoveText}>✕</Text>
@@ -564,43 +587,29 @@ export default function ChatScreen({ route }: any) {
             ) : templates.length === 0 ? (
               <Text style={styles.quickRepliesEmpty}>ยังไม่มีข้อความด่วน</Text>
             ) : (
-              (() => {
-                const filtered = templates.filter(
-                  (t) =>
-                    !templateSearch.trim() ||
-                    t.title.toLowerCase().includes(templateSearch.toLowerCase()) ||
-                    t.text.toLowerCase().includes(templateSearch.toLowerCase())
-                );
-                const grouped = filtered.reduce<Record<string, ReplyTemplate[]>>((acc, t) => {
-                  const cat = t.category || 'ทั่วไป';
-                  if (!acc[cat]) acc[cat] = [];
-                  acc[cat].push(t);
-                  return acc;
-                }, {});
-                return Object.entries(grouped).map(([category, items]) => (
-                  <View key={category}>
-                    <Text style={styles.quickRepliesCategory}>{category}</Text>
-                    {items.map((t) => (
-                      <TouchableOpacity
-                        key={t.id}
-                        style={styles.quickReplyItem}
-                        onPress={() => handleQuickReply(t.text, t.images)}
-                        disabled={sending}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Text style={[styles.quickReplyItemTitle, { flex: 1 }]}>{t.title}</Text>
-                          {t.images && t.images.length > 0 && (
-                            <View style={{ backgroundColor: '#eef2ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
-                              <Text style={{ fontSize: 10, fontWeight: '600', color: '#6366f1' }}>🖼 {t.images.length}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.quickReplyItemText} numberOfLines={2}>{t.text}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ));
-              })()
+              groupedTemplates.map(([category, items]) => (
+                <View key={category}>
+                  <Text style={styles.quickRepliesCategory}>{category}</Text>
+                  {items.map((t) => (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={styles.quickReplyItem}
+                      onPress={() => handleQuickReply(t.text, t.images)}
+                      disabled={sending}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[styles.quickReplyItemTitle, { flex: 1 }]}>{t.title}</Text>
+                        {t.images && t.images.length > 0 && (
+                          <View style={{ backgroundColor: '#eef2ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '600', color: '#6366f1' }}>🖼 {t.images.length}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.quickReplyItemText} numberOfLines={2}>{t.text}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))
             )}
           </ScrollView>
         </View>
@@ -743,12 +752,7 @@ export default function ChatScreen({ route }: any) {
             </TouchableOpacity>
           </View>
           <ScrollView style={{ maxHeight: 220 }}>
-            {[
-              { name: 'Moon', packageId: '11537', ids: ['52002734','52002735','52002736','52002737','52002738','52002739','52002740','52002741','52002742','52002743','52002744','52002745'] },
-              { name: 'Brown & Friends', packageId: '11538', ids: ['51626494','51626495','51626496','51626497','51626498','51626499','51626500','51626501','51626502','51626503','51626504','51626505'] },
-              { name: 'Brown Special', packageId: '6325', ids: ['10979904','10979905','10979906','10979907','10979908','10979909','10979910','10979911','10979912','10979913','10979914','10979915'] },
-              { name: 'Cony Special', packageId: '6359', ids: ['11069848','11069849','11069850','11069851','11069852','11069853','11069854','11069855','11069856','11069857','11069858','11069859'] },
-            ].map((set) => (
+            {STICKER_PACKS.map((set) => (
               <View key={set.name} style={{ marginBottom: 12 }}>
                 <Text style={styles.quickRepliesCategory}>{set.name}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 12 }}>
