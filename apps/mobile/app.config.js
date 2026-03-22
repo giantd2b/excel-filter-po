@@ -46,6 +46,7 @@ module.exports = {
       'expo-secure-store',
       'expo-notifications',
       'expo-document-picker',
+      'expo-image',
     ],
     owner: 'giantd2b',
   },

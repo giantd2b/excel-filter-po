@@ -6,9 +6,9 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
   Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 
@@ -107,7 +107,7 @@ export default function SlipReportScreen() {
               onPress={() => { if (item.link) Linking.openURL(item.link); }}
             >
               {item.link && (
-                <Image source={{ uri: item.link }} style={styles.slipImage} resizeMode="cover" />
+                <Image source={{ uri: item.link }} style={styles.slipImage} contentFit="cover" cachePolicy="disk" />
               )}
               <View style={styles.slipInfo}>
                 <Text style={styles.slipAmount}>

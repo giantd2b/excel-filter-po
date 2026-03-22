@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, memo } from 'react';
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   Dimensions,
   TouchableOpacity,
@@ -14,6 +13,7 @@ import {
   Animated,
   PanResponder,
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 let Audio: any = null;
 try { Audio = require('expo-av').Audio; } catch {}
@@ -103,7 +103,9 @@ function ChatBubble({ message, onReply }: Props) {
             <Image
               source={{ uri: message.previewUrl || message.mediaUrl }}
               style={styles.imageContent}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="disk"
+              transition={200}
               onError={() => setImageError(true)}
             />
           </TouchableOpacity>
@@ -121,7 +123,7 @@ function ChatBubble({ message, onReply }: Props) {
               <Image
                 source={{ uri: message.previewUrl }}
                 style={styles.imageContent}
-                resizeMode="cover"
+                contentFit="cover"
               />
             ) : null}
             <View style={styles.playOverlay}>
@@ -136,7 +138,8 @@ function ChatBubble({ message, onReply }: Props) {
           <Image
             source={{ uri: message.stickerUrl || message.mediaUrl }}
             style={styles.stickerContent}
-            resizeMode="contain"
+            contentFit="contain"
+            cachePolicy="disk"
           />
         );
 
@@ -337,7 +340,8 @@ function ChatBubble({ message, onReply }: Props) {
               <Image
                 source={{ uri: message.mediaUrl }}
                 style={styles.lightboxImage}
-                resizeMode="contain"
+                contentFit="contain"
+                cachePolicy="disk"
               />
             </ScrollView>
           </View>

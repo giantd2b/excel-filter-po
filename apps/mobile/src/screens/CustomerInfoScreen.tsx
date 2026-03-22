@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
@@ -11,6 +10,7 @@ import {
   Alert,
   Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 
@@ -138,7 +138,7 @@ export default function CustomerInfoScreen({ route }: any) {
       {/* Profile header */}
       <View style={styles.profileHeader}>
         {pictureUrl ? (
-          <Image source={{ uri: pictureUrl }} style={styles.avatar} />
+          <Image source={{ uri: pictureUrl }} style={styles.avatar} cachePolicy="disk" transition={150} />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
             <Text style={styles.avatarText}>
@@ -289,7 +289,7 @@ export default function CustomerInfoScreen({ route }: any) {
               </View>
               {payment.slipUrl && (
                 <TouchableOpacity onPress={() => Linking.openURL(payment.slipUrl)}>
-                  <Image source={{ uri: payment.slipUrl }} style={styles.slipImage} resizeMode="cover" />
+                  <Image source={{ uri: payment.slipUrl }} style={styles.slipImage} contentFit="cover" cachePolicy="disk" />
                 </TouchableOpacity>
               )}
               <Text style={styles.orderDate}>{formatDate(payment.createdAt)}</Text>

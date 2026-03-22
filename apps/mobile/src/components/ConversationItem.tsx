@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 
 export interface Conversation {
   id: string;
@@ -76,7 +77,7 @@ const ConversationItem = React.memo(function ConversationItem({ conversation, on
       {/* Avatar */}
       <View style={styles.avatarContainer}>
         {pictureUrl ? (
-          <Image source={{ uri: pictureUrl }} style={styles.avatar} />
+          <Image source={{ uri: pictureUrl }} style={styles.avatar} cachePolicy="disk" transition={150} />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
             <Text style={styles.avatarText}>

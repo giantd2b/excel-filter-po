@@ -10,10 +10,10 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
-  Image,
   Keyboard,
   ScrollView,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -434,7 +434,7 @@ export default function ChatScreen({ route }: any) {
       {/* Header info bar */}
       <View style={styles.infoBar}>
         {pictureUrl ? (
-          <Image source={{ uri: pictureUrl }} style={styles.headerAvatar} />
+          <Image source={{ uri: pictureUrl }} style={styles.headerAvatar} cachePolicy="disk" />
         ) : (
           <View style={[styles.headerAvatar, styles.headerAvatarPlaceholder]}>
             <Text style={styles.headerAvatarText}>
@@ -530,7 +530,7 @@ export default function ChatScreen({ route }: any) {
                 <Image
                   source={{ uri: img.uri }}
                   style={styles.previewImage}
-                  resizeMode="cover"
+                  contentFit="cover"
                 />
                 <TouchableOpacity
                   style={styles.previewRemove}
@@ -766,7 +766,8 @@ export default function ChatScreen({ route }: any) {
                       <Image
                         source={{ uri: `https://stickershop.line-scdn.net/stickershop/v1/sticker/${sid}/iPhone/sticker@2x.png` }}
                         style={{ width: '100%', height: '100%' }}
-                        resizeMode="contain"
+                        contentFit="contain"
+                        cachePolicy="disk"
                       />
                     </TouchableOpacity>
                   ))}
