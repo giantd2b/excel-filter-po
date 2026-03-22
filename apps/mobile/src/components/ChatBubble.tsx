@@ -10,7 +10,9 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 let Audio: any = null;
 try { Audio = require('expo-av').Audio; } catch {}
 import type { Message } from '../hooks/useMessages';
@@ -179,6 +181,25 @@ function ChatBubble({ message }: Props) {
 
   const isMedia = ['image', 'video', 'sticker'].includes(message.type);
 
+  const handleLongPress = () => {
+    if (!message.text && !message.mediaUrl) return;
+    const options: any[] = [];
+    if (message.text) {
+      options.push({
+        text: 'คัดลอกข้อความ',
+        onPress: () => Clipboard.setStringAsync(message.text!),
+      });
+    }
+    if (message.mediaUrl) {
+      options.push({
+        text: 'เปิดลิงก์สื่อ',
+        onPress: () => Linking.openURL(message.mediaUrl!),
+      });
+    }
+    options.push({ text: 'ยกเลิก', style: 'cancel' });
+    Alert.alert('ข้อความ', undefined, options);
+  };
+
   return (
     <View
       style={[
@@ -186,7 +207,10 @@ function ChatBubble({ message }: Props) {
         isOutgoing ? styles.wrapperOutgoing : styles.wrapperIncoming,
       ]}
     >
-      <View
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onLongPress={handleLongPress}
+        delayLongPress={400}
         style={[
           styles.bubble,
           isOutgoing ? styles.bubbleOutgoing : styles.bubbleIncoming,
@@ -200,7 +224,7 @@ function ChatBubble({ message }: Props) {
           </Text>
         )}
         {renderContent()}
-      </View>
+      </TouchableOpacity>
       <View style={[styles.metaRow, isOutgoing ? styles.metaRowOutgoing : styles.metaRowIncoming]}>
         <Text style={styles.timestamp}>
           {formatMessageTime(message.timestamp)}
