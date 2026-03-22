@@ -174,6 +174,7 @@ function ChatBubble({ message }: Props) {
             text={message.text || ''}
             style={[styles.text, isOutgoing && styles.textOutgoing]}
             linkStyle={isOutgoing ? styles.linkOutgoing : styles.linkIncoming}
+            selectable
           />
         );
     }
@@ -273,16 +274,16 @@ function ChatBubble({ message }: Props) {
 
 export default memo(ChatBubble);
 
-function LinkifiedText({ text, style, linkStyle }: { text: string; style: any; linkStyle: any }) {
+function LinkifiedText({ text, style, linkStyle, selectable }: { text: string; style: any; linkStyle: any; selectable?: boolean }) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = text.split(urlRegex);
 
   if (parts.length === 1) {
-    return <Text style={style}>{text}</Text>;
+    return <Text style={style} selectable={selectable}>{text}</Text>;
   }
 
   return (
-    <Text style={style}>
+    <Text style={style} selectable={selectable}>
       {parts.map((part, i) =>
         urlRegex.test(part) ? (
           <Text
