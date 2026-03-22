@@ -49,6 +49,7 @@ export function getFacebookRecipientChannel(recipientId: string): { token: strin
     '111545563829281': { envKey: 'FB_TEST_TOKEN', channel: 'FB_ทดสอบระบบ' },
     '2205446836437741': { envKey: 'FB_TEST2_TOKEN', channel: 'FB_ทดสอบระบบ2' },
     '100315376073691': { envKey: 'FB_TOHJEEN_TOKEN', channel: 'FB_โต๊ะจีน' },
+    '190328791785664': { envKey: 'FB_GREENHOUSE_TOKEN', channel: 'FB_กรีนเฮ้าส์' },
   };
 
   const entry = map[recipientId];
@@ -69,6 +70,7 @@ export function getFacebookPageToken(channel: string): string {
     'FB_โต๊ะจีน': process.env.FB_TOHJEEN_TOKEN,
     'FB_ทดสอบระบบ': process.env.FB_TEST_TOKEN,
     'FB_ทดสอบระบบ2': process.env.FB_TEST2_TOKEN,
+    'FB_กรีนเฮ้าส์': process.env.FB_GREENHOUSE_TOKEN,
   };
 
   const token = tokenMap[channel];

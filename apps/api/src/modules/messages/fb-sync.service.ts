@@ -22,6 +22,7 @@ const FB_PAGES: FBPage[] = [
   { pageId: '100315376073691', channel: 'FB_โต๊ะจีน', tokenEnvKey: 'FB_TOHJEEN_TOKEN' },
   { pageId: '111545563829281', channel: 'FB_ทดสอบระบบ', tokenEnvKey: 'FB_TEST_TOKEN' },
   { pageId: '2205446836437741', channel: 'FB_ทดสอบระบบ2', tokenEnvKey: 'FB_TEST2_TOKEN' },
+  { pageId: '190328791785664', channel: 'FB_กรีนเฮ้าส์', tokenEnvKey: 'FB_GREENHOUSE_TOKEN' },
 ];
 
 @Injectable()

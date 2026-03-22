@@ -152,6 +152,12 @@ export const FB_CHANNELS: Record<string, ChannelConfig> = {
     type: "facebook",
     pageId: "2205446836437741",
   },
+  "FB_กรีนเฮ้าส์": {
+    id: "FB_กรีนเฮ้าส์",
+    name: "กรีนเฮ้าส์",
+    type: "facebook",
+    pageId: "190328791785664",
+  },
 };
 
 // All channels combined
