@@ -1,5 +1,32 @@
+import { memo } from "react";
 import { ChatUser } from "@/types/inbox";
 import { Clock, CheckCircle2, Pin } from "lucide-react";
+
+function formatTime(timestamp: number): string {
+  if (!timestamp) return "";
+
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffDays = Math.floor(
+    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays === 0) {
+    return date.toLocaleTimeString("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } else if (diffDays === 1) {
+    return "Yesterday";
+  } else if (diffDays < 7) {
+    return date.toLocaleDateString("th-TH", { weekday: "short" });
+  } else {
+    return date.toLocaleDateString("th-TH", {
+      day: "numeric",
+      month: "short",
+    });
+  }
+}
 
 interface ChatListItemProps {
   user: ChatUser & {
@@ -12,32 +39,7 @@ interface ChatListItemProps {
   onPinToggle?: () => void;
 }
 
-export function ChatListItem({ user, isSelected, onClick, onPinToggle }: ChatListItemProps) {
-  const formatTime = (timestamp: number) => {
-    if (!timestamp) return "";
-
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffDays = Math.floor(
-      (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (diffDays === 0) {
-      return date.toLocaleTimeString("th-TH", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } else if (diffDays === 1) {
-      return "Yesterday";
-    } else if (diffDays < 7) {
-      return date.toLocaleDateString("th-TH", { weekday: "short" });
-    } else {
-      return date.toLocaleDateString("th-TH", {
-        day: "numeric",
-        month: "short",
-      });
-    }
-  };
+export const ChatListItem = memo(function ChatListItem({ user, isSelected, onClick, onPinToggle }: ChatListItemProps) {
 
   const hasUnread = user.unreadCount > 0;
   const status = user.status;
@@ -185,4 +187,4 @@ export function ChatListItem({ user, isSelected, onClick, onPinToggle }: ChatLis
       </div>
     </button>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   MessageCircle,
   ChevronDown,
@@ -8,28 +8,8 @@ import {
   Hash,
   CalendarClock,
 } from "lucide-react";
-import { getInboxStats } from "@/lib/api-service";
-import { getSocket } from "@/lib/socket";
-
-interface ChannelStats {
-  id: string;
-  name: string;
-  type: "line" | "facebook";
-  unreadCount: number;
-  totalConversations: number;
-}
-
-interface InboxStats {
-  totalUnread: number;
-  line: {
-    totalUnread: number;
-    channels: ChannelStats[];
-  };
-  facebook: {
-    totalUnread: number;
-    channels: ChannelStats[];
-  };
-}
+import { useUnreadSocket } from "@/hooks/useWebSocket";
+import { LINE_CHANNELS, FB_CHANNELS } from "@/types/inbox";
 
 interface ChannelsSidebarProps {
   selectedChannel: string | null;
@@ -50,46 +30,25 @@ export function ChannelsSidebar({
   onSelectChannel,
   onSelectFilter,
 }: ChannelsSidebarProps) {
-  const [stats, setStats] = useState<InboxStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { totalUnread, channelUnread, loading } = useUnreadSocket();
   const [lineExpanded, setLineExpanded] = useState(true);
   const [fbExpanded, setFbExpanded] = useState(true);
 
-  useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 30000);
-
-    // Listen for real-time unread updates via WebSocket
-    let socket: any = null;
-    getSocket().then((s) => {
-      socket = s;
-      socket.on('unread:update', () => {
-        fetchStats();
-      });
-      socket.on('conversation:updated', () => {
-        fetchStats();
-      });
-    }).catch(() => {});
-
-    return () => {
-      clearInterval(interval);
-      if (socket) {
-        socket.off('unread:update');
-        socket.off('conversation:updated');
-      }
-    };
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      const data = await getInboxStats();
-      setStats(data);
-    } catch (error) {
-      console.error("Failed to fetch stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { lineChannels, lineUnread, fbChannels, fbUnread } = useMemo(() => {
+    const lineChannels = Object.entries(LINE_CHANNELS).map(([id, config]) => ({
+      id,
+      name: config.name,
+      unreadCount: channelUnread[id] || 0,
+    }));
+    const fbChannels = Object.entries(FB_CHANNELS).map(([id, config]) => ({
+      id,
+      name: config.name,
+      unreadCount: channelUnread[id] || 0,
+    }));
+    const lineUnread = lineChannels.reduce((sum, ch) => sum + ch.unreadCount, 0);
+    const fbUnread = fbChannels.reduce((sum, ch) => sum + ch.unreadCount, 0);
+    return { lineChannels, lineUnread, fbChannels, fbUnread };
+  }, [channelUnread]);
 
   const isAllSelected = !selectedChannel && !selectedType && !selectedFilter;
 
@@ -122,9 +81,9 @@ export function ChannelsSidebar({
             <h2 className="text-[14px] font-semibold text-slate-800 leading-tight tracking-[-0.01em]">
               Inbox
             </h2>
-            {(stats?.totalUnread || 0) > 0 && (
+            {totalUnread > 0 && (
               <p className="text-[10px] text-brand-500 font-medium mt-0.5 tabular-nums">
-                {stats?.totalUnread} unread
+                {totalUnread} unread
               </p>
             )}
           </div>
@@ -146,7 +105,7 @@ export function ChannelsSidebar({
             <MessageCircle className="w-[15px] h-[15px] opacity-70" />
             <span>All Conversations</span>
           </div>
-          <Badge count={stats?.totalUnread || 0} />
+          <Badge count={totalUnread} />
         </button>
 
         {/* Upcoming Jobs */}
@@ -181,7 +140,7 @@ export function ChannelsSidebar({
               </div>
               <span>LINE</span>
             </div>
-            <Badge count={stats?.line?.totalUnread || 0} />
+            <Badge count={lineUnread} />
           </button>
 
           {lineExpanded && (
@@ -198,10 +157,10 @@ export function ChannelsSidebar({
                   <Hash className="w-3 h-3 opacity-40" />
                   <span>All LINE</span>
                 </div>
-                <Badge count={stats?.line?.totalUnread || 0} />
+                <Badge count={lineUnread} />
               </button>
 
-              {stats?.line?.channels.map((channel) => (
+              {lineChannels.map((channel) => (
                 <button
                   key={channel.id}
                   onClick={() => onSelectChannel(channel.id)}
@@ -239,7 +198,7 @@ export function ChannelsSidebar({
               </div>
               <span>Facebook</span>
             </div>
-            <Badge count={stats?.facebook?.totalUnread || 0} />
+            <Badge count={fbUnread} />
           </button>
 
           {fbExpanded && (
@@ -256,10 +215,10 @@ export function ChannelsSidebar({
                   <Hash className="w-3 h-3 opacity-40" />
                   <span>All Facebook</span>
                 </div>
-                <Badge count={stats?.facebook?.totalUnread || 0} />
+                <Badge count={fbUnread} />
               </button>
 
-              {stats?.facebook?.channels.map((channel) => (
+              {fbChannels.map((channel) => (
                 <button
                   key={channel.id}
                   onClick={() => onSelectChannel(channel.id)}

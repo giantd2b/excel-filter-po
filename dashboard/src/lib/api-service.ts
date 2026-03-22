@@ -2,34 +2,9 @@ import { api } from "./api-client";
 import { BankAccount } from "@/types/bank-account";
 import { LINE_CHANNELS, FB_CHANNELS } from "@/types/inbox";
 
-// ─── Dashboard Stats ────────────────────────────────────────────────
-
-interface Stats {
-  totalUsers: number;
-  lineUsers: number;
-  fbUsers: number;
-  channelStats: Record<string, number>;
-}
-
-export async function getStats(): Promise<Stats> {
-  const data = await api.get<{
-    total: number;
-    line: number;
-    facebook: number;
-    channels: Record<string, number>;
-  }>("/users/stats");
-
-  return {
-    totalUsers: data.total,
-    lineUsers: data.line,
-    fbUsers: data.facebook,
-    channelStats: data.channels,
-  };
-}
-
 // ─── Users ──────────────────────────────────────────────────────────
 
-export interface UserListItem {
+interface UserListItem {
   id: string;
   userId: string;
   displayName: string;
@@ -243,12 +218,6 @@ export async function getCustomerJobs(customerId: string) {
   return api.get<{ jobs: any[]; matched: boolean; phone?: string }>(`/users/${customerId}/jobs`);
 }
 
-// ─── AI Suggestions ─────────────────────────────────────────────
-
-export async function getAiSuggestions(customerId: string): Promise<string[]> {
-  return api.get<string[]>(`/messages/${customerId}/suggestions`);
-}
-
 // ─── Slip Records ───────────────────────────────────────────────────
 
 export interface SlipRecord {
@@ -370,10 +339,6 @@ export async function getKnowledgeEntries(params?: {
     searchParams.set("isActive", String(params.isActive));
   const qs = searchParams.toString();
   return api.get<KnowledgeEntry[]>(`/knowledge${qs ? `?${qs}` : ""}`);
-}
-
-export async function getKnowledgeServices(): Promise<string[]> {
-  return api.get<string[]>("/knowledge/services");
 }
 
 export async function createKnowledgeEntry(

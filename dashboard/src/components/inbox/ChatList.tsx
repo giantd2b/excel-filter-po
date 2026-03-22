@@ -62,7 +62,7 @@ export function ChatList({
     [notificationsEnabled, playNotificationSound, showNotification, onSelectUser]
   );
 
-  const { conversations: rawConversations, loading, error, connected } = useConversationsSocket({
+  const { conversations: rawConversations, setConversations, loading, error, connected } = useConversationsSocket({
     channel: selectedChannel,
     channelType,
     filter,
@@ -134,8 +134,7 @@ export function ChatList({
               if (!confirm("อ่านทั้งหมดแล้ว?")) return;
               try {
                 await bulkMarkAsRead([], true, selectedChannel || undefined, channelType || undefined);
-                // Refresh conversation list to clear unread badges
-                window.location.reload();
+                setConversations(prev => prev.map(u => ({ ...u, unreadCount: 0 })));
               } catch {}
             }}
             className="p-1.5 rounded-lg text-slate-400 hover:text-brand-500 hover:bg-brand-50 transition-all duration-150"
@@ -198,12 +197,9 @@ export function ChatList({
             const unpinned = conversations.filter((u) => !u.isPinned);
             const handlePinToggle = async (userId: string) => {
               await toggleCustomerPin(userId).catch(() => {});
-              // Optimistically update local state
-              const updated = conversations.map((u) =>
+              setConversations(prev => prev.map(u =>
                 u.id === userId ? { ...u, isPinned: !u.isPinned } : u
-              );
-              // Force re-render by triggering a refetch (conversations come from socket)
-              window.location.reload();
+              ));
             };
             return (
               <>

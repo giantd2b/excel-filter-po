@@ -1,28 +1,28 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Message } from "@/types/inbox";
 import { Check, CheckCheck, AlertCircle, X, FileDown, Volume2, SmilePlus, Reply } from "lucide-react";
 import { api } from "@/lib/api-client";
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "🙏", "✅"];
 
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString("th-TH", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 interface MessageBubbleProps {
   message: Message;
   onReply?: (message: Message) => void;
 }
 
-export function MessageBubble({ message, onReply }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, onReply }: MessageBubbleProps) {
   const isOutgoing = message.type === "outgoing";
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showReactions, setShowReactions] = useState(false);
   const [reactions, setReactions] = useState(message.reactions || []);
-
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("th-TH", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
   const hasMedia = message.mediaType && message.mediaUrl;
   const isSticker = message.mediaType === "sticker" ||
@@ -261,7 +261,7 @@ export function MessageBubble({ message, onReply }: MessageBubbleProps) {
       )}
     </>
   );
-}
+});
 
 function LinkifyText({ text, isOutgoing }: { text: string; isOutgoing: boolean }) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -292,30 +292,30 @@ function LinkifyText({ text, isOutgoing }: { text: string; isOutgoing: boolean }
   );
 }
 
+function formatDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return "Today";
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  } else {
+    return date.toLocaleDateString("th-TH", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+}
+
 interface DateDividerProps {
   timestamp: number;
 }
 
-export function DateDivider({ timestamp }: DateDividerProps) {
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return "Today";
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return "Yesterday";
-    } else {
-      return date.toLocaleDateString("th-TH", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-    }
-  };
-
+export const DateDivider = memo(function DateDivider({ timestamp }: DateDividerProps) {
   return (
     <div className="flex items-center gap-4 my-6">
       <div className="flex-1 h-px bg-slate-200/50" />
@@ -325,4 +325,4 @@ export function DateDivider({ timestamp }: DateDividerProps) {
       <div className="flex-1 h-px bg-slate-200/50" />
     </div>
   );
-}
+});
