@@ -98,7 +98,17 @@ export default function ChatScreen({ route }: any) {
     const trimmed = (overrideText || text).trim();
     if (!trimmed || sending) return;
 
-    const tempId = addOptimistic({ text: trimmed });
+    const tempId = addOptimistic({
+      text: trimmed,
+      replyTo: replyTo ? {
+        id: replyTo.id,
+        text: replyTo.text,
+        type: replyTo.direction === 'outgoing' ? 'outgoing' : 'incoming',
+        sender: replyTo.direction === 'outgoing' ? 'admin' : 'user',
+        mediaType: replyTo.type !== 'text' ? replyTo.type : undefined,
+        adminName: replyTo.senderName,
+      } : undefined,
+    });
     const currentReplyToId = replyTo?.id;
     setText('');
     setShowQuickReplies(false);

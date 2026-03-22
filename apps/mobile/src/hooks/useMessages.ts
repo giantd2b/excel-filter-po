@@ -100,6 +100,7 @@ export function useMessages(userId: string | null) {
     type?: string;
     mediaUrl?: string;
     previewUrl?: string;
+    replyTo?: ReplyTo;
   }): string => {
     const tempId = `optimistic_${Date.now()}_${++optimisticCounterRef.current}`;
     const optimistic: Message = {
@@ -111,6 +112,7 @@ export function useMessages(userId: string | null) {
       previewUrl: msg.previewUrl,
       timestamp: Date.now(),
       status: 'sending',
+      replyTo: msg.replyTo,
     };
     setMessages((prev) => [optimistic, ...prev]);
     return tempId;
