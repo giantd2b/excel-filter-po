@@ -62,7 +62,7 @@ export function MessageBubble({ message, onReply }: MessageBubbleProps) {
         className={`flex ${isOutgoing ? "justify-end" : "justify-start"} mb-2.5 group relative`}
       >
         <div
-          className={`max-w-[65%] overflow-hidden transition-all duration-150 ${
+          className={`max-w-[70%] overflow-hidden transition-all duration-150 ${
             isOutgoing
               ? "bg-brand-500 text-white rounded-2xl rounded-br-md shadow-sm shadow-brand-500/10"
               : "bg-white text-slate-800 rounded-2xl rounded-bl-md border border-slate-100/80 shadow-sm shadow-slate-900/[0.03]"
@@ -94,7 +94,7 @@ export function MessageBubble({ message, onReply }: MessageBubbleProps) {
               <img
                 src={message.mediaUrl}
                 alt="Shared image"
-                className="w-full max-h-64 object-cover cursor-pointer group-hover:opacity-[0.92] transition-opacity duration-150"
+                className="w-full max-h-80 object-cover cursor-pointer group-hover:opacity-[0.92] transition-opacity duration-150"
                 loading="lazy"
               />
             </button>
@@ -131,22 +131,22 @@ export function MessageBubble({ message, onReply }: MessageBubbleProps) {
           {/* Admin name label */}
           {isOutgoing && message.adminName && (
             <div className="px-4 pt-2 pb-0">
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/20 text-white">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded bg-white/20 text-white">
                 👤 {message.adminName}
               </span>
             </div>
           )}
 
           {/* Text content */}
-          <div className={`px-4 ${isOutgoing && message.adminName ? 'pt-1 pb-2.5' : 'py-2.5'}`}>
+          <div className={`px-4 ${isOutgoing && message.adminName ? 'pt-1 pb-3' : 'py-3'}`}>
             {message.text && (
-              <p className="whitespace-pre-wrap break-words text-[13px] leading-[1.55]">
+              <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.6]">
                 <LinkifyText text={message.text} isOutgoing={isOutgoing} />
               </p>
             )}
             {!message.text && hasMedia && (
               <p
-                className={`text-[11px] ${
+                className={`text-[12px] ${
                   isOutgoing ? "text-brand-200" : "text-slate-400"
                 }`}
               >
@@ -158,7 +158,7 @@ export function MessageBubble({ message, onReply }: MessageBubbleProps) {
                 isOutgoing ? "text-brand-200/70" : "text-slate-300"
               }`}
             >
-              <span className="text-[10px] font-medium tabular-nums">
+              <span className="text-[11px] font-medium tabular-nums">
                 {formatTime(message.timestamp)}
               </span>
               {isOutgoing && (
