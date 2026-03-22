@@ -151,7 +151,13 @@
       "Bash(find /c/Users/OatJirakitt/Documents/GitHub/excel-filter-po/dashboard -name ChatList.tsx -o -name ChannelsSidebar.tsx -o -name *inbox*)",
       "Bash(find /c/Users/OatJirakitt/Documents/GitHub/excel-filter-po/dashboard/src -name *api* -o -name *service*)",
       "Bash(grep -r quotation /c/Users/OatJirakitt/Documents/GitHub/excel-filter-po --include=*.ts --include=*.tsx --include=*.js -n)",
-      "Bash(find /c/Users/OatJirakitt/Documents/GitHub/excel-filter-po -name .env* -o -name README*)"
+      "Bash(find /c/Users/OatJirakitt/Documents/GitHub/excel-filter-po -name .env* -o -name README*)",
+      "Bash(npx eas:*)",
+      "Bash(mkdir -p apps/api/public/docs)",
+      "Bash(cp docs/message-flow.html apps/api/public/docs/)",
+      "Bash(rm -rf apps/api/public/*)",
+      "Bash(cp -r dashboard/dist/* apps/api/public/)",
+      "Bash(npm run:*)"
     ]
   }
 }
