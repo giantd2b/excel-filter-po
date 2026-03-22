@@ -11,6 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
@@ -317,6 +318,32 @@ export default function SettingsScreen() {
             <Text style={styles.infoValue}>IRIS CRM</Text>
           </View>
         </View>
+
+        {/* Clear cache */}
+        <TouchableOpacity
+          style={{ backgroundColor: '#f1f5f9', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16 }}
+          onPress={() => {
+            Alert.alert('ล้างแคช', 'ต้องการล้างแคชข้อความหรือไม่?', [
+              { text: 'ยกเลิก', style: 'cancel' },
+              {
+                text: 'ล้างแคช',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    const keys = await AsyncStorage.getAllKeys();
+                    const chatKeys = keys.filter((k) => k.startsWith('chat_msgs_'));
+                    if (chatKeys.length > 0) await AsyncStorage.multiRemove(chatKeys);
+                    Alert.alert('สำเร็จ', 'ล้างแคชเรียบร้อยแล้ว');
+                  } catch {
+                    Alert.alert('ผิดพลาด', 'ไม่สามารถล้างแคชได้');
+                  }
+                },
+              },
+            ]);
+          }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#64748b' }}>ล้างแคช</Text>
+        </TouchableOpacity>
 
         {/* Logout */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>

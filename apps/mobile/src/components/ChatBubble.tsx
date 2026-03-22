@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -31,7 +31,7 @@ function formatMessageTime(timestamp: number): string {
   });
 }
 
-export default function ChatBubble({ message }: Props) {
+function ChatBubble({ message }: Props) {
   const isOutgoing = message.direction === 'outgoing';
   const [showFullImage, setShowFullImage] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -215,8 +215,8 @@ export default function ChatBubble({ message }: Props) {
       </View>
 
       {/* Full-screen image viewer with pinch-to-zoom */}
-      {message.mediaUrl && (
-        <Modal visible={showFullImage} transparent animationType="fade" onRequestClose={() => setShowFullImage(false)}>
+      {showFullImage && message.mediaUrl && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setShowFullImage(false)}>
           <View style={styles.lightboxOverlay}>
             <TouchableOpacity style={styles.lightboxClose} onPress={() => setShowFullImage(false)}>
               <Text style={styles.lightboxCloseText}>✕</Text>
@@ -241,6 +241,8 @@ export default function ChatBubble({ message }: Props) {
     </View>
   );
 }
+
+export default memo(ChatBubble);
 
 function LinkifiedText({ text, style, linkStyle }: { text: string; style: any; linkStyle: any }) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;

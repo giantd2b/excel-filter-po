@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
 import {
   getSocket,
@@ -9,7 +10,7 @@ import {
 export interface Message {
   id: string;
   text?: string;
-  type: string; // 'text' | 'image' | 'video' | 'sticker' | 'audio' | 'file'
+  type: string;
   direction: 'incoming' | 'outgoing';
   mediaUrl?: string;
   previewUrl?: string;
@@ -19,32 +20,23 @@ export interface Message {
   status?: string;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 30;
+const CACHE_KEY_PREFIX = 'chat_msgs_';
+const MAX_CACHED_MESSAGES = 30;
 
 function detectType(m: any): string {
   const text = m.text || '';
   const mediaType = (m.mediaType || '').toLowerCase();
   const url = decodeURIComponent(m.mediaUrl || '').toLowerCase();
 
-  // Explicit file mediaType from API
   if (mediaType === 'file') return 'file';
-
-  // File detection: text contains [ไฟล์ or [file], or URL ends with non-image extension
   if (text.includes('[ไฟล์') || text.includes('[file]')) return 'file';
   if (url.match(/\.(pdf|doc|docx|xlsx|xls|zip|rar|csv|pptx?)(\?|$)/)) return 'file';
-
-  // Sticker detection
   if (text.includes('[สติกเกอร์]') || url.includes('stickershop.line-scdn.net')) return 'image';
-
-  // Audio detection
   if (text.includes('[เสียง]') || text.includes('[audio]') || mediaType === 'audio') return 'audio';
-
   if (mediaType === 'image') return 'image';
   if (mediaType === 'video') return 'video';
-
-  // If has mediaUrl but no recognized type, treat as file
   if (m.mediaUrl && !mediaType) return 'file';
-
   return 'text';
 }
 
@@ -63,6 +55,23 @@ function mapMessage(m: any): Message {
   };
 }
 
+async function getCachedMessages(userId: string): Promise<Message[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEY_PREFIX + userId);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function setCachedMessages(userId: string, messages: Message[]) {
+  try {
+    const toCache = messages.slice(0, MAX_CACHED_MESSAGES);
+    await AsyncStorage.setItem(CACHE_KEY_PREFIX + userId, JSON.stringify(toCache));
+  } catch {}
+}
+
 export function useMessages(userId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,18 +79,26 @@ export function useMessages(userId: string | null) {
   const [hasMore, setHasMore] = useState(true);
   const mountedRef = useRef(true);
 
-  // Fetch latest messages
   const fetchMessages = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
+
+    const cached = await getCachedMessages(userId);
+    if (cached && cached.length > 0 && mountedRef.current) {
+      setMessages(cached);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const { data } = await api.get(`/messages/${userId}`, {
         params: { limit: PAGE_SIZE },
       });
       if (mountedRef.current) {
         const mapped = (Array.isArray(data) ? data : []).map(mapMessage);
-        setMessages(mapped.reverse());
+        const reversed = mapped.reverse();
+        setMessages(reversed);
         setHasMore(mapped.length >= PAGE_SIZE);
+        setCachedMessages(userId, reversed);
       }
     } catch (err) {
       console.error('[useMessages] Fetch error:', err);
@@ -90,12 +107,10 @@ export function useMessages(userId: string | null) {
     }
   }, [userId]);
 
-  // Load older messages
   const loadMore = useCallback(async () => {
     if (!userId || loadingMore || !hasMore || messages.length === 0) return;
     setLoadingMore(true);
     try {
-      // Oldest message is at the end of array (newest-first for inverted list)
       const oldestTimestamp = messages[messages.length - 1]?.timestamp;
       const { data } = await api.get(`/messages/${userId}`, {
         params: { limit: PAGE_SIZE, before: oldestTimestamp },
@@ -105,7 +120,6 @@ export function useMessages(userId: string | null) {
         if (mapped.length === 0) {
           setHasMore(false);
         } else {
-          // Append older messages at the end
           setMessages((prev) => {
             const ids = new Set(prev.map((m) => m.id));
             const newMsgs = mapped.reverse().filter((m) => !ids.has(m.id));
@@ -121,7 +135,6 @@ export function useMessages(userId: string | null) {
     }
   }, [userId, loadingMore, hasMore, messages]);
 
-  // Subscribe to real-time updates
   useEffect(() => {
     mountedRef.current = true;
 
@@ -139,7 +152,9 @@ export function useMessages(userId: string | null) {
         const mapped = mapMessage(payload.message);
         setMessages((prev) => {
           if (prev.some((msg) => msg.id === mapped.id)) return prev;
-          return [mapped, ...prev];
+          const updated = [mapped, ...prev];
+          setCachedMessages(userId, updated);
+          return updated;
         });
       }
     };

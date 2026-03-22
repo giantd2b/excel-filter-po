@@ -28,6 +28,7 @@ interface ReplyTemplate {
   title: string;
   text: string;
   category?: string;
+  images?: string[];
 }
 
 export default function ChatScreen({ route }: any) {
@@ -49,11 +50,11 @@ export default function ChatScreen({ route }: any) {
   const [showStickers, setShowStickers] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
   const [showMessageSearch, setShowMessageSearch] = useState(false);
-  const [pendingImage, setPendingImage] = useState<{
+  const [pendingImages, setPendingImages] = useState<{
     uri: string;
     fileName?: string;
     mimeType?: string;
-  } | null>(null);
+  }[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
   const { messages, loading, loadingMore, hasMore, loadMore, refresh } = useMessages(docId);
@@ -83,16 +84,14 @@ export default function ChatScreen({ route }: any) {
     }
   }, [docId]);
 
-  // Fetch templates when quick replies panel opens
+  // Pre-fetch templates on mount
   useEffect(() => {
-    if (showQuickReplies && templates.length === 0) {
-      setTemplatesLoading(true);
-      api.get('/templates')
-        .then(({ data }) => setTemplates(Array.isArray(data) ? data : []))
-        .catch(() => setTemplates([]))
-        .finally(() => setTemplatesLoading(false));
-    }
-  }, [showQuickReplies]);
+    setTemplatesLoading(true);
+    api.get('/templates')
+      .then(({ data }) => setTemplates(Array.isArray(data) ? data : []))
+      .catch(() => setTemplates([]))
+      .finally(() => setTemplatesLoading(false));
+  }, []);
 
   const handleSend = useCallback(async (overrideText?: string) => {
     const trimmed = (overrideText || text).trim();
@@ -129,17 +128,20 @@ export default function ChatScreen({ route }: any) {
         mediaTypes: ['images'],
         quality: 0.8,
         allowsEditing: false,
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
       });
 
-      if (result.canceled || !result.assets[0]) return;
+      if (result.canceled || !result.assets?.length) return;
 
-      const asset = result.assets[0];
-      const compressedUri = await compressImage(asset.uri);
-      setPendingImage({
-        uri: compressedUri,
-        fileName: asset.fileName || undefined,
-        mimeType: 'image/jpeg',
-      });
+      const compressed = await Promise.all(
+        result.assets.map(async (asset) => ({
+          uri: await compressImage(asset.uri),
+          fileName: asset.fileName || undefined,
+          mimeType: 'image/jpeg',
+        }))
+      );
+      setPendingImages((prev) => [...prev, ...compressed]);
     } catch (err: any) {
       Alert.alert('เลือกรูปไม่สำเร็จ', err.message);
     }
@@ -164,54 +166,56 @@ export default function ChatScreen({ route }: any) {
 
       const asset = result.assets[0];
       const compressedUri = await compressImage(asset.uri);
-      setPendingImage({
+      setPendingImages((prev) => [...prev, {
         uri: compressedUri,
         fileName: asset.fileName || undefined,
         mimeType: 'image/jpeg',
-      });
+      }]);
     } catch (err: any) {
       Alert.alert('ถ่ายรูปไม่สำเร็จ', err.message);
     }
   }, []);
 
-  const handleSendImage = useCallback(async () => {
-    if (!pendingImage || sending) return;
+  const handleSendImages = useCallback(async () => {
+    if (pendingImages.length === 0 || sending) return;
 
+    const imagesToSend = [...pendingImages];
+    setPendingImages([]);
     setSending(true);
     try {
-      const formData = new FormData();
-      formData.append('file', {
-        uri: pendingImage.uri,
-        name: pendingImage.fileName || 'image.jpg',
-        type: pendingImage.mimeType || 'image/jpeg',
-      } as any);
-      formData.append('docId', docId);
+      for (const img of imagesToSend) {
+        const formData = new FormData();
+        formData.append('file', {
+          uri: img.uri,
+          name: img.fileName || 'image.jpg',
+          type: img.mimeType || 'image/jpeg',
+        } as any);
+        formData.append('docId', docId);
 
-      const { data: uploadResult } = await api.post(
-        '/messages/upload',
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 30000,
-        },
-      );
+        const { data: uploadResult } = await api.post(
+          '/messages/upload',
+          formData,
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000,
+          },
+        );
 
-      await api.post('/messages/send', {
-        oduserId: userId,
-        docId,
-        mediaType: 'image',
-        mediaUrl: uploadResult.url,
-        previewUrl: uploadResult.previewUrl || uploadResult.url,
-        channel,
-      });
-
-      setPendingImage(null);
+        await api.post('/messages/send', {
+          oduserId: userId,
+          docId,
+          mediaType: 'image',
+          mediaUrl: uploadResult.url,
+          previewUrl: uploadResult.previewUrl || uploadResult.url,
+          channel,
+        });
+      }
     } catch (err: any) {
       Alert.alert('ส่งรูปไม่สำเร็จ', err.message);
     } finally {
       setSending(false);
     }
-  }, [pendingImage, sending, userId, docId, channel]);
+  }, [pendingImages, sending, userId, docId, channel]);
 
   const handlePickFile = useCallback(async () => {
     setShowHelper(false);
@@ -281,11 +285,31 @@ export default function ChatScreen({ route }: any) {
     }
   }, [userId, docId, channel]);
 
-  const handleQuickReply = useCallback((reply: string) => {
+  const handleQuickReply = useCallback(async (reply: string, images?: string[]) => {
     setShowQuickReplies(false);
     setShowHelper(false);
-    handleSend(reply);
-  }, [handleSend]);
+
+    if (images && images.length > 0) {
+      setSending(true);
+      try {
+        if (reply.trim()) {
+          await api.post('/messages/send', { oduserId: userId, docId, text: reply, channel });
+        }
+        for (const imageUrl of images) {
+          await api.post('/messages/send', {
+            oduserId: userId, docId, mediaType: 'image',
+            mediaUrl: imageUrl, previewUrl: imageUrl, channel,
+          });
+        }
+      } catch (err: any) {
+        Alert.alert('ส่งข้อความไม่สำเร็จ', err.message);
+      } finally {
+        setSending(false);
+      }
+    } else {
+      handleSend(reply);
+    }
+  }, [handleSend, userId, docId, channel]);
 
   const toggleHelper = useCallback(() => {
     Keyboard.dismiss();
@@ -413,6 +437,10 @@ export default function ChatScreen({ route }: any) {
           }}
           onEndReached={hasMore ? loadMore : undefined}
           onEndReachedThreshold={0.3}
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === 'android'}
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator size="small" color="#6366f1" style={{ paddingVertical: 12 }} />
@@ -427,30 +455,43 @@ export default function ChatScreen({ route }: any) {
       )}
 
       {/* Image preview */}
-      {pendingImage && (
+      {pendingImages.length > 0 && (
         <View style={styles.previewBar}>
-          <Image
-            source={{ uri: pendingImage.uri }}
-            style={styles.previewImage}
-            resizeMode="cover"
-          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexShrink: 1 }}>
+            {pendingImages.map((img, idx) => (
+              <View key={idx} style={{ position: 'relative', marginRight: 8 }}>
+                <Image
+                  source={{ uri: img.uri }}
+                  style={styles.previewImage}
+                  resizeMode="cover"
+                />
+                <TouchableOpacity
+                  style={styles.previewRemove}
+                  onPress={() => setPendingImages((prev) => prev.filter((_, i) => i !== idx))}
+                  disabled={sending}
+                >
+                  <Text style={styles.previewRemoveText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
           <View style={styles.previewActions}>
             <TouchableOpacity
               style={styles.previewCancel}
-              onPress={() => setPendingImage(null)}
+              onPress={() => setPendingImages([])}
               disabled={sending}
             >
               <Text style={styles.previewCancelText}>ยกเลิก</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.previewSend, sending && styles.sendButtonDisabled]}
-              onPress={handleSendImage}
+              onPress={handleSendImages}
               disabled={sending}
             >
               {sending ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.previewSendText}>ส่งรูป</Text>
+                <Text style={styles.previewSendText}>ส่ง {pendingImages.length} รูป</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -499,10 +540,17 @@ export default function ChatScreen({ route }: any) {
                       <TouchableOpacity
                         key={t.id}
                         style={styles.quickReplyItem}
-                        onPress={() => handleQuickReply(t.text)}
+                        onPress={() => handleQuickReply(t.text, t.images)}
                         disabled={sending}
                       >
-                        <Text style={styles.quickReplyItemTitle}>{t.title}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={[styles.quickReplyItemTitle, { flex: 1 }]}>{t.title}</Text>
+                          {t.images && t.images.length > 0 && (
+                            <View style={{ backgroundColor: '#eef2ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
+                              <Text style={{ fontSize: 10, fontWeight: '600', color: '#6366f1' }}>🖼 {t.images.length}</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text style={styles.quickReplyItemText} numberOfLines={2}>{t.text}</Text>
                       </TouchableOpacity>
                     ))}
@@ -895,7 +943,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
-    maxHeight: 280,
+    height: 280,
   },
   quickRepliesHeader: {
     flexDirection: 'row',
@@ -971,12 +1019,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewImage: {
-    width: 80,
-    height: 80,
+    width: 72,
+    height: 72,
     borderRadius: 8,
   },
+  previewRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewRemoveText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   previewActions: {
-    flex: 1,
     marginLeft: 12,
     gap: 8,
   },
