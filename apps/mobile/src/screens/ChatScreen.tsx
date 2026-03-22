@@ -57,7 +57,7 @@ export default function ChatScreen({ route }: any) {
   }[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
-  const { messages, loading, loadingMore, hasMore, loadMore, refresh } = useMessages(docId);
+  const { messages, loading, loadingMore, hasMore, loadMore, refresh, addOptimistic, markFailed, removeOptimistic } = useMessages(docId);
   const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
@@ -97,7 +97,10 @@ export default function ChatScreen({ route }: any) {
     const trimmed = (overrideText || text).trim();
     if (!trimmed || sending) return;
 
-    setSending(true);
+    const tempId = addOptimistic({ text: trimmed });
+    setText('');
+    setShowQuickReplies(false);
+
     try {
       await api.post('/messages/send', {
         oduserId: userId,
@@ -105,14 +108,11 @@ export default function ChatScreen({ route }: any) {
         text: trimmed,
         channel,
       });
-      setText('');
-      setShowQuickReplies(false);
     } catch (err: any) {
+      markFailed(tempId);
       Alert.alert('ส่งข้อความไม่สำเร็จ', err.message);
-    } finally {
-      setSending(false);
     }
-  }, [text, sending, userId, docId, channel]);
+  }, [text, sending, userId, docId, channel, addOptimistic, markFailed]);
 
   const handlePickImage = useCallback(async () => {
     setShowHelper(false);
@@ -179,11 +179,15 @@ export default function ChatScreen({ route }: any) {
   const handleSendImages = useCallback(async () => {
     if (pendingImages.length === 0 || sending) return;
 
+    const tempIds = pendingImages.map((img) =>
+      addOptimistic({ type: 'image', mediaUrl: img.uri, previewUrl: img.uri })
+    );
     const imagesToSend = [...pendingImages];
     setPendingImages([]);
     setSending(true);
     try {
-      for (const img of imagesToSend) {
+      for (let i = 0; i < imagesToSend.length; i++) {
+        const img = imagesToSend[i];
         const formData = new FormData();
         formData.append('file', {
           uri: img.uri,
@@ -209,13 +213,15 @@ export default function ChatScreen({ route }: any) {
           previewUrl: uploadResult.previewUrl || uploadResult.url,
           channel,
         });
+        removeOptimistic(tempIds[i]);
       }
     } catch (err: any) {
+      tempIds.forEach((id) => markFailed(id));
       Alert.alert('ส่งรูปไม่สำเร็จ', err.message);
     } finally {
       setSending(false);
     }
-  }, [pendingImages, sending, userId, docId, channel]);
+  }, [pendingImages, sending, userId, docId, channel, addOptimistic, markFailed, removeOptimistic]);
 
   const handlePickFile = useCallback(async () => {
     setShowHelper(false);
@@ -290,7 +296,10 @@ export default function ChatScreen({ route }: any) {
     setShowHelper(false);
 
     if (images && images.length > 0) {
-      setSending(true);
+      const tempIds: string[] = [];
+      if (reply.trim()) tempIds.push(addOptimistic({ text: reply }));
+      for (const url of images) tempIds.push(addOptimistic({ type: 'image', mediaUrl: url, previewUrl: url }));
+
       try {
         if (reply.trim()) {
           await api.post('/messages/send', { oduserId: userId, docId, text: reply, channel });
@@ -302,14 +311,13 @@ export default function ChatScreen({ route }: any) {
           });
         }
       } catch (err: any) {
+        tempIds.forEach((id) => markFailed(id));
         Alert.alert('ส่งข้อความไม่สำเร็จ', err.message);
-      } finally {
-        setSending(false);
       }
     } else {
       handleSend(reply);
     }
-  }, [handleSend, userId, docId, channel]);
+  }, [handleSend, userId, docId, channel, addOptimistic, markFailed]);
 
   const toggleHelper = useCallback(() => {
     Keyboard.dismiss();

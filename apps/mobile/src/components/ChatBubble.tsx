@@ -191,6 +191,7 @@ function ChatBubble({ message }: Props) {
           styles.bubble,
           isOutgoing ? styles.bubbleOutgoing : styles.bubbleIncoming,
           isMedia && styles.bubbleMedia,
+          message.status === 'sending' && { opacity: 0.6 },
         ]}
       >
         {message.senderName && (
@@ -205,12 +206,16 @@ function ChatBubble({ message }: Props) {
           {formatMessageTime(message.timestamp)}
         </Text>
         {isOutgoing && (
-          <Text style={[
-            styles.statusIcon,
-            message.status === 'failed' && styles.statusFailed,
-          ]}>
-            {message.status === 'failed' ? '!' : message.status === 'delivered' ? '✓✓' : '✓'}
-          </Text>
+          message.status === 'sending' ? (
+            <Text style={styles.statusIcon}>...</Text>
+          ) : (
+            <Text style={[
+              styles.statusIcon,
+              message.status === 'failed' && styles.statusFailed,
+            ]}>
+              {message.status === 'failed' ? '!' : message.status === 'delivered' ? '✓✓' : '✓'}
+            </Text>
+          )
         )}
       </View>
 

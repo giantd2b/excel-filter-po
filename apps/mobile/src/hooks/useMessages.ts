@@ -78,6 +78,38 @@ export function useMessages(userId: string | null) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const mountedRef = useRef(true);
+  const optimisticCounterRef = useRef(0);
+
+  const addOptimistic = useCallback((msg: {
+    text?: string;
+    type?: string;
+    mediaUrl?: string;
+    previewUrl?: string;
+  }): string => {
+    const tempId = `optimistic_${Date.now()}_${++optimisticCounterRef.current}`;
+    const optimistic: Message = {
+      id: tempId,
+      text: msg.text,
+      type: msg.type || 'text',
+      direction: 'outgoing',
+      mediaUrl: msg.mediaUrl,
+      previewUrl: msg.previewUrl,
+      timestamp: Date.now(),
+      status: 'sending',
+    };
+    setMessages((prev) => [optimistic, ...prev]);
+    return tempId;
+  }, []);
+
+  const markFailed = useCallback((tempId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => m.id === tempId ? { ...m, status: 'failed' } : m)
+    );
+  }, []);
+
+  const removeOptimistic = useCallback((tempId: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== tempId));
+  }, []);
 
   const fetchMessages = useCallback(async () => {
     if (!userId) return;
@@ -151,8 +183,18 @@ export function useMessages(userId: string | null) {
       if (payload.userId === userId && mountedRef.current) {
         const mapped = mapMessage(payload.message);
         setMessages((prev) => {
-          if (prev.some((msg) => msg.id === mapped.id)) return prev;
-          const updated = [mapped, ...prev];
+          // Remove matching optimistic messages
+          const cleaned = prev.filter((m) => {
+            if (!m.id.startsWith('optimistic_')) return true;
+            if (m.direction !== mapped.direction) return true;
+            if (m.text && mapped.text && m.text === mapped.text) return false;
+            if (m.mediaUrl && mapped.mediaUrl && m.mediaUrl === mapped.mediaUrl) return false;
+            if (m.type === mapped.type && m.type !== 'text' &&
+                Math.abs(m.timestamp - mapped.timestamp) < 30000) return false;
+            return true;
+          });
+          if (cleaned.some((msg) => msg.id === mapped.id)) return cleaned;
+          const updated = [mapped, ...cleaned];
           setCachedMessages(userId, updated);
           return updated;
         });
@@ -168,5 +210,9 @@ export function useMessages(userId: string | null) {
     };
   }, [userId, fetchMessages]);
 
-  return { messages, loading, loadingMore, hasMore, loadMore, refresh: fetchMessages };
+  return {
+    messages, loading, loadingMore, hasMore, loadMore,
+    refresh: fetchMessages,
+    addOptimistic, markFailed, removeOptimistic,
+  };
 }
