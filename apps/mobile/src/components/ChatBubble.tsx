@@ -428,6 +428,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginBottom: 4,
+    minWidth: 160,
   },
   replyQuoteIncoming: {
     backgroundColor: '#e2e8f0',
