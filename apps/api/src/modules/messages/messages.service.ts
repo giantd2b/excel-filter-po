@@ -202,8 +202,13 @@ export class MessagesService {
 
     try {
       if (isLine) {
-        const messages = this.buildLineMessages(platformText, effectiveMediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, quoteToken);
-        sendMethod = await this.sendLineMessage(oduserId, messages, channel);
+        const lineMessages = this.buildLineMessages(platformText, effectiveMediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, quoteToken);
+        const lineResult = await this.sendLineMessage(oduserId, lineMessages, channel);
+        sendMethod = lineResult.method;
+        // Store LINE message ID so incoming quote replies can reference this message
+        if (lineResult.lineMid) {
+          (data as any)._fbMid = lineResult.lineMid;
+        }
       } else {
         // For Facebook: convert LINE sticker to image
         const fbMediaType = stickerId ? 'image' : effectiveMediaType;
@@ -368,14 +373,14 @@ export class MessagesService {
     return messages;
   }
 
-  private async sendLineMessage(userId: string, messages: any[], channel: string): Promise<string> {
+  private async sendLineMessage(userId: string, messages: any[], channel: string): Promise<{ method: string; lineMid: string | null }> {
     const accessToken = getLineAccessToken(channel);
 
     // Try Reply API first (free)
     const cached = this.replyTokenCache.consume(userId);
     if (cached) {
       try {
-        await axios({
+        const res = await axios({
           url: 'https://api.line.me/v2/bot/message/reply',
           method: 'POST',
           headers: {
@@ -384,8 +389,9 @@ export class MessagesService {
           },
           data: { replyToken: cached.replyToken, messages },
         });
-        this.logger.log(`Reply API used for ${userId} — FREE`);
-        return 'line_reply';
+        const lineMid = res.data?.sentMessages?.[0]?.id || null;
+        this.logger.log(`Reply API used for ${userId} — FREE (mid: ${lineMid})`);
+        return { method: 'line_reply', lineMid };
       } catch (err: any) {
         this.logger.warn(
           `Reply API failed, falling back to Push: ${err.response?.data?.message || err.message}`,
@@ -394,7 +400,7 @@ export class MessagesService {
     }
 
     // Fallback: Push API
-    await axios({
+    const res = await axios({
       url: 'https://api.line.me/v2/bot/message/push',
       method: 'POST',
       headers: {
@@ -403,8 +409,9 @@ export class MessagesService {
       },
       data: { to: userId, messages },
     });
-    this.logger.log(`Push API used for ${userId} — QUOTA`);
-    return 'line_push';
+    const lineMid = res.data?.sentMessages?.[0]?.id || null;
+    this.logger.log(`Push API used for ${userId} — QUOTA (mid: ${lineMid})`);
+    return { method: 'line_push', lineMid };
   }
 
   // ─── Facebook ─────────────────────────────────────────────────────

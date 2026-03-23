@@ -218,6 +218,19 @@ export class WebhookService {
       // Ensure customer exists
       await this.ensureCustomerExists(userId, customerId, lineBot, 'LINE', accessToken);
 
+      // Resolve LINE quotedMessageId for image replies
+      const imgQuotedMid = message.quotedMessageId || null;
+      let imgReplyToId: string | null = null;
+      if (imgQuotedMid) {
+        const byId = await this.prisma.message.findUnique({ where: { id: imgQuotedMid }, select: { id: true } });
+        if (byId) {
+          imgReplyToId = byId.id;
+        } else {
+          const byQt = await this.prisma.message.findFirst({ where: { quoteToken: imgQuotedMid }, select: { id: true } });
+          imgReplyToId = byQt?.id || null;
+        }
+      }
+
       // Always save image as message
       await this.prisma.message.create({
         data: {
@@ -230,6 +243,7 @@ export class WebhookService {
           mediaType: 'IMAGE',
           mediaUrl: imageUrl,
           quoteToken: message.quoteToken || null,
+          replyToId: imgReplyToId,
         },
       });
 
