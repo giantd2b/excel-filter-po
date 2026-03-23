@@ -104,6 +104,27 @@ export class WebhookService {
         },
       });
 
+      // Resolve LINE quotedMessageId to replyToId
+      const lineQuotedMid = message.quotedMessageId || null;
+      let lineReplyToId: string | null = null;
+      if (lineQuotedMid) {
+        // LINE message IDs match our stored IDs for incoming messages
+        const byId = await this.prisma.message.findUnique({
+          where: { id: lineQuotedMid },
+          select: { id: true },
+        });
+        if (byId) {
+          lineReplyToId = byId.id;
+        } else {
+          // For admin messages, LINE mid is stored in quoteToken
+          const byQuoteToken = await this.prisma.message.findFirst({
+            where: { quoteToken: lineQuotedMid },
+            select: { id: true },
+          });
+          lineReplyToId = byQuoteToken?.id || null;
+        }
+      }
+
       // Save message to PostgreSQL (primary)
       await this.prisma.message.create({
         data: {
@@ -114,6 +135,7 @@ export class WebhookService {
           sender: 'USER',
           timestamp: BigInt(messageTime),
           quoteToken: message.quoteToken || null,
+          replyToId: lineReplyToId,
         },
       });
 
