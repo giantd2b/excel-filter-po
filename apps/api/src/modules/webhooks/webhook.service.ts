@@ -155,6 +155,25 @@ export class WebhookService {
         unreadCount: 1,
       });
 
+      // Fetch replyTo details for WebSocket broadcast
+      let lineReplyToData: any = undefined;
+      if (lineReplyToId) {
+        const replyMsg = await this.prisma.message.findUnique({
+          where: { id: lineReplyToId },
+          select: { id: true, text: true, type: true, sender: true, mediaType: true, adminName: true },
+        });
+        if (replyMsg) {
+          lineReplyToData = {
+            id: replyMsg.id,
+            text: replyMsg.text,
+            type: replyMsg.type === 'OUTGOING' ? 'outgoing' : 'incoming',
+            sender: replyMsg.sender === 'ADMIN' ? 'admin' : 'user',
+            mediaType: replyMsg.mediaType?.toLowerCase() || null,
+            adminName: replyMsg.adminName,
+          };
+        }
+      }
+
       // Broadcast via WebSocket
       this.inboxGateway.emitNewMessage(customerId, {
         id: messageID,
@@ -162,6 +181,8 @@ export class WebhookService {
         type: 'incoming',
         sender: 'user',
         timestamp: messageTime,
+        replyToId: lineReplyToId || undefined,
+        replyTo: lineReplyToData,
         quoteToken: message.quoteToken || null,
       });
       this.inboxGateway.emitConversationUpdated({
@@ -426,6 +447,25 @@ export class WebhookService {
         unreadCount: 1,
       });
 
+      // Fetch replyTo details for WebSocket broadcast
+      let replyToData: any = undefined;
+      if (resolvedReplyToId) {
+        const replyMsg = await this.prisma.message.findUnique({
+          where: { id: resolvedReplyToId },
+          select: { id: true, text: true, type: true, sender: true, mediaType: true, adminName: true },
+        });
+        if (replyMsg) {
+          replyToData = {
+            id: replyMsg.id,
+            text: replyMsg.text,
+            type: replyMsg.type === 'OUTGOING' ? 'outgoing' : 'incoming',
+            sender: replyMsg.sender === 'ADMIN' ? 'admin' : 'user',
+            mediaType: replyMsg.mediaType?.toLowerCase() || null,
+            adminName: replyMsg.adminName,
+          };
+        }
+      }
+
       // Broadcast via WebSocket
       this.inboxGateway.emitNewMessage(customerId, {
         id: messageId,
@@ -433,6 +473,8 @@ export class WebhookService {
         type: 'incoming',
         sender: 'user',
         timestamp: timeOfMessage,
+        replyToId: resolvedReplyToId || undefined,
+        replyTo: replyToData,
       });
       this.inboxGateway.emitConversationUpdated({
         id: customerId,
