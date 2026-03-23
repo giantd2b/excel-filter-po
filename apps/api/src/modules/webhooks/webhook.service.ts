@@ -340,8 +340,16 @@ export class WebhookService {
         },
       });
 
-      // Resolve FB reply_to.mid to our message ID
+      // Resolve FB reply_to.mid — only use if it exists in our messages table
       const fbReplyToMid = message.reply_to?.mid || null;
+      let resolvedReplyToId: string | null = null;
+      if (fbReplyToMid) {
+        const exists = await this.prisma.message.findUnique({
+          where: { id: fbReplyToMid },
+          select: { id: true },
+        });
+        resolvedReplyToId = exists ? fbReplyToMid : null;
+      }
 
       // Save message to PostgreSQL (primary)
       await this.prisma.message.create({
@@ -352,7 +360,7 @@ export class WebhookService {
           type: 'INCOMING',
           sender: 'USER',
           timestamp: BigInt(timeOfMessage),
-          replyToId: fbReplyToMid,
+          replyToId: resolvedReplyToId,
         },
       });
 
