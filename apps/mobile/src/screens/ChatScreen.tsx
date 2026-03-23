@@ -404,7 +404,7 @@ export default function ChatScreen({ route }: any) {
 
       return (
         <View>
-          <ChatBubble message={item} onReply={handleReply} />
+          <ChatBubble message={item} onReply={handleReply} pictureUrl={item.direction === 'incoming' ? pictureUrl : undefined} />
           {showUnread && (
             <View style={styles.unreadDivider}>
               <View style={styles.unreadDividerLine} />

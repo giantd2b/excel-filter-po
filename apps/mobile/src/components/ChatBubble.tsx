@@ -25,6 +25,7 @@ const MAX_BUBBLE_WIDTH = SCREEN_WIDTH * 0.72;
 interface Props {
   message: Message;
   onReply?: (message: Message) => void;
+  pictureUrl?: string;
 }
 
 function formatMessageTime(timestamp: number): string {
@@ -36,7 +37,7 @@ function formatMessageTime(timestamp: number): string {
   });
 }
 
-function ChatBubble({ message, onReply }: Props) {
+function ChatBubble({ message, onReply, pictureUrl }: Props) {
   const isOutgoing = message.direction === 'outgoing';
   const [showFullImage, setShowFullImage] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -266,8 +267,20 @@ function ChatBubble({ message, onReply }: Props) {
       )}
       <Animated.View
         {...panResponder.panHandlers}
-        style={{ transform: [{ translateX: swipeX }] }}
+        style={{ transform: [{ translateX: swipeX }], flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}
       >
+      {/* Avatar for incoming messages */}
+      {!isOutgoing && (
+        pictureUrl ? (
+          <Image source={{ uri: pictureUrl }} style={styles.chatAvatar} cachePolicy="disk" />
+        ) : (
+          <View style={[styles.chatAvatar, styles.chatAvatarPlaceholder]}>
+            <Text style={styles.chatAvatarText}>
+              {message.senderName?.charAt(0)?.toUpperCase() || '?'}
+            </Text>
+          </View>
+        )
+      )}
       <TouchableOpacity
         activeOpacity={0.8}
         onLongPress={handleLongPress}
@@ -385,6 +398,22 @@ const styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: 12,
     marginVertical: 2,
+  },
+  chatAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginBottom: 2,
+  },
+  chatAvatarPlaceholder: {
+    backgroundColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatAvatarText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
   },
   wrapperIncoming: {
     alignItems: 'flex-start',
