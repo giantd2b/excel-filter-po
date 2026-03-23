@@ -210,7 +210,11 @@ export class MessagesService {
         const fbMediaUrl = stickerId
           ? `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`
           : mediaUrl;
-        await this.sendFacebookMessage(oduserId, platformText, fbMediaType, fbMediaUrl, channel, replyToMid);
+        const fbMid = await this.sendFacebookMessage(oduserId, platformText, fbMediaType, fbMediaUrl, channel, replyToMid);
+        // Store FB message_id in quoteToken so incoming replies can reference this message
+        if (fbMid) {
+          (data as any)._fbMid = fbMid;
+        }
         sendMethod = 'facebook';
       }
       status = 'sent';
@@ -246,6 +250,7 @@ export class MessagesService {
           mediaUrl: stickerUrl || mediaUrl || null,
           previewUrl: previewUrl || null,
           replyToId: replyToId || null,
+          quoteToken: (data as any)._fbMid || null,
         },
       }),
       this.prisma.customer.update({
@@ -411,13 +416,14 @@ export class MessagesService {
     mediaUrl?: string,
     channel?: string,
     replyToMid?: string | null,
-  ) {
+  ): Promise<string | null> {
     const pageToken = getFacebookPageToken(channel!);
+    let fbMessageId: string | null = null;
 
     // Send media/file first if present
     if (mediaType && mediaUrl) {
       const fbType = mediaType === 'file' ? 'file' : mediaType;
-      await axios({
+      const res = await axios({
         url: 'https://graph.facebook.com/v18.0/me/messages',
         method: 'POST',
         params: { access_token: pageToken },
@@ -432,11 +438,12 @@ export class MessagesService {
           ...(replyToMid && { reply_to: { mid: replyToMid } }),
         },
       });
+      fbMessageId = res.data?.message_id || null;
     }
 
     // Send text if present (skip if file was sent with text like [ไฟล์: xxx])
     if (text && !(mediaType === 'file' && text.startsWith('[ไฟล์'))) {
-      await axios({
+      const res = await axios({
         url: 'https://graph.facebook.com/v18.0/me/messages',
         method: 'POST',
         params: { access_token: pageToken },
@@ -446,6 +453,9 @@ export class MessagesService {
           ...(replyToMid && { reply_to: { mid: replyToMid } }),
         },
       });
+      fbMessageId = res.data?.message_id || fbMessageId || null;
     }
+
+    return fbMessageId;
   }
 }

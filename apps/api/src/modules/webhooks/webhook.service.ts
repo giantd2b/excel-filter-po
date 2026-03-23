@@ -340,15 +340,25 @@ export class WebhookService {
         },
       });
 
-      // Resolve FB reply_to.mid — only use if it exists in our messages table
+      // Resolve FB reply_to.mid to our message ID
       const fbReplyToMid = message.reply_to?.mid || null;
       let resolvedReplyToId: string | null = null;
       if (fbReplyToMid) {
-        const exists = await this.prisma.message.findUnique({
+        // First try direct ID match (for messages received via webhook)
+        const byId = await this.prisma.message.findUnique({
           where: { id: fbReplyToMid },
           select: { id: true },
         });
-        resolvedReplyToId = exists ? fbReplyToMid : null;
+        if (byId) {
+          resolvedReplyToId = byId.id;
+        } else {
+          // Try quoteToken match (for admin messages sent via our system — FB mid stored in quoteToken)
+          const byQuoteToken = await this.prisma.message.findFirst({
+            where: { quoteToken: fbReplyToMid },
+            select: { id: true },
+          });
+          resolvedReplyToId = byQuoteToken?.id || null;
+        }
       }
 
       // Save message to PostgreSQL (primary)
