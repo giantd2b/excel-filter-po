@@ -338,12 +338,6 @@ export function ConversationArea({
         )}
       </div>
 
-      {/* AI Suggestions */}
-      <AISuggestions
-        customerId={selectedUser.id}
-        onSelect={handleSuggestionSelect}
-      />
-
       {/* Reply bar */}
       {replyTo && (
         <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-t border-slate-100">

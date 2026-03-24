@@ -157,7 +157,10 @@
       "Bash(cp docs/message-flow.html apps/api/public/docs/)",
       "Bash(rm -rf apps/api/public/*)",
       "Bash(cp -r dashboard/dist/* apps/api/public/)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(eas build:*)",
+      "Bash(eas submit:*)",
+      "Bash(1:*)"
     ]
   }
 }
