@@ -14,6 +14,21 @@ export class BackfillController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Get('find-dupes')
+  async findDupes(@Query('key') key?: string) {
+    if (key !== 'iris-backfill-2026') return { error: 'Invalid key' };
+    const dupes = await this.prisma.$queryRaw`
+      SELECT c1.id as id1, c2.id as id2, c1.display_name, c1.channel, c1.platform_user_id,
+             (SELECT COUNT(*) FROM messages WHERE customer_id = c1.id) as msgs1,
+             (SELECT COUNT(*) FROM messages WHERE customer_id = c2.id) as msgs2
+      FROM customers c1
+      JOIN customers c2 ON c1.platform_user_id = c2.platform_user_id
+        AND c1.channel = c2.channel AND c1.id < c2.id
+      LIMIT 20
+    `;
+    return dupes;
+  }
+
   @Post('backfill-job-dates')
   async backfillJobDates(@Query('key') key?: string) {
     if (key !== 'iris-backfill-2026') {
