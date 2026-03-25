@@ -52,7 +52,7 @@ export class BackfillController {
       });
 
       // Move notes
-      await this.prisma.customerNote.updateMany({
+      await this.prisma.note.updateMany({
         where: { customerId: d.old_id },
         data: { customerId: d.new_id },
       }).catch(() => {});
