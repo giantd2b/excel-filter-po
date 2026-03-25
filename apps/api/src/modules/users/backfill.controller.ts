@@ -29,6 +29,51 @@ export class BackfillController {
     return dupes;
   }
 
+  @Post('merge-dupes')
+  async mergeDupes(@Query('key') key?: string) {
+    if (key !== 'iris-backfill-2026') return { error: 'Invalid key' };
+
+    // Find all duplicates: old format (just platformUserId) vs new format (platformUserId__channel)
+    const dupes: any[] = await this.prisma.$queryRaw`
+      SELECT c1.id as old_id, c2.id as new_id, c1.display_name, c1.channel,
+             (SELECT COUNT(*)::int FROM messages WHERE customer_id = c1.id) as old_msgs,
+             (SELECT COUNT(*)::int FROM messages WHERE customer_id = c2.id) as new_msgs
+      FROM customers c1
+      JOIN customers c2 ON c1.platform_user_id = c2.platform_user_id
+        AND c1.channel = c2.channel AND c1.id < c2.id
+    `;
+
+    let merged = 0;
+    for (const d of dupes) {
+      // Move messages from old record to new record
+      await this.prisma.message.updateMany({
+        where: { customerId: d.old_id },
+        data: { customerId: d.new_id },
+      });
+
+      // Move notes
+      await this.prisma.customerNote.updateMany({
+        where: { customerId: d.old_id },
+        data: { customerId: d.new_id },
+      }).catch(() => {});
+
+      // Move tags
+      await this.prisma.customerTag.updateMany({
+        where: { customerId: d.old_id },
+        data: { customerId: d.new_id },
+      }).catch(() => {});
+
+      // Delete old customer record
+      await this.prisma.customer.delete({
+        where: { id: d.old_id },
+      }).catch(() => {});
+
+      merged++;
+    }
+
+    return { merged, details: dupes.map(d => ({ old: d.old_id, new: d.new_id, name: d.display_name, oldMsgs: d.old_msgs })) };
+  }
+
   @Post('backfill-job-dates')
   async backfillJobDates(@Query('key') key?: string) {
     if (key !== 'iris-backfill-2026') {
