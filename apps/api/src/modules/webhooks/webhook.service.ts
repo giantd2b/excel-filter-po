@@ -12,7 +12,6 @@ import { InboxStatsService } from '../inbox-gateway/inbox-stats.service';
 import { findThaiPhones, formatThaiPhone } from '../../common/utils/phone.utils';
 import { pushGroupMessage } from '../../common/utils/line-notify.utils';
 import { SlipDetectionService } from '../slips/slip-detection.service';
-import { AiSuggestService } from '../messages/ai-suggest.service';
 
 @Injectable()
 export class WebhookService {
@@ -24,7 +23,6 @@ export class WebhookService {
     private readonly replyTokenCache: ReplyTokenCacheService,
     private readonly inboxGateway: InboxGateway,
     private readonly inboxStats: InboxStatsService,
-    private readonly aiSuggest: AiSuggestService,
   ) {}
 
   async saveMarkAsReadToken(customerId: string, token: string) {
@@ -195,9 +193,6 @@ export class WebhookService {
         lastMessagePreview: messagePreview,
       });
       this.inboxStats.refreshAndBroadcast();
-
-      // Auto-generate AI reply suggestions (fire-and-forget)
-      this.triggerAiSuggestions(customerId);
 
       this.logger.log(`Saved message for LINE user ${userId} on ${lineBot}`);
     } catch (error: any) {
@@ -486,9 +481,6 @@ export class WebhookService {
         lastMessagePreview: messagePreview,
       });
       this.inboxStats.refreshAndBroadcast();
-
-      // Auto-generate AI reply suggestions (fire-and-forget)
-      this.triggerAiSuggestions(customerId);
 
       this.logger.log(`Saved message for Facebook user ${senderID} on ${fbbot}`);
     } catch (error: any) {
@@ -1186,19 +1178,6 @@ export class WebhookService {
     } catch (error: any) {
       this.logger.error(`Failed to process FB sticker: ${error.message}`);
     }
-  }
-
-  // ─── Helper: Fire-and-forget AI suggestions ─────────────────
-
-  private triggerAiSuggestions(customerId: string) {
-    this.aiSuggest.invalidateCache(customerId);
-    this.aiSuggest.getSuggestions(customerId).then((suggestions) => {
-      if (suggestions.length > 0) {
-        this.inboxGateway.emitSuggestionsUpdate(customerId, suggestions);
-      }
-    }).catch((err) => {
-      this.logger.warn(`AI suggestions failed for ${customerId}: ${err.message}`);
-    });
   }
 
   // ─── Helper: Ensure customer exists ───────────────────────────
