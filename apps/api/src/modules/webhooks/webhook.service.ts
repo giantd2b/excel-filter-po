@@ -32,6 +32,21 @@ export class WebhookService {
     }).catch(() => {});
   }
 
+  /**
+   * Rows migrated from Firestore use the OLD id format (bare platformUserId,
+   * no __channel suffix). Upserting by the composite id alone therefore
+   * created duplicate customers when an old customer re-contacted.
+   * Always resolve to the existing row for this user+channel first.
+   */
+  private async resolveCustomerId(platformUserId: string, channel: string): Promise<string> {
+    const existing = await this.prisma.customer.findFirst({
+      where: { platformUserId, channel },
+      orderBy: { lastMessageAt: 'desc' },
+      select: { id: true },
+    });
+    return existing?.id ?? `${platformUserId}__${channel}`;
+  }
+
   // ─── LINE Text Message ────────────────────────────────────────
 
   async processLineTextMessage(event: any, accessToken: string, lineBot: string) {
@@ -67,7 +82,7 @@ export class WebhookService {
         : undefined;
 
       // Composite ID: userId__channel (separate chat per channel)
-      const customerId = `${proFile.userId}__${lineBot}`;
+      const customerId = await this.resolveCustomerId(proFile.userId, lineBot);
 
       // Save markAsReadToken from webhook event (LINE only, never expires)
       const markAsReadToken = event.message?.markAsReadToken || event.markAsReadToken || null;
@@ -206,7 +221,7 @@ export class WebhookService {
     const { message, source } = event;
     const messageID = message.id;
     const userId = source.userId;
-    const customerId = `${userId}__${lineBot}`;
+    const customerId = await this.resolveCustomerId(userId, lineBot);
     const messageTime = event.timestamp;
 
     if (event.replyToken) {
@@ -362,7 +377,7 @@ export class WebhookService {
         : undefined;
 
       // Composite ID: userId__channel (separate chat per channel)
-      const customerId = `${proFile.id}__${fbbot}`;
+      const customerId = await this.resolveCustomerId(proFile.id, fbbot);
 
       // Upsert customer in PostgreSQL
       await this.prisma.customer.upsert({
@@ -497,7 +512,7 @@ export class WebhookService {
     fbToken: string,
     fbbot: string,
   ) {
-    const customerId = `${senderID}__${fbbot}`;
+    const customerId = await this.resolveCustomerId(senderID, fbbot);
 
     try {
       // Download image
@@ -612,7 +627,7 @@ export class WebhookService {
     const messageTime = event.timestamp;
     const groupId = sourceType === 'group' ? source.groupId : source.roomId;
     const senderId = source.userId || null; // May not be available
-    const customerId = `${groupId}__${lineBot}`;
+    const customerId = await this.resolveCustomerId(groupId, lineBot);
 
     if (event.replyToken) {
       this.replyTokenCache.set(groupId, event.replyToken, lineBot);
@@ -825,7 +840,7 @@ export class WebhookService {
     const messageID = message.id;
     const messageTime = event.timestamp;
     const userId = source.userId;
-    const customerId = `${userId}__${lineBot}`;
+    const customerId = await this.resolveCustomerId(userId, lineBot);
 
     if (event.replyToken) {
       this.replyTokenCache.set(userId, event.replyToken, lineBot);
@@ -936,7 +951,7 @@ export class WebhookService {
     const messageID = message.id;
     const messageTime = event.timestamp;
     const userId = source.userId;
-    const customerId = `${userId}__${lineBot}`;
+    const customerId = await this.resolveCustomerId(userId, lineBot);
 
     if (event.replyToken) {
       this.replyTokenCache.set(userId, event.replyToken, lineBot);
@@ -1000,7 +1015,7 @@ export class WebhookService {
     const messageID = message.id;
     const messageTime = event.timestamp;
     const userId = source.userId;
-    const customerId = `${userId}__${lineBot}`;
+    const customerId = await this.resolveCustomerId(userId, lineBot);
 
     if (event.replyToken) {
       this.replyTokenCache.set(userId, event.replyToken, lineBot);
@@ -1066,7 +1081,7 @@ export class WebhookService {
     fbToken: string,
     fbbot: string,
   ) {
-    const customerId = `${senderID}__${fbbot}`;
+    const customerId = await this.resolveCustomerId(senderID, fbbot);
     const preview = mediaType === 'video' ? '[วิดีโอ]' : mediaType === 'audio' ? '[เสียง]' : '[ไฟล์]';
     const dbMediaType = mediaType === 'video' ? 'VIDEO' : null;
 
@@ -1128,7 +1143,7 @@ export class WebhookService {
     fbToken: string,
     fbbot: string,
   ) {
-    const customerId = `${senderID}__${fbbot}`;
+    const customerId = await this.resolveCustomerId(senderID, fbbot);
     const stickerUrl = message.attachments?.[0]?.payload?.url || null;
 
     try {

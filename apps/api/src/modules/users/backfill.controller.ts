@@ -44,34 +44,85 @@ export class BackfillController {
     `;
 
     let merged = 0;
+    const failures: any[] = [];
     for (const d of dupes) {
-      // Move messages from old record to new record
-      await this.prisma.message.updateMany({
-        where: { customerId: d.old_id },
-        data: { customerId: d.new_id },
-      });
+      try {
+        // Move all children from old record to new record
+        await this.prisma.message.updateMany({
+          where: { customerId: d.old_id },
+          data: { customerId: d.new_id },
+        });
+        await this.prisma.note.updateMany({
+          where: { customerId: d.old_id },
+          data: { customerId: d.new_id },
+        });
+        // Tags: skip ones the new record already has (unique constraint)
+        const newTags = await this.prisma.customerTag.findMany({
+          where: { customerId: d.new_id },
+          select: { tagId: true },
+        });
+        const newTagIds = newTags.map((t) => t.tagId);
+        if (newTagIds.length > 0) {
+          await this.prisma.customerTag.deleteMany({
+            where: { customerId: d.old_id, tagId: { in: newTagIds } },
+          });
+        }
+        await this.prisma.customerTag.updateMany({
+          where: { customerId: d.old_id },
+          data: { customerId: d.new_id },
+        });
+        await this.prisma.order.updateMany({
+          where: { customerId: d.old_id },
+          data: { customerId: d.new_id },
+        });
+        await this.prisma.payment.updateMany({
+          where: { customerId: d.old_id },
+          data: { customerId: d.new_id },
+        });
+        await this.prisma.slip.updateMany({
+          where: { customerId: d.old_id },
+          data: { customerId: d.new_id },
+        });
 
-      // Move notes
-      await this.prisma.note.updateMany({
-        where: { customerId: d.old_id },
-        data: { customerId: d.new_id },
-      }).catch(() => {});
+        // Preserve history from the old record on the survivor
+        const [oldC, newC] = await Promise.all([
+          this.prisma.customer.findUnique({ where: { id: d.old_id } }),
+          this.prisma.customer.findUnique({ where: { id: d.new_id } }),
+        ]);
+        if (oldC && newC) {
+          const keepFirstContact =
+            oldC.firstContactAt && oldC.firstContactAt < newC.firstContactAt
+              ? oldC.firstContactAt
+              : newC.firstContactAt;
+          const mergedPhones = [
+            ...new Set([...(newC.additionalPhones ?? []), ...(oldC.additionalPhones ?? [])]),
+          ];
+          await this.prisma.customer.update({
+            where: { id: d.new_id },
+            data: {
+              firstContactAt: keepFirstContact,
+              phoneNumber: newC.phoneNumber ?? oldC.phoneNumber,
+              phoneClean: newC.phoneClean ?? oldC.phoneClean,
+              nickname: newC.nickname ?? oldC.nickname,
+              additionalPhones: mergedPhones,
+            },
+          });
+        }
 
-      // Move tags
-      await this.prisma.customerTag.updateMany({
-        where: { customerId: d.old_id },
-        data: { customerId: d.new_id },
-      }).catch(() => {});
-
-      // Delete old customer record
-      await this.prisma.customer.delete({
-        where: { id: d.old_id },
-      }).catch(() => {});
-
-      merged++;
+        // Delete old customer record
+        await this.prisma.customer.delete({ where: { id: d.old_id } });
+        merged++;
+      } catch (err: any) {
+        failures.push({ old: d.old_id, new: d.new_id, error: err?.message });
+      }
     }
 
-    return { merged, details: dupes.map(d => ({ old: d.old_id, new: d.new_id, name: d.display_name, oldMsgs: d.old_msgs })) };
+    return {
+      merged,
+      failed: failures.length,
+      failures,
+      details: dupes.map(d => ({ old: d.old_id, new: d.new_id, name: d.display_name, oldMsgs: d.old_msgs })),
+    };
   }
 
   @Post('backfill-job-dates')
