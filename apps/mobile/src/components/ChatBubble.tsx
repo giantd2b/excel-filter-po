@@ -25,6 +25,7 @@ const MAX_BUBBLE_WIDTH = SCREEN_WIDTH * 0.72;
 interface Props {
   message: Message;
   onReply?: (message: Message) => void;
+  onRetry?: (message: Message) => void;
   pictureUrl?: string;
 }
 
@@ -37,7 +38,7 @@ function formatMessageTime(timestamp: number): string {
   });
 }
 
-function ChatBubble({ message, onReply, pictureUrl }: Props) {
+function ChatBubble({ message, onReply, onRetry, pictureUrl }: Props) {
   const isOutgoing = message.direction === 'outgoing';
   const [showFullImage, setShowFullImage] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -322,12 +323,24 @@ function ChatBubble({ message, onReply, pictureUrl }: Props) {
         {isOutgoing && (
           message.status === 'sending' ? (
             <Text style={styles.statusIcon}>...</Text>
+          ) : message.status === 'failed' ? (
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => {
+                if (!onRetry) return;
+                Alert.alert('ส่งไม่สำเร็จ', 'ต้องการส่งข้อความนี้อีกครั้งหรือไม่?', [
+                  { text: 'ยกเลิก', style: 'cancel' },
+                  { text: 'ส่งอีกครั้ง', onPress: () => onRetry(message) },
+                ]);
+              }}
+            >
+              <Text style={[styles.statusIcon, styles.statusFailed]}>
+                ! {onRetry ? 'แตะเพื่อส่งใหม่' : ''}
+              </Text>
+            </TouchableOpacity>
           ) : (
-            <Text style={[
-              styles.statusIcon,
-              message.status === 'failed' && styles.statusFailed,
-            ]}>
-              {message.status === 'failed' ? '!' : message.status === 'delivered' ? '✓✓' : '✓'}
+            <Text style={styles.statusIcon}>
+              {message.status === 'delivered' ? '✓✓' : '✓'}
             </Text>
           )
         )}

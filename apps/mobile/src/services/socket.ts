@@ -6,14 +6,35 @@ const SOCKET_URL = 'https://harmonious-presence-production.up.railway.app';
 let socket: Socket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Server-side rooms die with each connection, so remember what we're
+// subscribed to and re-join on every (re)connect.
+let currentMessagesUserId: string | null = null;
+let currentConversationsFilter: { channel?: string; channelType?: string } | null = null;
+
+function resubscribe() {
+  if (!socket) return;
+  if (currentConversationsFilter) {
+    socket.emit('subscribe:conversations', currentConversationsFilter);
+  }
+  if (currentMessagesUserId) {
+    socket.emit('subscribe:messages', { userId: currentMessagesUserId });
+  }
+}
+
 export async function connectSocket(): Promise<Socket> {
   if (socket?.connected) return socket;
 
-  // Clean up existing socket
+  // Reuse the existing instance — screens attach listeners to it via getSocket(),
+  // so recreating it would orphan them all. Just refresh auth and reconnect.
   if (socket) {
-    socket.removeAllListeners();
-    socket.disconnect();
-    socket = null;
+    try {
+      const token = (await auth.currentUser?.getIdToken()) || null;
+      if (token) socket.auth = { token };
+    } catch {
+      // Will retry on reconnect
+    }
+    socket.connect();
+    return socket;
   }
 
   // Get fresh token from Firebase Auth
@@ -40,6 +61,7 @@ export async function connectSocket(): Promise<Socket> {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+    resubscribe();
   });
 
   let lastTokenRefresh = 0;
@@ -94,6 +116,8 @@ export function disconnectSocket() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+  currentMessagesUserId = null;
+  currentConversationsFilter = null;
   if (socket) {
     socket.removeAllListeners();
     socket.disconnect();
@@ -105,13 +129,16 @@ export function subscribeConversations(filter?: {
   channel?: string;
   channelType?: string;
 }) {
-  socket?.emit('subscribe:conversations', filter || {});
+  currentConversationsFilter = filter || {};
+  socket?.emit('subscribe:conversations', currentConversationsFilter);
 }
 
 export function subscribeMessages(userId: string) {
+  currentMessagesUserId = userId;
   socket?.emit('subscribe:messages', { userId });
 }
 
 export function unsubscribeMessages() {
+  currentMessagesUserId = null;
   socket?.emit('unsubscribe:messages');
 }

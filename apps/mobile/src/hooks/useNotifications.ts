@@ -5,6 +5,7 @@ import api from '../services/api';
 export function useNotifications(onTap?: (data: any) => void) {
   const onTapRef = useRef(onTap);
   onTapRef.current = onTap;
+  const handledColdStartRef = useRef<string | null>(null);
 
   useEffect(() => {
     let subscription: any = null;
@@ -39,6 +40,18 @@ export function useNotifications(onTap?: (data: any) => void) {
             onTapRef.current(data);
           }
         });
+      } catch {}
+
+      // Cold start: the tap that launched the app from a killed state is not
+      // delivered to the listener above — pick it up here (once per identifier).
+      try {
+        const last = await Notifications.getLastNotificationResponseAsync?.();
+        const data = last?.notification?.request?.content?.data;
+        const id = last?.notification?.request?.identifier;
+        if (data?.docId && id && id !== handledColdStartRef.current) {
+          handledColdStartRef.current = id;
+          onTapRef.current?.(data);
+        }
       } catch {}
 
       // Register push token

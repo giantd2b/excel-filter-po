@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -42,6 +42,8 @@ export default function InboxScreen({ navigation }: any) {
     return undefined;
   }, [channelFilter]);
 
+  const lastFetchRef = useRef(0);
+
   const fetchConversations = useCallback(async () => {
     try {
       const params: any = { limit: '200' };
@@ -50,6 +52,7 @@ export default function InboxScreen({ navigation }: any) {
       }
       const { data } = await api.get('/inbox/conversations', { params });
       setConversations(data);
+      lastFetchRef.current = Date.now();
     } catch (err) {
       console.error('[InboxScreen] Fetch error:', err);
     }
@@ -60,9 +63,14 @@ export default function InboxScreen({ navigation }: any) {
     fetchConversations().finally(() => setLoading(false));
   }, [fetchConversations]);
 
+  // Socket patches keep the list fresh — only refetch on focus when the data is
+  // stale or the socket is down (pull-to-refresh remains the manual escape hatch).
   useFocusEffect(
     useCallback(() => {
-      fetchConversations();
+      const stale = Date.now() - lastFetchRef.current > 30_000;
+      if (stale || !getSocket()?.connected) {
+        fetchConversations();
+      }
     }, [fetchConversations]),
   );
 
@@ -77,25 +85,33 @@ export default function InboxScreen({ navigation }: any) {
     const handleUpdate = (updated: Conversation) => {
       setConversations((prev) => {
         const idx = prev.findIndex((c) => c.id === updated.id);
-        let next: Conversation[];
-        if (idx >= 0) {
-          next = [...prev];
-          next[idx] = { ...next[idx], ...updated };
-        } else {
-          next = [updated, ...prev];
-        }
-        return next.sort(
-          (a, b) => (b.lastmessagetime || 0) - (a.lastmessagetime || 0),
-        );
+        const merged = idx >= 0 ? { ...prev[idx], ...updated } : updated;
+        // Splice out + insert at the right spot (usually index 0) instead of
+        // re-sorting all 200 rows on every event
+        const next = idx >= 0
+          ? [...prev.slice(0, idx), ...prev.slice(idx + 1)]
+          : [...prev];
+        const time = merged.lastmessagetime || 0;
+        let insertAt = next.findIndex((c) => (c.lastmessagetime || 0) <= time);
+        if (insertAt < 0) insertAt = next.length;
+        next.splice(insertAt, 0, merged);
+        return next;
       });
     };
 
+    // After a reconnect the list may have missed updates — refetch once
+    const handleReconnect = () => {
+      fetchConversations();
+    };
+
     socket?.on('conversation:updated', handleUpdate);
+    socket?.on('connect', handleReconnect);
 
     return () => {
       socket?.off('conversation:updated', handleUpdate);
+      socket?.off('connect', handleReconnect);
     };
-  }, [apiChannelType]);
+  }, [apiChannelType, fetchConversations]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

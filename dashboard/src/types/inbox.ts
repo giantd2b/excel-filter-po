@@ -21,7 +21,7 @@ export interface Message {
   type: "incoming" | "outgoing";
   sender: "user" | "admin";
   timestamp: number;
-  status?: "sent" | "delivered" | "failed";
+  status?: "sending" | "sent" | "delivered" | "failed";
   adminId?: string;
   adminName?: string;
   mediaType?: "image" | "video" | "sticker";

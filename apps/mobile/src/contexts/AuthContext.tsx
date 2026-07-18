@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
+import { AppState } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import {
   auth,
@@ -64,6 +65,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return unsubscribe;
   }, []);
+
+  // OS suspends the socket in background — make sure we're reconnected (with a
+  // fresh token) as soon as the app comes back to the foreground.
+  useEffect(() => {
+    if (!user) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        connectSocket().catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, [user]);
 
   const login = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);

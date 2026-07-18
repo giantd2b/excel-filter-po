@@ -17,12 +17,16 @@ export class MessagesService {
     private readonly inboxGateway: InboxGateway,
   ) {}
 
-  async getMessages(userId: string, limit = 50, before?: number) {
+  async getMessages(userId: string, limit = 50, before?: number, after?: number) {
     // Fetch newest messages first, then reverse for chronological display
     const messages = await this.prisma.message.findMany({
       where: {
         customerId: userId,
-        ...(before ? { timestamp: { lt: BigInt(before) } } : {}),
+        ...(after
+          ? { timestamp: { gt: BigInt(after) } }
+          : before
+          ? { timestamp: { lt: BigInt(before) } }
+          : {}),
       },
       orderBy: { timestamp: 'desc' },
       take: limit,
@@ -152,8 +156,9 @@ export class MessagesService {
     adminId?: string;
     adminName?: string;
     replyToId?: string;
+    clientTempId?: string;
   }) {
-    const { oduserId, docId, text, mediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, channel, adminId, adminName, replyToId } = data;
+    const { oduserId, docId, text, mediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, channel, adminId, adminName, replyToId, clientTempId } = data;
 
     if (!oduserId || !docId || !channel) {
       throw new BadRequestException('Missing required fields: oduserId, docId, channel');
@@ -169,12 +174,8 @@ export class MessagesService {
       throw new BadRequestException('Invalid channel format');
     }
 
-    // Send to platform — track success/failure
-    const messageId = `out_${Date.now()}`;
+    const messageId = `out_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const timestamp = Date.now();
-    let status = 'sent';
-    let sendError: string | null = null;
-    let sendMethod: string | null = null;
 
     // Auto-detect file type if not set
     if (!mediaType && mediaUrl && text?.startsWith('[ไฟล์')) {
@@ -200,35 +201,6 @@ export class MessagesService {
       }
     }
 
-    try {
-      if (isLine) {
-        const lineMessages = this.buildLineMessages(platformText, effectiveMediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, quoteToken);
-        const lineResult = await this.sendLineMessage(oduserId, lineMessages, channel);
-        sendMethod = lineResult.method;
-        // Store LINE message ID so incoming quote replies can reference this message
-        if (lineResult.lineMid) {
-          (data as any)._fbMid = lineResult.lineMid;
-        }
-      } else {
-        // For Facebook: convert LINE sticker to image
-        const fbMediaType = stickerId ? 'image' : effectiveMediaType;
-        const fbMediaUrl = stickerId
-          ? `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`
-          : mediaUrl;
-        const fbMid = await this.sendFacebookMessage(oduserId, platformText, fbMediaType, fbMediaUrl, channel, replyToMid);
-        // Store FB message_id in quoteToken so incoming replies can reference this message
-        if (fbMid) {
-          (data as any)._fbMid = fbMid;
-        }
-        sendMethod = 'facebook';
-      }
-      status = 'sent';
-    } catch (err: any) {
-      status = 'failed';
-      sendError = err.response?.data?.message || err.message || 'Unknown error';
-      this.logger.error(`Failed to send message to ${channel}:${oduserId}: ${sendError}`);
-    }
-
     const stickerUrl = stickerId ? `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png` : null;
     const preview = stickerId
       ? '[You] [สติกเกอร์]'
@@ -238,8 +210,9 @@ export class MessagesService {
       ? `[You] [${effectiveMediaType === 'image' ? 'รูปภาพ' : 'วิดีโอ'}]`
       : `[You] ${(text || '').substring(0, 80)}`;
 
-    // Save message with delivery status
-    await this.prisma.$transaction([
+    // Persist first (status 'sending'), then respond + emit immediately —
+    // the client never waits on the LINE/FB round-trip.
+    const [, customer] = await this.prisma.$transaction([
       this.prisma.message.create({
         data: {
           id: messageId,
@@ -248,14 +221,14 @@ export class MessagesService {
           type: 'OUTGOING',
           sender: 'ADMIN',
           timestamp: BigInt(timestamp),
-          status,
+          status: 'sending',
           adminId: adminId || null,
           adminName: adminName || null,
           mediaType: stickerId ? 'IMAGE' : effectiveMediaType === 'image' ? 'IMAGE' : effectiveMediaType === 'video' ? 'VIDEO' : null,
           mediaUrl: stickerUrl || mediaUrl || null,
           previewUrl: previewUrl || null,
           replyToId: replyToId || null,
-          quoteToken: (data as any)._fbMid || null,
+          quoteToken: null,
         },
       }),
       this.prisma.customer.update({
@@ -267,9 +240,155 @@ export class MessagesService {
       }),
     ]);
 
-    // Backup outgoing message to Firestore (fire-and-forget)
-    const firestoreUserId = oduserId; // platform userId
-    const userRef = this.firebase.firestore.doc(`user/${firestoreUserId}`);
+    // Broadcast via WebSocket
+    this.inboxGateway.emitNewMessage(docId, {
+      id: messageId,
+      text: stickerId ? '[สติกเกอร์]' : (text || null),
+      type: 'outgoing',
+      sender: 'admin',
+      timestamp,
+      status: 'sending',
+      adminId: adminId || null,
+      adminName: adminName || null,
+      mediaType: stickerId ? 'image' : (effectiveMediaType || undefined),
+      mediaUrl: stickerUrl || mediaUrl || undefined,
+      replyToId: replyToId || undefined,
+      clientTempId: clientTempId || undefined,
+    });
+    this.inboxGateway.emitConversationUpdated({
+      id: docId,
+      oduserId: oduserId,
+      channel,
+      lastmessagetime: timestamp,
+      lastMessagePreview: preview,
+      unreadCount: customer.unreadCount,
+    });
+
+    // Deliver to LINE/FB asynchronously, serialized per customer so rapid
+    // sends (e.g. text + images) arrive in order.
+    this.queueDelivery(docId, () =>
+      this.deliverToPlatform({
+        isLine,
+        oduserId,
+        docId,
+        channel,
+        platformText,
+        effectiveMediaType,
+        mediaUrl,
+        previewUrl,
+        stickerId,
+        stickerPackageId,
+        quoteToken,
+        replyToMid,
+        messageId,
+        preview,
+        timestamp,
+        text,
+        adminId,
+        adminName,
+      }),
+    );
+
+    return {
+      success: true,
+      messageId,
+      timestamp,
+      status: 'sending',
+      sendMethod: null,
+      error: null,
+      clientTempId: clientTempId || undefined,
+    };
+  }
+
+  // Per-customer delivery chains keep platform message order for rapid sends
+  private deliveryQueues = new Map<string, Promise<void>>();
+
+  private queueDelivery(docId: string, task: () => Promise<void>) {
+    const prev = this.deliveryQueues.get(docId) || Promise.resolve();
+    const next = prev.then(task).catch((err: any) => {
+      this.logger.error(`Delivery task failed: ${err?.message || err}`);
+    });
+    this.deliveryQueues.set(docId, next);
+    next.finally(() => {
+      if (this.deliveryQueues.get(docId) === next) {
+        this.deliveryQueues.delete(docId);
+      }
+    });
+  }
+
+  private async deliverToPlatform(params: {
+    isLine: boolean;
+    oduserId: string;
+    docId: string;
+    channel: string;
+    platformText?: string;
+    effectiveMediaType?: string;
+    mediaUrl?: string;
+    previewUrl?: string;
+    stickerId?: string;
+    stickerPackageId?: string;
+    quoteToken: string | null;
+    replyToMid: string | null;
+    messageId: string;
+    preview: string;
+    timestamp: number;
+    text?: string;
+    adminId?: string;
+    adminName?: string;
+  }) {
+    const {
+      isLine, oduserId, docId, channel, platformText,
+      effectiveMediaType, mediaUrl, previewUrl, stickerId, stickerPackageId,
+      quoteToken, replyToMid, messageId, preview, timestamp,
+      text, adminId, adminName,
+    } = params;
+
+    let status = 'sent';
+    let sendError: string | null = null;
+    // LINE mid / FB message_id — stored in quoteToken so incoming quote
+    // replies can reference this message
+    let platformMid: string | null = null;
+
+    try {
+      if (isLine) {
+        const lineMessages = this.buildLineMessages(platformText, effectiveMediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, quoteToken);
+        const lineResult = await this.sendLineMessage(oduserId, lineMessages, channel);
+        platformMid = lineResult.lineMid;
+      } else {
+        // For Facebook: convert LINE sticker to image
+        const fbMediaType = stickerId ? 'image' : effectiveMediaType;
+        const fbMediaUrl = stickerId
+          ? `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`
+          : mediaUrl;
+        platformMid = await this.sendFacebookMessage(oduserId, platformText, fbMediaType, fbMediaUrl, channel, replyToMid);
+      }
+    } catch (err: any) {
+      status = 'failed';
+      sendError = err.response?.data?.message || err.message || 'Unknown error';
+      this.logger.error(`Failed to send message to ${channel}:${oduserId}: ${sendError}`);
+    }
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { status, quoteToken: platformMid || null },
+    }).catch((err: any) => {
+      this.logger.error(`Failed to update message ${messageId} status: ${err.message}`);
+    });
+
+    this.inboxGateway.emitMessageUpdate(docId, messageId, status, sendError);
+
+    if (status === 'failed') {
+      this.inboxGateway.emitConversationUpdated({
+        id: docId,
+        oduserId,
+        channel,
+        lastmessagetime: timestamp,
+        lastMessagePreview: `[ส่งไม่สำเร็จ] ${preview}`,
+      });
+    }
+
+    // Backup outgoing message to Firestore with the final status (fire-and-forget)
+    const userRef = this.firebase.firestore.doc(`user/${oduserId}`);
     Promise.all([
       userRef.collection('messages').doc(messageId).set({
         id: messageId,
@@ -277,7 +396,7 @@ export class MessagesService {
         type: 'outgoing',
         sender: 'admin',
         timestamp,
-        status: 'sent',
+        status,
         adminId: adminId || null,
         adminName: adminName || null,
       }),
@@ -288,37 +407,6 @@ export class MessagesService {
     ]).catch((err) => {
       this.logger.warn(`Firestore backup failed: ${err.message}`);
     });
-
-    // Broadcast via WebSocket
-    this.inboxGateway.emitNewMessage(docId, {
-      id: messageId,
-      text: stickerId ? '[สติกเกอร์]' : (text || null),
-      type: 'outgoing',
-      sender: 'admin',
-      timestamp,
-      status,
-      adminId: adminId || null,
-      adminName: adminName || null,
-      mediaType: stickerId ? 'image' : (effectiveMediaType || undefined),
-      mediaUrl: stickerUrl || mediaUrl || undefined,
-      replyToId: replyToId || undefined,
-    });
-    this.inboxGateway.emitConversationUpdated({
-      id: docId,
-      oduserId: oduserId,
-      channel,
-      lastmessagetime: timestamp,
-      lastMessagePreview: status === 'failed' ? `[ส่งไม่สำเร็จ] ${preview}` : preview,
-    });
-
-    return {
-      success: status === 'sent',
-      messageId,
-      timestamp,
-      status,
-      sendMethod,
-      error: sendError,
-    };
   }
 
   // ─── LINE ─────────────────────────────────────────────────────────

@@ -36,11 +36,13 @@ export class MessagesController {
     @Param('userId') userId: string,
     @Query('limit') limit?: string,
     @Query('before') before?: string,
+    @Query('after') after?: string,
   ) {
     return this.messagesService.getMessages(
       userId,
       limit ? parseInt(limit, 10) : 50,
       before ? parseInt(before, 10) : undefined,
+      after ? parseInt(after, 10) : undefined,
     );
   }
 
@@ -175,6 +177,7 @@ export class MessagesController {
       previewUrl?: string;
       channel: string;
       replyToId?: string;
+      clientTempId?: string;
     },
   ) {
     return this.messagesService.sendMessage({

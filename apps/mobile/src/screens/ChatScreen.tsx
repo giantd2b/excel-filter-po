@@ -21,6 +21,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { useNavigation } from '@react-navigation/native';
 import api from '../services/api';
 import ChatBubble from '../components/ChatBubble';
+import ChatInputBar from '../components/ChatInputBar';
 import { useMessages, type Message } from '../hooks/useMessages';
 
 const STICKER_PACKS = [
@@ -61,7 +62,6 @@ export default function ChatScreen({ route }: any) {
 
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showHelper, setShowHelper] = useState(false);
@@ -76,7 +76,7 @@ export default function ChatScreen({ route }: any) {
   }[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
-  const { messages, loading, loadingMore, hasMore, loadMore, refresh, addOptimistic, markFailed, removeOptimistic } = useMessages(docId);
+  const { messages, loading, loadingMore, hasMore, loadMore, refresh, addOptimistic, markFailed, removeOptimistic, confirmOptimistic } = useMessages(docId);
   const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
@@ -112,39 +112,98 @@ export default function ChatScreen({ route }: any) {
       .finally(() => setTemplatesLoading(false));
   }, []);
 
-  const handleSend = useCallback(async (overrideText?: string) => {
-    const trimmed = (overrideText || text).trim();
+  // Payload per optimistic bubble, kept for tap-to-retry until the send succeeds
+  const pendingPayloadsRef = useRef<Map<string, Record<string, any>>>(new Map());
+
+  // Core send: optimistic bubble → POST with clientTempId → reconcile via HTTP
+  // response (socket echo also reconciles; whichever arrives first wins).
+  const sendWithOptimistic = useCallback(async (
+    body: Record<string, any>,
+    optimistic: Parameters<typeof addOptimistic>[0],
+  ) => {
+    const tempId = addOptimistic(optimistic);
+    pendingPayloadsRef.current.set(tempId, body);
+    try {
+      const { data } = await api.post(
+        '/messages/send',
+        { ...body, clientTempId: tempId },
+        { timeout: 15000 },
+      );
+      pendingPayloadsRef.current.delete(tempId);
+      confirmOptimistic(tempId, data);
+    } catch (err: any) {
+      markFailed(tempId);
+      Alert.alert('ส่งข้อความไม่สำเร็จ', 'แตะ "ส่งใหม่" ที่ข้อความเพื่อลองอีกครั้ง');
+    }
+  }, [addOptimistic, confirmOptimistic, markFailed]);
+
+  const handleSend = useCallback((textArg: string) => {
+    const trimmed = (textArg || '').trim();
     if (!trimmed || sending) return;
 
-    const tempId = addOptimistic({
-      text: trimmed,
-      replyTo: replyTo ? {
-        id: replyTo.id,
-        text: replyTo.text,
-        type: replyTo.direction === 'outgoing' ? 'outgoing' : 'incoming',
-        sender: replyTo.direction === 'outgoing' ? 'admin' : 'user',
-        mediaType: replyTo.type !== 'text' ? replyTo.type : undefined,
-        adminName: replyTo.senderName,
-      } : undefined,
-    });
-    const currentReplyToId = replyTo?.id;
-    setText('');
+    const currentReplyTo = replyTo;
     setShowQuickReplies(false);
     setReplyTo(null);
 
-    try {
-      await api.post('/messages/send', {
+    sendWithOptimistic(
+      {
         oduserId: userId,
         docId,
         text: trimmed,
         channel,
-        ...(currentReplyToId ? { replyToId: currentReplyToId } : {}),
+        ...(currentReplyTo ? { replyToId: currentReplyTo.id } : {}),
+      },
+      {
+        text: trimmed,
+        replyTo: currentReplyTo ? {
+          id: currentReplyTo.id,
+          text: currentReplyTo.text,
+          type: currentReplyTo.direction === 'outgoing' ? 'outgoing' : 'incoming',
+          sender: currentReplyTo.direction === 'outgoing' ? 'admin' : 'user',
+          mediaType: currentReplyTo.type !== 'text' ? currentReplyTo.type : undefined,
+          adminName: currentReplyTo.senderName,
+        } : undefined,
+      },
+    );
+  }, [sending, replyTo, userId, docId, channel, sendWithOptimistic]);
+
+  // Stable retry callback so memoized ChatBubble rows don't re-render when
+  // handleSend's deps (replyTo ฯลฯ) change.
+  const retryRef = useRef<(m: Message) => void>(() => {});
+  retryRef.current = (m: Message) => {
+    const body = pendingPayloadsRef.current.get(m.id);
+    pendingPayloadsRef.current.delete(m.id);
+    removeOptimistic(m.id);
+    if (body) {
+      sendWithOptimistic(body, {
+        text: m.text,
+        type: m.type !== 'text' ? m.type : undefined,
+        mediaUrl: m.mediaUrl,
+        previewUrl: m.previewUrl,
+        replyTo: m.replyTo,
       });
-    } catch (err: any) {
-      markFailed(tempId);
-      Alert.alert('ส่งข้อความไม่สำเร็จ', err.message);
+    } else if (m.type === 'text' && m.text) {
+      sendWithOptimistic(
+        { oduserId: userId, docId, text: m.text, channel },
+        { text: m.text },
+      );
+    } else if (m.mediaUrl && !m.mediaUrl.startsWith('file:')) {
+      sendWithOptimistic(
+        {
+          oduserId: userId,
+          docId,
+          mediaType: m.type === 'video' ? 'video' : 'image',
+          mediaUrl: m.mediaUrl,
+          previewUrl: m.previewUrl,
+          channel,
+        },
+        { type: m.type, mediaUrl: m.mediaUrl, previewUrl: m.previewUrl },
+      );
+    } else {
+      Alert.alert('ไม่สามารถส่งใหม่ได้', 'กรุณาเลือกรูป/ไฟล์แล้วส่งใหม่อีกครั้ง');
     }
-  }, [text, sending, userId, docId, channel, addOptimistic, markFailed]);
+  };
+  const handleRetry = useCallback((m: Message) => retryRef.current(m), []);
 
   const handlePickImage = useCallback(async () => {
     setShowHelper(false);
@@ -237,23 +296,32 @@ export default function ChatScreen({ route }: any) {
           },
         );
 
-        await api.post('/messages/send', {
+        const body = {
           oduserId: userId,
           docId,
           mediaType: 'image',
           mediaUrl: uploadResult.url,
           previewUrl: uploadResult.previewUrl || uploadResult.url,
           channel,
-        });
-        removeOptimistic(tempIds[i]);
+        };
+        pendingPayloadsRef.current.set(tempIds[i], body);
+        const { data } = await api.post(
+          '/messages/send',
+          { ...body, clientTempId: tempIds[i] },
+          { timeout: 15000 },
+        );
+        pendingPayloadsRef.current.delete(tempIds[i]);
+        confirmOptimistic(tempIds[i], data);
       }
     } catch (err: any) {
+      // Already-confirmed bubbles have server ids by now, so this only
+      // marks the ones that never made it out.
       tempIds.forEach((id) => markFailed(id));
       Alert.alert('ส่งรูปไม่สำเร็จ', err.message);
     } finally {
       setSending(false);
     }
-  }, [pendingImages, sending, userId, docId, channel, addOptimistic, markFailed, removeOptimistic]);
+  }, [pendingImages, sending, userId, docId, channel, addOptimistic, markFailed, confirmOptimistic]);
 
   const handlePickFile = useCallback(async () => {
     setShowHelper(false);
@@ -328,28 +396,22 @@ export default function ChatScreen({ route }: any) {
     setShowHelper(false);
 
     if (images && images.length > 0) {
-      const tempIds: string[] = [];
-      if (reply.trim()) tempIds.push(addOptimistic({ text: reply }));
-      for (const url of images) tempIds.push(addOptimistic({ type: 'image', mediaUrl: url, previewUrl: url }));
-
-      try {
-        if (reply.trim()) {
-          await api.post('/messages/send', { oduserId: userId, docId, text: reply, channel });
-        }
-        for (const imageUrl of images) {
-          await api.post('/messages/send', {
-            oduserId: userId, docId, mediaType: 'image',
-            mediaUrl: imageUrl, previewUrl: imageUrl, channel,
-          });
-        }
-      } catch (err: any) {
-        tempIds.forEach((id) => markFailed(id));
-        Alert.alert('ส่งข้อความไม่สำเร็จ', err.message);
+      if (reply.trim()) {
+        await sendWithOptimistic(
+          { oduserId: userId, docId, text: reply, channel },
+          { text: reply },
+        );
+      }
+      for (const url of images) {
+        await sendWithOptimistic(
+          { oduserId: userId, docId, mediaType: 'image', mediaUrl: url, previewUrl: url, channel },
+          { type: 'image', mediaUrl: url, previewUrl: url },
+        );
       }
     } else {
       handleSend(reply);
     }
-  }, [handleSend, userId, docId, channel, addOptimistic, markFailed]);
+  }, [handleSend, sendWithOptimistic, userId, docId, channel]);
 
   const toggleHelper = useCallback(() => {
     Keyboard.dismiss();
@@ -357,7 +419,7 @@ export default function ChatScreen({ route }: any) {
     setShowQuickReplies(false);
   }, []);
 
-  const messageKeyExtractor = useCallback((item: Message) => item.id, []);
+  const messageKeyExtractor = useCallback((item: Message) => item.clientKey ?? item.id, []);
 
   const dismissPanels = useCallback(() => {
     setShowHelper(false);
@@ -404,7 +466,7 @@ export default function ChatScreen({ route }: any) {
 
       return (
         <View>
-          <ChatBubble message={item} onReply={handleReply} pictureUrl={item.direction === 'incoming' ? pictureUrl : undefined} />
+          <ChatBubble message={item} onReply={handleReply} onRetry={handleRetry} pictureUrl={item.direction === 'incoming' ? pictureUrl : undefined} />
           {showUnread && (
             <View style={styles.unreadDivider}>
               <View style={styles.unreadDividerLine} />
@@ -422,8 +484,13 @@ export default function ChatScreen({ route }: any) {
         </View>
       );
     },
-    [handleReply],
+    [handleReply, handleRetry],
   );
+
+  // Keep ChatInputBar's props stable so its memo holds across ChatScreen renders
+  const handleSendRef = useRef(handleSend);
+  handleSendRef.current = handleSend;
+  const onSendStable = useCallback((t: string) => handleSendRef.current(t), []);
 
   return (
     <KeyboardAvoidingView
@@ -796,48 +863,15 @@ export default function ChatScreen({ route }: any) {
         </View>
       )}
 
-      {/* Input bar */}
-      <View style={[styles.inputBar, { paddingBottom: insets.bottom || 8 }]}>
-        <TouchableOpacity
-          style={styles.helperButton}
-          onPress={toggleHelper}
-          disabled={sending}
-        >
-          <Text style={[styles.helperButtonText, showHelper && styles.helperButtonActive]}>
-            {showHelper ? '✕' : '+'}
-          </Text>
-        </TouchableOpacity>
-
-        <TextInput
-          style={styles.input}
-          value={text}
-          onChangeText={setText}
-          placeholder="พิมพ์ข้อความ..."
-          placeholderTextColor="#94a3b8"
-          multiline
-          maxLength={2000}
-          editable={!sending}
-          onFocus={() => {
-            setShowHelper(false);
-            setShowQuickReplies(false);
-          }}
-        />
-
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            (!text.trim() || sending) && styles.sendButtonDisabled,
-          ]}
-          onPress={() => handleSend()}
-          disabled={!text.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.sendButtonText}>ส่ง</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      {/* Input bar — owns text state so keystrokes don't re-render this screen */}
+      <ChatInputBar
+        onSend={onSendStable}
+        disabled={sending}
+        showHelper={showHelper}
+        onToggleHelper={toggleHelper}
+        onInputFocus={dismissPanels}
+        bottomInset={insets.bottom}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -1185,61 +1219,7 @@ const styles = StyleSheet.create({
   replyBarClose: {
     padding: 8,
   },
-  // Input bar
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  helperButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#6366f1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    marginBottom: 2,
-  },
-  helperButtonText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-    lineHeight: 22,
-  },
-  helperButtonActive: {
-    fontSize: 16,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#1e293b',
-    maxHeight: 100,
-    marginRight: 8,
-  },
-  sendButton: {
-    backgroundColor: '#6366f1',
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
   sendButtonDisabled: {
     backgroundColor: '#c7d2fe',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
   },
 });

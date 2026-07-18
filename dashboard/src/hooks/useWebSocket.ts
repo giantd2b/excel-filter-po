@@ -287,6 +287,14 @@ export function useMessagesSocket({
       }
     };
 
+    // Delivery status flips (sending → sent/failed) from the async platform send
+    const onMessageUpdate = (data: any) => {
+      if (data.userId !== userId || !data.messageId) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === data.messageId ? { ...m, status: data.status } : m))
+      );
+    };
+
     (async () => {
       try {
         // Fetch recent messages via REST
@@ -306,6 +314,7 @@ export function useMessagesSocket({
 
         socket.emit("subscribe:messages", { userId });
         socket.on("message:new", onMessageNew);
+        socket.on("message:update", onMessageUpdate);
       } catch (err: any) {
         if (!cancelled) {
           setError(err.message);
@@ -320,6 +329,7 @@ export function useMessagesSocket({
       if (s) {
         s.emit("unsubscribe:messages");
         s.off("message:new", onMessageNew);
+        s.off("message:update", onMessageUpdate);
       }
     };
   }, [userId]);

@@ -18,6 +18,8 @@ export interface ReplyTo {
 
 export interface Message {
   id: string;
+  /** Stable key for FlatList — survives the optimistic→server id swap so rows never remount */
+  clientKey?: string;
   text?: string;
   type: string;
   direction: 'incoming' | 'outgoing';
@@ -55,6 +57,7 @@ function detectType(m: any): string {
 function mapMessage(m: any): Message {
   return {
     id: m.id,
+    clientKey: m.id,
     text: m.text,
     type: detectType(m),
     direction: m.type === 'outgoing' ? 'outgoing' : 'incoming',
@@ -82,7 +85,15 @@ async function getCachedMessages(userId: string): Promise<Message[] | null> {
 
 async function setCachedMessages(userId: string, messages: Message[]) {
   try {
-    const toCache = messages.slice(0, MAX_CACHED_MESSAGES);
+    // Local file:// URIs die with the app cache — don't persist them
+    const toCache = messages
+      .filter((m) => !m.id.startsWith('optimistic_'))
+      .slice(0, MAX_CACHED_MESSAGES)
+      .map((m) => ({
+        ...m,
+        previewUrl: m.previewUrl?.startsWith('file:') ? undefined : m.previewUrl,
+        mediaUrl: m.mediaUrl?.startsWith('file:') ? undefined : m.mediaUrl,
+      }));
     await AsyncStorage.setItem(CACHE_KEY_PREFIX + userId, JSON.stringify(toCache));
   } catch {}
 }
@@ -105,6 +116,7 @@ export function useMessages(userId: string | null) {
     const tempId = `optimistic_${Date.now()}_${++optimisticCounterRef.current}`;
     const optimistic: Message = {
       id: tempId,
+      clientKey: tempId,
       text: msg.text,
       type: msg.type || 'text',
       direction: 'outgoing',
@@ -122,6 +134,32 @@ export function useMessages(userId: string | null) {
     setMessages((prev) =>
       prev.map((m) => m.id === tempId ? { ...m, status: 'failed' } : m)
     );
+  }, []);
+
+  // Reconcile an optimistic bubble with the HTTP send response.
+  // Keeps clientKey so the FlatList row never remounts.
+  const confirmOptimistic = useCallback((tempId: string, server: {
+    messageId: string;
+    timestamp?: number;
+    status?: string;
+  }) => {
+    setMessages((prev) => {
+      // Socket echo already delivered the server message — just drop the temp bubble
+      if (prev.some((m) => m.id === server.messageId)) {
+        return prev.filter((m) => m.id !== tempId);
+      }
+      return prev.map((m) =>
+        m.id === tempId
+          ? {
+              ...m,
+              id: server.messageId,
+              timestamp: server.timestamp ?? m.timestamp,
+              status: server.status || 'sent',
+              clientKey: m.clientKey ?? tempId,
+            }
+          : m
+      );
+    });
   }, []);
 
   const removeOptimistic = useCallback((tempId: string) => {
@@ -158,6 +196,39 @@ export function useMessages(userId: string | null) {
 
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
+
+  // Delta backfill after socket reconnect — fetch only messages newer than the newest local one
+  const fetchLatest = useCallback(async () => {
+    if (!userId) return;
+    const newest = messagesRef.current.find((m) => !m.id.startsWith('optimistic_'))?.timestamp;
+    if (!newest) {
+      fetchMessages();
+      return;
+    }
+    try {
+      const { data } = await api.get(`/messages/${userId}`, {
+        params: { limit: PAGE_SIZE, after: newest },
+      });
+      if (!mountedRef.current) return;
+      const mapped = (Array.isArray(data) ? data : []).map(mapMessage);
+      if (mapped.length === 0) return;
+      if (mapped.length >= PAGE_SIZE) {
+        // Missed more than a page — replace instead of merging a gap
+        fetchMessages();
+        return;
+      }
+      setMessages((prev) => {
+        const ids = new Set(prev.map((m) => m.id));
+        const fresh = mapped.reverse().filter((m) => !ids.has(m.id));
+        if (fresh.length === 0) return prev;
+        const updated = [...fresh, ...prev];
+        setCachedMessages(userId, updated);
+        return updated;
+      });
+    } catch (err) {
+      console.error('[useMessages] Backfill error:', err);
+    }
+  }, [userId, fetchMessages]);
 
   const loadMore = useCallback(async () => {
     if (!userId || loadingMore || !hasMore || messagesRef.current.length === 0) return;
@@ -199,40 +270,89 @@ export function useMessages(userId: string | null) {
     subscribeMessages(userId);
 
     const socket = getSocket();
+
+    // Merge the server echo into an existing bubble, preserving clientKey (no row
+    // remount) and any local image preview (no reload flash).
+    const mergeIntoExisting = (existing: Message, mapped: Message): Message => ({
+      ...mapped,
+      clientKey: existing.clientKey ?? mapped.id,
+      previewUrl: existing.previewUrl?.startsWith('file:')
+        ? existing.previewUrl
+        : mapped.previewUrl,
+    });
+
     const handleNewMessage = (payload: { userId: string; message: any }) => {
       if (payload.userId === userId && mountedRef.current) {
         const mapped = mapMessage(payload.message);
+        const clientTempId: string | undefined = payload.message?.clientTempId;
         setMessages((prev) => {
-          // Remove matching optimistic messages
-          const cleaned = prev.filter((m) => {
-            if (!m.id.startsWith('optimistic_')) return true;
-            if (m.direction !== mapped.direction) return true;
-            if (m.text && mapped.text && m.text === mapped.text) return false;
-            if (m.mediaUrl && mapped.mediaUrl && m.mediaUrl === mapped.mediaUrl) return false;
-            if (m.type === mapped.type && m.type !== 'text' &&
-                Math.abs(m.timestamp - mapped.timestamp) < 30000) return false;
-            return true;
-          });
-          if (cleaned.some((msg) => msg.id === mapped.id)) return cleaned;
-          const updated = [mapped, ...cleaned];
+          // HTTP confirm may have already swapped the optimistic id for the server id
+          const existingIdx = prev.findIndex((m) => m.id === mapped.id);
+          if (existingIdx >= 0) {
+            const updated = prev
+              .filter((m) => !(clientTempId && m.id === clientTempId))
+              .map((m) => (m.id === mapped.id ? mergeIntoExisting(m, mapped) : m));
+            setCachedMessages(userId, updated);
+            return updated;
+          }
+
+          // Deterministic match by clientTempId, else legacy heuristic fallback
+          let matchIdx = clientTempId
+            ? prev.findIndex((m) => m.id === clientTempId)
+            : -1;
+          if (matchIdx < 0) {
+            matchIdx = prev.findIndex((m) =>
+              m.id.startsWith('optimistic_') &&
+              m.direction === mapped.direction &&
+              ((!!m.text && !!mapped.text && m.text === mapped.text) ||
+                (!!m.mediaUrl && !!mapped.mediaUrl && m.mediaUrl === mapped.mediaUrl) ||
+                (m.type === mapped.type && m.type !== 'text' &&
+                  Math.abs(m.timestamp - mapped.timestamp) < 30000))
+            );
+          }
+
+          let updated: Message[];
+          if (matchIdx >= 0) {
+            updated = [...prev];
+            updated[matchIdx] = mergeIntoExisting(prev[matchIdx], mapped);
+          } else {
+            updated = [mapped, ...prev];
+          }
           setCachedMessages(userId, updated);
           return updated;
         });
       }
     };
 
+    // Delivery status flips (sending → sent/failed) after the async platform send
+    const handleMessageUpdate = (payload: { userId: string; messageId: string; status: string }) => {
+      if (payload.userId === userId && mountedRef.current) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === payload.messageId ? { ...m, status: payload.status } : m))
+        );
+      }
+    };
+
+    const handleReconnect = () => {
+      if (mountedRef.current) fetchLatest();
+    };
+
     socket?.on('message:new', handleNewMessage);
+    socket?.on('message:update', handleMessageUpdate);
+    socket?.on('connect', handleReconnect);
 
     return () => {
       mountedRef.current = false;
       socket?.off('message:new', handleNewMessage);
+      socket?.off('message:update', handleMessageUpdate);
+      socket?.off('connect', handleReconnect);
       unsubscribeMessages();
     };
-  }, [userId, fetchMessages]);
+  }, [userId, fetchMessages, fetchLatest]);
 
   return {
     messages, loading, loadingMore, hasMore, loadMore,
     refresh: fetchMessages,
-    addOptimistic, markFailed, removeOptimistic,
+    addOptimistic, markFailed, removeOptimistic, confirmOptimistic,
   };
 }

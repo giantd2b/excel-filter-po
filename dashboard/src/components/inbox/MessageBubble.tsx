@@ -1,6 +1,6 @@
 import { useState, memo } from "react";
 import { Message } from "@/types/inbox";
-import { Check, CheckCheck, AlertCircle, X, FileDown, Volume2, SmilePlus, Reply } from "lucide-react";
+import { Check, CheckCheck, AlertCircle, X, FileDown, Volume2, SmilePlus, Reply, Clock } from "lucide-react";
 import { api } from "@/lib/api-client";
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "🙏", "✅"];
@@ -166,6 +166,8 @@ export const MessageBubble = memo(function MessageBubble({ message, onReply }: M
                 <>
                   {message.status === "failed" ? (
                     <AlertCircle className="w-3 h-3 text-red-300" />
+                  ) : message.status === "sending" ? (
+                    <Clock className="w-3 h-3" />
                   ) : message.status === "delivered" ? (
                     <CheckCheck className="w-3 h-3" />
                   ) : (

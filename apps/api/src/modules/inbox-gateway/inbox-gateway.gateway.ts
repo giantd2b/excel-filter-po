@@ -113,6 +113,17 @@ export class InboxGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  // Delivery status flips (sending → sent/failed) after the async platform send
+  emitMessageUpdate(userId: string, messageId: string, status: string, error?: string | null) {
+    this.server.to(`messages:${userId}`).emit('message:update', {
+      userId,
+      messageId,
+      status,
+      error: error || undefined,
+      timestamp: Date.now(),
+    });
+  }
+
   emitReactionUpdate(userId: string, messageId: string, reactions: any[]) {
     this.server.to(`messages:${userId}`).emit('reaction:update', {
       userId,
