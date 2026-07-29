@@ -441,6 +441,8 @@ export class UsersService {
       customerDisplayName: customer.displayName,
       customerPictureUrl: customer.pictureUrl,
       customerChannel: customer.channel,
+      ...(body.slipUrl ? { slipUrl: body.slipUrl } : {}),
+      ...(body.slipTime ? { slipTime: body.slipTime } : {}),
     };
 
     try {

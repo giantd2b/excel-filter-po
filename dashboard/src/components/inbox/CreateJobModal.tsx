@@ -26,14 +26,35 @@ export default function CreateJobModal({
   const [error, setError] = useState("");
   const [createdId, setCreatedId] = useState<string | null>(null);
 
-  // Prefill the phone number from the full customer record
+  interface RecentSlip {
+    id: string;
+    imageUrl: string;
+    amount: number | null;
+    dateTime: string | null;
+    bankName: string | null;
+  }
+  const [slips, setSlips] = useState<RecentSlip[]>([]);
+  const [selectedSlip, setSelectedSlip] = useState<RecentSlip | null>(null);
+
+  // Prefill the phone number + recent slips from the full customer record
   useEffect(() => {
     getCustomerDetails(user.id)
       .then((d) => {
         if (d?.phoneNumber) setTelno(d.phoneNumber);
+        if (Array.isArray(d?.recentSlips)) setSlips(d.recentSlips.filter((s: RecentSlip) => s.imageUrl));
       })
       .catch(() => {});
   }, [user.id]);
+
+  const toggleSlip = (s: RecentSlip) => {
+    if (selectedSlip?.id === s.id) {
+      setSelectedSlip(null);
+      return;
+    }
+    setSelectedSlip(s);
+    // Slip amount doubles as the deposit if it hasn't been typed yet
+    if (!deposit && s.amount) setDeposit(String(s.amount));
+  };
 
   const handleSubmit = async () => {
     if (!name.trim() || !due) {
@@ -51,6 +72,8 @@ export default function CreateJobModal({
         balance: parseFloat(balance) || 0,
         telno: telno.trim() || undefined,
         desc: desc.trim() || undefined,
+        slipUrl: selectedSlip?.imageUrl || undefined,
+        slipTime: selectedSlip?.dateTime || undefined,
       });
       if (!res.success) throw new Error(res.error || "สร้างงานไม่สำเร็จ");
       setCreatedId(res.cardId ?? null);
@@ -167,6 +190,41 @@ export default function CreateJobModal({
                 <input type="number" min="0" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="0" className={inputCls} />
               </div>
             </div>
+            {slips.length > 0 && (
+              <div>
+                <label className={labelCls}>แนบสลิปจากแชท (แตะเพื่อเลือก)</label>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {slips.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleSlip(s)}
+                      className={`relative shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
+                        selectedSlip?.id === s.id
+                          ? "border-brand-500 ring-2 ring-brand-500/30"
+                          : "border-slate-200 opacity-80 hover:opacity-100"
+                      }`}
+                    >
+                      <img src={s.imageUrl} alt="slip" className="h-20 w-16 object-cover" />
+                      {s.amount != null && (
+                        <span className="absolute bottom-0 left-0 right-0 bg-slate-900/70 px-1 py-0.5 text-center text-[10px] font-medium text-white">
+                          ฿{s.amount.toLocaleString()}
+                        </span>
+                      )}
+                      {selectedSlip?.id === s.id && (
+                        <span className="absolute right-1 top-1 rounded-full bg-brand-500 px-1 text-[10px] text-white">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {selectedSlip && (
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    สลิปจะแนบเข้าการ์ดงาน{selectedSlip.dateTime ? ` · เวลาโอน ${selectedSlip.dateTime}` : ""}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className={labelCls}>เบอร์โทรลูกค้า</label>
               <input value={telno} onChange={(e) => setTelno(e.target.value)} placeholder="08xxxxxxxx" className={inputCls} />

@@ -397,6 +397,8 @@ export interface CreateJobCardInput {
   balance?: number;
   telno?: string;
   desc?: string;
+  slipUrl?: string;
+  slipTime?: string;
 }
 
 export async function createJobCard(customerId: string, input: CreateJobCardInput) {
