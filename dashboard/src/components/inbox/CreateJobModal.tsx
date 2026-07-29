@@ -111,6 +111,9 @@ export default function CreateJobModal({
                 customerChannel: user.channel ?? "",
                 ...(telno ? { telno } : {}),
                 ...(name.trim() ? { name: name.trim() } : {}),
+                ...(selectedSlip ? { slipUrl: selectedSlip.imageUrl } : {}),
+                ...(selectedSlip?.dateTime ? { slipTime: selectedSlip.dateTime } : {}),
+                ...(deposit ? { deposit } : {}),
               }).toString()}`}
               target="_blank"
               rel="noreferrer"
