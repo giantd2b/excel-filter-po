@@ -79,9 +79,28 @@ export default function CreateJobModal({
             <Briefcase className="h-4 w-4 text-brand-500" />
             สร้างการ์ดงาน (IRIS Jobs)
           </h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <a
+              href={`https://iris-job.vercel.app/create?${new URLSearchParams({
+                customerId: user.id,
+                customerDisplayName: user.displayName ?? "",
+                customerPictureUrl: user.pictureUrl ?? "",
+                customerChannel: user.channel ?? "",
+                ...(telno ? { telno } : {}),
+                ...(name.trim() ? { name: name.trim() } : {}),
+              }).toString()}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+              title="เปิดฟอร์มเต็มใน IRIS Jobs (Pack Type, City, เซลล์ ฯลฯ) พร้อมข้อมูลลูกค้ารายนี้"
+            >
+              <ExternalLink className="h-3 w-3" />
+              ฟอร์มเต็ม
+            </a>
+            <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {createdId ? (
