@@ -387,6 +387,25 @@ export async function getCustomerDetails(id: string) {
   return api.get<any>(`/users/${id}/details`);
 }
 
+// ─── IRIS Jobs: create a job card from this chat customer ───────────
+
+export interface CreateJobCardInput {
+  name: string;
+  due: string; // YYYY-MM-DD
+  eventTime?: string; // HH:mm
+  deposit?: number;
+  balance?: number;
+  telno?: string;
+  desc?: string;
+}
+
+export async function createJobCard(customerId: string, input: CreateJobCardInput) {
+  return api.post<{ success: boolean; cardId?: string; error?: string }>(
+    `/users/${customerId}/job-card`,
+    input,
+  );
+}
+
 // ─── CRM: Tags ──────────────────────────────────────────────────────
 
 export async function getAllTags() {

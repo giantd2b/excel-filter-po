@@ -15,8 +15,10 @@ import {
   Clock,
   CheckCircle2,
   ChevronUp,
+  Briefcase,
 } from "lucide-react";
 import { setCustomerStatus } from "@/lib/api-service";
+import CreateJobModal from "./CreateJobModal";
 
 interface ConversationAreaProps {
   selectedUser: ChatUser | null;
@@ -31,6 +33,7 @@ export function ConversationArea({
 }: ConversationAreaProps) {
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [showCreateJob, setShowCreateJob] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
@@ -235,6 +238,14 @@ export function ConversationArea({
 
         <div className="flex items-center gap-1.5">
           <button
+            onClick={() => setShowCreateJob(true)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-brand-600 bg-orange-50 hover:bg-orange-100 border border-orange-100 transition-all duration-150"
+            title="สร้างการ์ดงานใน IRIS Jobs จากลูกค้ารายนี้"
+          >
+            <Briefcase className="w-3 h-3" />
+            สร้างงาน
+          </button>
+          <button
             onClick={() => {
               setCustomerStatus(selectedUser.id, "FOLLOW_UP");
               onMessageSent();
@@ -367,6 +378,10 @@ export function ConversationArea({
         replyToId={replyTo?.id}
         onSent={() => setReplyTo(null)}
       />
+
+      {showCreateJob && (
+        <CreateJobModal user={selectedUser} onClose={() => setShowCreateJob(false)} />
+      )}
     </div>
   );
 }

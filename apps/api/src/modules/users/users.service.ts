@@ -411,6 +411,63 @@ export class UsersService {
     }
   }
 
+  /**
+   * Create a job card in IRIS Jobs from this chat customer. The customer's
+   * name/picture/channel/id are linked onto the new job so it shows up in
+   * the app with a chat profile attached.
+   */
+  async createJobCard(customerId: string, body: any) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, displayName: true, pictureUrl: true, channel: true, phoneNumber: true },
+    });
+    if (!customer) return { success: false, error: 'Customer not found' };
+    if (!body?.name || !body?.due) return { success: false, error: 'name and due are required' };
+
+    const JOBS_API = 'https://iris-job.vercel.app/api/external/jobs';
+    const JOBS_KEY = process.env.IRIS_JOBS_API_KEY || 'iris-jobs-7cba15f1c6f5de3a3365554e6e36eb01fdd4f4b6184288045b709869312d9819';
+
+    const telno = String(body.telno || customer.phoneNumber || '').replace(/[-\s]/g, '');
+    const payload = {
+      name: body.name,
+      due: body.due,
+      eventTime: body.eventTime || undefined,
+      deposit: Number(body.deposit) || 0,
+      balance: Number(body.balance) || 0,
+      telno,
+      desc: body.desc || '',
+      listKey: 'deposit-new',
+      customerId: customer.id,
+      customerDisplayName: customer.displayName,
+      customerPictureUrl: customer.pictureUrl,
+      customerChannel: customer.channel,
+    };
+
+    try {
+      const resp = await axios.post(JOBS_API, payload, {
+        headers: { 'X-API-Key': JOBS_KEY },
+        timeout: 15000,
+      });
+
+      // Same bookkeeping the job lookup does: tag + next-job info on the chat row
+      await this.addTag(customerId, 'ลูกค้าจองงานแล้ว', '#884929').catch(() => {});
+      await this.prisma.customer
+        .update({
+          where: { id: customerId },
+          data: {
+            nextJobDate: new Date(body.due),
+            nextJobTitle: String(body.name).substring(0, 100),
+          },
+        })
+        .catch(() => {});
+
+      return { success: true, ...resp.data };
+    } catch (err: any) {
+      this.logger.warn(`IRIS Jobs create failed: ${err.message}`);
+      return { success: false, error: err?.response?.data?.message || err.message };
+    }
+  }
+
   async backfillJobDates() {
     const customers = await this.prisma.customer.findMany({
       where: {

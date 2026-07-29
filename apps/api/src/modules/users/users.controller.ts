@@ -62,6 +62,11 @@ export class UsersController {
     return this.usersService.getCustomerJobs(id);
   }
 
+  @Post(':id/job-card')
+  async createJobCard(@Param('id') id: string, @Body() body: any) {
+    return this.usersService.createJobCard(id, body);
+  }
+
   @Get(':id/quotations')
   async getCustomerQuotations(@Param('id') id: string) {
     return this.usersService.getCustomerQuotations(id);
