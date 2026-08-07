@@ -422,3 +422,49 @@ model Product {
   @@index([category])
   @@map("products")
 }
+
+// ─── Merit Booking (หน้าจองแพคเกจงานบุญ /booking) ────────────────────
+
+enum BookingStatus {
+  NEW
+  CONTACTED
+  CONFIRMED
+  DONE
+}
+
+model Booking {
+  id             String        @id @default(uuid())
+  code           String        @unique // TB-YYMMDD-NNN
+  status         BookingStatus @default(NEW)
+
+  occasion       String
+  eventDate      String        @map("event_date") // YYYY-MM-DD as entered
+  timeSlot       String        @map("time_slot")
+  tambon         String?
+  amphoe         String?
+  province       String?
+  zip            String?
+  venue          String?
+
+  packageId      String        @map("package_id")
+  packageName    String        @map("package_name")
+  foodMode       String        @map("food_mode") // buffet | table | none
+  guests         Int
+  tables         Int
+  monks          Int
+  selfTransport  Boolean       @default(false) @map("self_transport")
+  addons         String[]      @default([])
+  budget         String?
+
+  customerName   String        @map("customer_name")
+  phone          String
+  note           String?
+  estimatedTotal Int           @map("estimated_total")
+
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@map("bookings")
+}
