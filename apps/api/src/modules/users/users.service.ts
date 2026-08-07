@@ -350,6 +350,48 @@ export class UsersService {
     });
   }
 
+  /** IRIS Jobs API key — env only. The old hardcoded fallback key leaked into
+   *  git history and has been rotated; a missing env now fails loudly. */
+  private getJobsApiKey(): string {
+    const key = process.env.IRIS_JOBS_API_KEY;
+    if (!key) throw new Error('IRIS_JOBS_API_KEY not configured');
+    return key;
+  }
+
+  /**
+   * Re-pull job info for every customer matching a phone number and refresh
+   * the chat-list fields (tag + nextJobDate/nextJobTitle). Used by the
+   * iris-job webhook: a single job event can't compute "next job" (that's a
+   * min over ALL of the phone's jobs), so we just re-run the proven lookup.
+   */
+  async refreshJobInfoForPhone(phone: string) {
+    const clean = String(phone).replace(/\D/g, '');
+    if (clean.length < 9) return { refreshed: 0, reason: 'phone too short' };
+
+    const customers = await this.prisma.customer.findMany({
+      where: { OR: [{ phoneClean: clean }, { phoneNumber: clean }] },
+      select: { id: true },
+    });
+
+    let refreshed = 0;
+    for (const c of customers) {
+      try {
+        const result = await this.getCustomerJobs(c.id);
+        // Lookup only ever sets nextJobDate — clear it when no jobs remain
+        // (e.g. the job that produced it was deleted in iris-job)
+        if (!result.matched) {
+          await this.prisma.customer
+            .update({ where: { id: c.id }, data: { nextJobDate: null, nextJobTitle: null } })
+            .catch(() => {});
+        }
+        refreshed++;
+      } catch {
+        // per-customer failure shouldn't kill the webhook
+      }
+    }
+    return { refreshed, customers: customers.length };
+  }
+
   /**
    * Look up customer's jobs from IRIS Jobs API by phone number.
    * Auto-tags customer with "ลูกค้าจองงานแล้ว" if jobs found.
@@ -368,7 +410,7 @@ export class UsersService {
 
     try {
       const JOBS_API = 'https://iris-job.vercel.app/api/external/lookup';
-      const JOBS_KEY = process.env.IRIS_JOBS_API_KEY || 'iris-jobs-7cba15f1c6f5de3a3365554e6e36eb01fdd4f4b6184288045b709869312d9819';
+      const JOBS_KEY = this.getJobsApiKey();
 
       const resp = await axios.get(`${JOBS_API}?phone=${cleanPhone}`, {
         headers: { 'X-API-Key': JOBS_KEY },
@@ -425,7 +467,7 @@ export class UsersService {
     if (!body?.name || !body?.due) return { success: false, error: 'name and due are required' };
 
     const JOBS_API = 'https://iris-job.vercel.app/api/external/jobs';
-    const JOBS_KEY = process.env.IRIS_JOBS_API_KEY || 'iris-jobs-7cba15f1c6f5de3a3365554e6e36eb01fdd4f4b6184288045b709869312d9819';
+    const JOBS_KEY = this.getJobsApiKey();
 
     const telno = String(body.telno || customer.phoneNumber || '').replace(/[-\s]/g, '');
     const payload = {
@@ -487,7 +529,7 @@ export class UsersService {
     let failed = 0;
 
     const JOBS_API = 'https://iris-job.vercel.app/api/external/lookup';
-    const JOBS_KEY = process.env.IRIS_JOBS_API_KEY || 'iris-jobs-7cba15f1c6f5de3a3365554e6e36eb01fdd4f4b6184288045b709869312d9819';
+    const JOBS_KEY = this.getJobsApiKey();
 
     for (const c of customers) {
       const phone = c.phoneNumber!.replace(/\D/g, '');
