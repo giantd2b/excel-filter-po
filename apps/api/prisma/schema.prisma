@@ -31,6 +31,7 @@ model Customer {
   // Job info (synced from IRIS Jobs)
   nextJobDate       DateTime?          @map("next_job_date")
   nextJobTitle      String?            @map("next_job_title")
+  nextJobNo         String?            @map("next_job_no") // เลขที่งานจาก iris-job เช่น "J2608-014"
 
   // Chat state
   isPinned          Boolean            @default(false) @map("is_pinned")

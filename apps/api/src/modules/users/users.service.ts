@@ -381,7 +381,7 @@ export class UsersService {
         // (e.g. the job that produced it was deleted in iris-job)
         if (!result.matched) {
           await this.prisma.customer
-            .update({ where: { id: c.id }, data: { nextJobDate: null, nextJobTitle: null } })
+            .update({ where: { id: c.id }, data: { nextJobDate: null, nextJobTitle: null, nextJobNo: null } })
             .catch(() => {});
         }
         refreshed++;
@@ -437,6 +437,7 @@ export class UsersService {
             data: {
               nextJobDate: new Date(nextJob.due),
               nextJobTitle: (nextJob.job || '').substring(0, 100),
+              nextJobNo: nextJob.jobNo ?? null,
             },
           }).catch(() => {});
         }
@@ -501,6 +502,7 @@ export class UsersService {
           data: {
             nextJobDate: new Date(body.due),
             nextJobTitle: String(body.name).substring(0, 100),
+            nextJobNo: resp.data?.jobNo ?? null,
           },
         })
         .catch(() => {});
@@ -557,6 +559,7 @@ export class UsersService {
             data: {
               nextJobDate: new Date(nextJob.due),
               nextJobTitle: (nextJob.job || '').substring(0, 100),
+              nextJobNo: nextJob.jobNo ?? null,
             },
           });
           updated++;
