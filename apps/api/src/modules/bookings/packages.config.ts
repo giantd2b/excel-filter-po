@@ -183,12 +183,26 @@ export function evalFormula(expr: string, vars: Record<string, number>): number 
       if (op === '*' || op === '/' || op === '%') { i++; const r = primary(); v = op === '*' ? v * r : op === '/' ? v / r : v % r; } else return v;
     }
   };
-  const expr3 = (): number => {
+  const sum = (): number => {
     let v = expr2();
     for (;;) {
       skip();
       const op = peek();
       if (op === '+' || op === '-') { i++; const r = expr2(); v = op === '+' ? v + r : v - r; } else return v;
+    }
+  };
+  // comparisons (lowest precedence) yield 1 / 0 — mirrors flowaccount-app's expression.ts
+  const expr3 = (): number => {
+    let v = sum();
+    for (;;) {
+      skip();
+      const two = src.slice(i, i + 2);
+      const op = ['<=', '>=', '==', '!='].includes(two) ? two : peek() === '<' || peek() === '>' ? peek() : null;
+      if (!op) return v;
+      i += op.length;
+      const r = sum();
+      const ok = op === '<' ? v < r : op === '<=' ? v <= r : op === '>' ? v > r : op === '>=' ? v >= r : op === '==' ? v === r : v !== r;
+      v = ok ? 1 : 0;
     }
   };
   const v = expr3();
