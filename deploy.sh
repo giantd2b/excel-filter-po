@@ -6,7 +6,8 @@ set -e
 
 echo "Building frontend..."
 cd dashboard
-VITE_API_URL=/api npm run build
+# MSYS_NO_PATHCONV stops Git Bash on Windows from rewriting "/api" into "C:/Program Files/Git/api"
+MSYS_NO_PATHCONV=1 VITE_API_URL=/api npm run build
 cd ..
 
 echo "Copying frontend to API public..."
