@@ -527,7 +527,24 @@ export interface MeritBooking {
   phone: string;
   note?: string | null;
   estimatedTotal: number;
+  quotationDocNo?: string | null;
+  quotationUrl?: string | null;
+  quotationCreatedAt?: string | null;
   createdAt: string;
+}
+
+export interface BookingQuotationResult {
+  booking: MeritBooking;
+  docNo: string;
+  quotationUrl: string;
+  reused: boolean;
+  grandTotal: string;
+  warnings: string[];
+}
+
+/** Create (idempotently) the flowaccount-app quotation for a booking. */
+export async function createBookingQuotation(id: string) {
+  return api.post<BookingQuotationResult>(`/bookings/${id}/quotation`, {});
 }
 
 export async function getBookings(status?: string) {

@@ -290,8 +290,14 @@ export class QuotationsService {
     this.syncing = true;
 
     try {
-    const FA_URL = 'https://honest-mindfulness-production.up.railway.app/api/v1';
-    const FA_KEY = process.env.FA_API_KEY || 'iris-fa-2026-secret';
+    // Same base URL / key as FlowAccountClient (flowaccount.client.ts); no hardcoded fallback key
+    const FA_URL = (process.env.FA_API_URL || 'https://honest-mindfulness-production.up.railway.app/api/v1').replace(/\/+$/, '');
+    const FA_KEY = process.env.FA_API_KEY;
+    if (!FA_KEY) {
+      this.logger.warn('FA_API_KEY is not set — skipping FlowAccount sync');
+      this.syncing = false;
+      return null;
+    }
     const headers = { 'X-Api-Key': FA_KEY };
 
     this.logger.log('Syncing all quotations from FlowAccount...');

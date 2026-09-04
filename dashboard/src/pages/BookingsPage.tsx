@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText } from "lucide-react";
 import {
   getBookings,
   updateBookingStatus,
   deleteBooking,
+  createBookingQuotation,
   type MeritBooking,
 } from "@/lib/api-service";
 
@@ -122,6 +123,29 @@ export default function BookingsPage() {
     }
   };
 
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
+  const createQuote = async (b: MeritBooking) => {
+    setBusyId(b.id);
+    setQuoteError(null);
+    try {
+      const res = await createBookingQuotation(b.id);
+      setBookings((list) =>
+        list.map((x) =>
+          x.id === b.id
+            ? { ...x, quotationDocNo: res.docNo, quotationUrl: res.quotationUrl, quotationCreatedAt: new Date().toISOString() }
+            : x
+        )
+      );
+      if (res.quotationUrl) window.open(res.quotationUrl, "_blank", "noopener");
+    } catch (err: any) {
+      console.error("Failed to create quotation:", err);
+      setQuoteError(`${b.code}: ${err?.message || "สร้างใบเสนอราคาไม่สำเร็จ"}`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const tabs = [
     { key: "ALL", label: `ทั้งหมด (${total})` },
     ...STATUSES.map((s) => ({ key: s, label: `${STATUS_LABELS[s]} (${statusCounts[s] || 0})` })),
@@ -178,6 +202,12 @@ export default function BookingsPage() {
         <div className="text-center py-20 text-slate-400 text-sm">ยังไม่มีรายการจองในหมวดนี้</div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
+          {quoteError && (
+            <div className="md:col-span-2 text-sm text-red-600 bg-red-50 ring-1 ring-red-200 rounded-xl px-4 py-2.5 flex justify-between items-center">
+              <span>{quoteError}</span>
+              <button onClick={() => setQuoteError(null)} className="text-red-400 hover:text-red-600 text-xs">ปิด</button>
+            </div>
+          )}
           {bookings.map((b) => (
             <div key={b.id} className="bg-white rounded-xl ring-1 ring-slate-200 p-4 shadow-sm">
               <div className="flex justify-between items-start gap-2">
@@ -220,7 +250,30 @@ export default function BookingsPage() {
                   <div className="font-bold text-brand-700">{formatBaht(b.estimatedTotal)}</div>
                   <div className="text-[11px] text-slate-400">จองเมื่อ {formatDateTime(b.createdAt)}</div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  {b.quotationUrl ? (
+                    <a
+                      href={b.quotationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
+                      title="เปิดใบเสนอราคาใน FlowAccount app"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      {b.quotationDocNo}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => createQuote(b)}
+                      disabled={busyId === b.id}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full ring-1 ring-brand-200 text-brand-700 text-xs font-semibold hover:bg-brand-50 disabled:opacity-50"
+                      title="สร้างใบเสนอราคาใน FlowAccount app"
+                    >
+                      {busyId === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                      ใบเสนอราคา
+                    </button>
+                  )}
                   <button
                     onClick={() => advance(b)}
                     disabled={busyId === b.id}

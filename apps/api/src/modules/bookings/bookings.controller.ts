@@ -40,6 +40,13 @@ export class BookingsController {
     return this.bookingsService.updateStatus(id, status);
   }
 
+  /** Create (idempotently) the flowaccount-app quotation for a booking. */
+  @UseGuards(FirebaseAuthGuard)
+  @Post(':id/quotation')
+  async createQuotation(@Param('id') id: string) {
+    return this.bookingsService.createQuotation(id);
+  }
+
   @UseGuards(FirebaseAuthGuard)
   @Delete(':id')
   async remove(@Param('id') id: string) {

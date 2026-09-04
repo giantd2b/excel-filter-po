@@ -462,6 +462,11 @@ model Booking {
   note           String?
   estimatedTotal Int           @map("estimated_total")
 
+  // Quotation created in flowaccount-app (externalRef = booking code)
+  quotationDocNo     String?   @map("quotation_doc_no")
+  quotationUrl       String?   @map("quotation_url")
+  quotationCreatedAt DateTime? @map("quotation_created_at")
+
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
