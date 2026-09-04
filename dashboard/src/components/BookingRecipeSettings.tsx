@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Save, RotateCcw, ExternalLink, AlertTriangle } from "lucide-react";
+import { Loader2, Save, RotateCcw, ExternalLink, AlertTriangle, Plus, X, ChevronDown, ChevronRight, Utensils, Users, Sparkles } from "lucide-react";
 import {
   getBookingRecipes,
   saveBookingRecipes,
@@ -7,15 +7,18 @@ import {
   type FaRecipeConfig,
   type FaRecipe,
   type MonkTier,
+  type FaCatalogProduct,
 } from "@/lib/api-service";
 
 const selectCls =
   "w-full px-2.5 py-1.5 rounded-lg ring-1 ring-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-300";
-const labelCls = "text-[11px] text-slate-500 mb-1 block";
+const labelCls = "text-[11px] font-medium text-slate-500 mb-1 block";
+const TIER_UNIT: Record<string, string> = { buffet: "คน", table: "โต๊ะ", any: "" };
+const TIER_TITLE: Record<string, string> = { buffet: "บุฟเฟต์ — เลือกตามจำนวนแขก", table: "โต๊ะจีน — เลือกตามจำนวนโต๊ะ", any: "ทุกโหมด" };
 
 /**
- * Maps each booking package (and add-on) to product codes in flowaccount-app.
- * Saved in SystemSetting; used by POST /bookings/:id/quotation.
+ * Maps each booking package to flowaccount-app products and remark templates.
+ * Saved in SystemSetting; used by POST /bookings/:id/quotation and for deriving prices.
  */
 export default function BookingRecipeSettings({ onClose }: { onClose?: () => void }) {
   const [data, setData] = useState<Settings | null>(null);
@@ -23,7 +26,8 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-  // raw text of the "display tiers" inputs so a trailing comma survives re-render; parsed on change
+  const [advanced, setAdvanced] = useState<Record<string, boolean>>({});
+  // raw text of the "display tiers" inputs so a trailing comma survives re-render
   const [tiersText, setTiersText] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -38,8 +42,10 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
 
   const products = data?.products || [];
   const byCode = useMemo(() => Object.fromEntries(products.filter((p) => p.code).map((p) => [p.code!, p])), [products]);
-  const packageProducts = products.filter((p) => p.code);
+  const monkProducts = products.filter((p) => p.code && p.kind === "PACKAGE" && p.variables.includes("monks"));
   const buffetProducts = products.filter((p) => p.code && p.kind === "PACKAGE" && p.variables.includes("guests"));
+  const allProducts = products.filter((p) => p.code);
+  const remarkOptions = (data?.remarkTemplates || []).filter((x) => x.code);
 
   const setPkg = (id: string, patch: Partial<FaRecipe>) =>
     setConfig((c) => c && { ...c, packages: { ...c.packages, [id]: { ...c.packages[id], ...patch } } });
@@ -60,48 +66,115 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
     }
   };
 
-  const reset = () => data && setConfig(data.defaults);
+  const reset = () => data && setConfig(JSON.parse(JSON.stringify(data.defaults)));
 
+  // ── small controls ─────────────────────────────────────────────
   const ProductSelect = ({
-    value,
-    onChange,
-    options,
-    allowEmpty,
-  }: {
-    value: string | null | undefined;
-    onChange: (v: string) => void;
-    options: typeof products;
-    allowEmpty?: boolean;
-  }) => {
+    value, onChange, options, allowEmpty, emptyLabel,
+  }: { value: string | null | undefined; onChange: (v: string) => void; options: FaCatalogProduct[]; allowEmpty?: boolean; emptyLabel?: string }) => {
     const known = options.some((p) => p.code === value);
     return (
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={selectCls}>
-        {allowEmpty ? <option value="">(ไม่ใช้ — ส่งเป็นข้อความ)</option> : <option value="">เลือกสินค้า…</option>}
-        {value && !known && <option value={value}>{value} (ไม่พบใน flowaccount-app)</option>}
+        <option value="">{allowEmpty ? emptyLabel || "(ไม่ใช้ — ส่งเป็นข้อความ)" : "เลือกสินค้า…"}</option>
+        {value && !known && <option value={value}>{value} (ไม่พบใน FlowAccount)</option>}
         {options.map((p) => (
-          <option key={p.code!} value={p.code!}>
-            {p.code} · {p.name}
-          </option>
+          <option key={p.code!} value={p.code!}>{p.code} · {p.name}</option>
         ))}
       </select>
     );
   };
 
-  const TransportSelect = ({ productCode, value, onChange }: { productCode: string; value: string; onChange: (v: string) => void }) => {
+  const RemarkSelect = ({ value, onChange, emptyLabel }: { value: string | null | undefined; onChange: (v: string | null) => void; emptyLabel: string }) => (
+    <select value={value || ""} onChange={(e) => onChange(e.target.value || null)} className={selectCls}>
+      <option value="">{emptyLabel}</option>
+      {value && !remarkOptions.some((x) => x.code === value) && <option value={value}>{value} (ไม่พบ)</option>}
+      {remarkOptions.map((x) => (
+        <option key={x.code!} value={x.code!}>{x.code} · {x.name}{x.isDefault ? " (ค่าเริ่มต้น)" : ""}</option>
+      ))}
+    </select>
+  );
+
+  const TransportField = ({ productCode, value, onChange }: { productCode: string; value: string; onChange: (v: string) => void }) => {
     const comps = byCode[productCode]?.components || [];
     const optional = comps.filter((c) => c.optional);
-    if (!comps.length) {
-      return <input value={value} onChange={(e) => onChange(e.target.value)} className={selectCls + " font-mono"} placeholder="เช่น transport" />;
-    }
+    const found = comps.some((c) => c.code === value);
+    const suggested = comps.find((c) => c.optional && /นิมนต์|รับ.?ส่งพระ/.test(c.title));
     return (
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={selectCls}>
-        {value && !comps.some((c) => c.code === value) && <option value={value}>{value} (ไม่พบ)</option>}
-        {(optional.length ? optional : comps).map((c) => (
-          <option key={c.code} value={c.code}>
-            {c.code} · {c.title}
-          </option>
-        ))}
-      </select>
+      <div>
+        {comps.length ? (
+          <select value={value} onChange={(e) => onChange(e.target.value)} className={selectCls}>
+            {!found && <option value={value}>{value} (ไม่พบในสินค้านี้)</option>}
+            {(optional.length ? optional : comps).map((c) => (
+              <option key={c.code} value={c.code}>{c.code} · {c.title}</option>
+            ))}
+          </select>
+        ) : (
+          <input value={value} onChange={(e) => onChange(e.target.value)} className={selectCls + " font-mono"} placeholder="เช่น transport" />
+        )}
+        {!found && suggested && (
+          <button type="button" onClick={() => onChange(suggested.code)} className="mt-1 text-[11px] text-brand-600 hover:underline">
+            ใช้ "{suggested.code} · {suggested.title}" ที่พบในสินค้า
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // ── tier group (buffet / table) ────────────────────────────────
+  const TierGroup = ({ pkg, r, mode }: { pkg: { id: string }; r: FaRecipe; mode: MonkTier["mode"] }) => {
+    const tiers = r.monkTiers || [];
+    const rows = tiers.map((t, i) => ({ t, i })).filter(({ t }) => t.mode === mode);
+    const update = (i: number, patch: Partial<MonkTier>) => setPkg(pkg.id, { monkTiers: tiers.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+    const remove = (i: number) => setPkg(pkg.id, { monkTiers: tiers.filter((_, j) => j !== i) });
+    const add = () => {
+      const last = rows[rows.length - 1]?.t;
+      setPkg(pkg.id, { monkTiers: [...tiers, { mode, from: last ? last.from + 10 : 0, code: last?.code || r.monkCode, remarkCode: null }] });
+    };
+    if (mode === "any" && rows.length === 0) return null;
+    return (
+      <div className="rounded-lg bg-white ring-1 ring-slate-100">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
+          <div className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+            {mode === "buffet" ? <Users className="w-3.5 h-3.5 text-slate-400" /> : <Utensils className="w-3.5 h-3.5 text-slate-400" />}
+            {TIER_TITLE[mode]}
+          </div>
+          <button type="button" onClick={add} className="inline-flex items-center gap-1 text-[11px] text-brand-600 hover:underline">
+            <Plus className="w-3 h-3" /> เพิ่มขั้น
+          </button>
+        </div>
+        {rows.length === 0 ? (
+          <p className="px-3 py-2 text-[11px] text-slate-400 italic">ยังไม่มีขั้น — ใช้สินค้าค่าเริ่มต้นของแพ็กเกจ</p>
+        ) : (
+          <div className="divide-y divide-slate-50">
+            <div className="grid grid-cols-12 gap-2 px-3 py-1 text-[10px] uppercase tracking-wide text-slate-400">
+              <div className="col-span-2">ตั้งแต่ ({TIER_UNIT[mode] || "จำนวน"})</div>
+              <div className="col-span-5">สินค้าพิธีสงฆ์</div>
+              <div className="col-span-4">หมายเหตุ</div>
+              <div className="col-span-1" />
+            </div>
+            {rows.map(({ t, i }) => (
+              <div key={i} className="grid grid-cols-12 gap-2 px-3 py-1.5 items-center">
+                <input
+                  type="number"
+                  min={0}
+                  value={t.from}
+                  onChange={(e) => update(i, { from: Math.max(0, Number(e.target.value) || 0) })}
+                  className={selectCls + " col-span-2 text-right tabular-nums"}
+                />
+                <div className="col-span-5">
+                  <ProductSelect value={t.code} onChange={(v) => update(i, { code: v })} options={monkProducts.length ? monkProducts : allProducts} />
+                </div>
+                <div className="col-span-4">
+                  <RemarkSelect value={t.remarkCode} onChange={(v) => update(i, { remarkCode: v })} emptyLabel="(ตามแพ็กเกจ)" />
+                </div>
+                <button type="button" onClick={() => remove(i)} className="col-span-1 flex justify-center text-slate-300 hover:text-red-500" title="ลบขั้น">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -118,13 +191,14 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
 
   return (
     <div className="bg-white rounded-xl ring-1 ring-slate-200 p-5 space-y-5">
+      {/* header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-semibold text-slate-800">ผูกแพ็กเกจกับสินค้าใน FlowAccount app</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            เลือกว่าแต่ละแพ็กเกจของหน้า /booking จะใช้รหัสสินค้าไหนตอนสร้างใบเสนอราคา · จัดการสินค้าได้ที่{" "}
+            แต่ละแพ็กเกจของหน้า /booking จะกลายเป็นบรรทัดในใบเสนอราคาตามที่ผูกไว้ · ราคาและข้อความมาจากสินค้าใน{" "}
             <a href={`${data.appUrl}/products`} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline inline-flex items-center gap-0.5">
-              {data.appUrl.replace(/^https?:\/\//, "")}/products <ExternalLink className="w-3 h-3" />
+              FlowAccount app <ExternalLink className="w-3 h-3" />
             </a>
           </p>
         </div>
@@ -133,9 +207,7 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
             <RotateCcw className="w-3.5 h-3.5" /> ค่าเริ่มต้น
           </button>
           {onClose && (
-            <button onClick={onClose} className="px-3 py-1.5 rounded-lg ring-1 ring-slate-200 text-xs text-slate-600 hover:bg-slate-50">
-              ปิด
-            </button>
+            <button onClick={onClose} className="px-3 py-1.5 rounded-lg ring-1 ring-slate-200 text-xs text-slate-600 hover:bg-slate-50">ปิด</button>
           )}
           <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} บันทึก
@@ -153,17 +225,20 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
         <div className={`text-xs rounded-lg px-3 py-2 ring-1 ${msg.kind === "ok" ? "text-emerald-700 bg-emerald-50 ring-emerald-200" : "text-red-600 bg-red-50 ring-red-200"}`}>{msg.text}</div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* packages */}
+      <div className="space-y-4">
         {data.packages.map((pkg) => {
           const r = config.packages[pkg.id];
           if (!r) return null;
           const isFull = pkg.kind === "full";
+          const open = !!advanced[pkg.id];
           return (
-            <div key={pkg.id} className="rounded-xl ring-1 ring-slate-100 bg-slate-50/60 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-slate-800">{pkg.name}</div>
-                  <div className="text-[11px] font-mono text-slate-400">{pkg.id}</div>
+            <section key={pkg.id} className="rounded-xl ring-1 ring-slate-200 overflow-hidden">
+              <header className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-semibold text-slate-800">{pkg.name}</span>
+                  <span className="text-[11px] font-mono text-slate-400">{pkg.id}</span>
+                  <span className="text-[11px] text-slate-400">{isFull ? "· พิธีสงฆ์ + อาหาร + โต๊ะ/เก้าอี้" : "· พิธีสงฆ์อย่างเดียว"}</span>
                 </div>
                 <label className="text-xs text-slate-600 flex items-center gap-1.5">
                   VAT
@@ -172,157 +247,114 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
                     <option value={7}>7%</option>
                   </select>
                 </label>
-              </div>
+              </header>
 
-              <div>
-                <label className={labelCls}>สินค้าพิธีสงฆ์ (บรรทัดหลัก)</label>
-                <ProductSelect value={r.monkCode} onChange={(v) => setPkg(pkg.id, { monkCode: v })} options={packageProducts} />
-              </div>
-              <div>
-                <label className={labelCls}>รายการย่อย "นิมนต์รับ-ส่งพระ" ในสินค้านั้น (ตัดออกเมื่อลูกค้านิมนต์เอง)</label>
-                <TransportSelect productCode={r.monkCode} value={r.transportCode} onChange={(v) => setPkg(pkg.id, { transportCode: v })} />
-              </div>
-              <div>
-                <label className={labelCls}>หมายเหตุในใบเสนอราคา (เทมเพลตหมายเหตุใน FlowAccount app)</label>
-                <select value={r.remarkCode || ""} onChange={(e) => setPkg(pkg.id, { remarkCode: e.target.value || null })} className={selectCls}>
-                  <option value="">(ใช้เทมเพลตค่าเริ่มต้นของ FlowAccount)</option>
-                  {r.remarkCode && !(data.remarkTemplates || []).some((t) => t.code === r.remarkCode) && (
-                    <option value={r.remarkCode}>{r.remarkCode} (ไม่พบใน FlowAccount)</option>
-                  )}
-                  {(data.remarkTemplates || [])
-                    .filter((t) => t.code)
-                    .map((t) => (
-                      <option key={t.code!} value={t.code!}>
-                        {t.code} · {t.name}{t.isDefault ? " (ค่าเริ่มต้น)" : ""}
-                      </option>
-                    ))}
-                </select>
-                {!(data.remarkTemplates || []).some((t) => t.code) && (
-                  <p className="text-[11px] text-slate-400 mt-1">ยังไม่มีเทมเพลตหมายเหตุที่ตั้ง "รหัส (สำหรับ API)" ใน FlowAccount app → หน้าเทมเพลต</p>
-                )}
-              </div>
-
-              {isFull && (
-                <>
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className={labelCls + " mb-0"}>สินค้าพิธีสงฆ์ตามขั้น (ส่วนพิธีสงฆ์ต่างกันเมื่อรวมเต้นท์ใหญ่)</label>
-                      <button
-                        type="button"
-                        onClick={() => setPkg(pkg.id, { monkTiers: [...(r.monkTiers || []), { mode: "buffet", from: 0, code: r.monkCode }] })}
-                        className="text-[11px] text-brand-600 hover:underline"
-                      >
-                        + เพิ่มขั้น
-                      </button>
-                    </div>
-                    {(r.monkTiers || []).length === 0 && <p className="text-[11px] text-slate-400 italic">ไม่มีขั้น — ใช้สินค้าพิธีสงฆ์ด้านบนทุกกรณี</p>}
-                    <div className="space-y-1.5">
-                      {(r.monkTiers || []).map((t, i) => {
-                        const setTier = (patch: Partial<MonkTier>) =>
-                          setPkg(pkg.id, { monkTiers: (r.monkTiers || []).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
-                        const remarkOptions = (data.remarkTemplates || []).filter((x) => x.code);
-                        return (
-                          <div key={i} className="rounded-lg bg-white ring-1 ring-slate-100 p-1.5 space-y-1">
-                            <div className="grid grid-cols-12 gap-1.5 items-center">
-                              <select value={t.mode} onChange={(e) => setTier({ mode: e.target.value as MonkTier["mode"] })} className={selectCls + " col-span-3"}>
-                                <option value="buffet">บุฟเฟต์</option>
-                                <option value="table">โต๊ะจีน</option>
-                                <option value="any">ทุกโหมด</option>
-                              </select>
-                              <div className="col-span-3 flex items-center gap-1">
-                                <span className="text-[11px] text-slate-400 whitespace-nowrap">ตั้งแต่</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={t.from}
-                                  onChange={(e) => setTier({ from: Math.max(0, Number(e.target.value) || 0) })}
-                                  className={selectCls}
-                                  title={t.mode === "table" ? "จำนวนโต๊ะจีน" : "จำนวนแขก"}
-                                />
-                              </div>
-                              <div className="col-span-5">
-                                <ProductSelect value={t.code} onChange={(v) => setTier({ code: v })} options={packageProducts} />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => setPkg(pkg.id, { monkTiers: (r.monkTiers || []).filter((_, j) => j !== i) })}
-                                className="col-span-1 text-slate-400 hover:text-red-500 text-xs"
-                                title="ลบขั้น"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                            <div className="grid grid-cols-12 gap-1.5 items-center">
-                              <span className="col-span-3 text-[11px] text-slate-400 pl-1">หมายเหตุของขั้นนี้</span>
-                              <select
-                                value={t.remarkCode || ""}
-                                onChange={(e) => setTier({ remarkCode: e.target.value || null })}
-                                className={selectCls + " col-span-8 text-xs"}
-                                title="เทมเพลตหมายเหตุที่ใช้เมื่อเข้าขั้นนี้ (ว่าง = ใช้ของแพ็กเกจ)"
-                              >
-                                <option value="">(ใช้หมายเหตุของแพ็กเกจ)</option>
-                                {t.remarkCode && !remarkOptions.some((x) => x.code === t.remarkCode) && (
-                                  <option value={t.remarkCode}>{t.remarkCode} (ไม่พบ)</option>
-                                )}
-                                {remarkOptions.map((x) => (
-                                  <option key={x.code!} value={x.code!}>
-                                    {x.code} · {x.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1">ระบบเลือกแถวที่โหมดตรงกันและ "ตั้งแต่" มากที่สุดที่ไม่เกินจำนวนแขก/โต๊ะ (บุฟเฟต์นับแขก, โต๊ะจีนนับโต๊ะ)</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["buffet", "table"] as const).map((mode) => (
-                      <div key={mode}>
-                        <label className={labelCls}>{mode === "buffet" ? "ขั้นแขกที่แสดงบนหน้า booking (คน)" : "ขั้นโต๊ะจีนที่แสดง (โต๊ะ)"}</label>
-                        <input
-                          value={tiersText[`${pkg.id}:${mode}`] ?? (r.displayTiers?.[mode] || []).join(", ")}
-                          onChange={(e) => {
-                            setTiersText((t) => ({ ...t, [`${pkg.id}:${mode}`]: e.target.value }));
-                            const list = e.target.value.split(/[,\s]+/).map((s) => Number(s)).filter((n) => Number.isFinite(n) && n > 0);
-                            setPkg(pkg.id, { displayTiers: { buffet: r.displayTiers?.buffet || [], table: r.displayTiers?.table || [], [mode]: Array.from(new Set(list)).sort((a, b) => a - b) } });
-                          }}
-                          className={selectCls}
-                          placeholder={mode === "buffet" ? "20, 30, 40, 50" : "8, 10, 20"}
-                        />
+              <div className="p-4 space-y-4">
+                {isFull ? (
+                  <>
+                    {/* 1. ceremony product per tier */}
+                    <div>
+                      <div className="text-xs font-semibold text-slate-700 mb-2">1. สินค้าพิธีสงฆ์ (เลือกตามขนาดงาน) และหมายเหตุ</div>
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        <TierGroup pkg={pkg} r={r} mode="buffet" />
+                        <TierGroup pkg={pkg} r={r} mode="table" />
+                        <TierGroup pkg={pkg} r={r} mode="any" />
                       </div>
-                    ))}
+                      <div className="grid gap-3 md:grid-cols-2 mt-3">
+                        <div>
+                          <label className={labelCls}>สินค้าพิธีสงฆ์ค่าเริ่มต้น (เมื่อไม่มีขั้นที่ตรง)</label>
+                          <ProductSelect value={r.monkCode} onChange={(v) => setPkg(pkg.id, { monkCode: v })} options={monkProducts.length ? monkProducts : allProducts} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>หมายเหตุค่าเริ่มต้นของแพ็กเกจ (เมื่อขั้นไม่ได้ตั้ง)</label>
+                          <RemarkSelect value={r.remarkCode} onChange={(v) => setPkg(pkg.id, { remarkCode: v })} emptyLabel="(ใช้เทมเพลตค่าเริ่มต้นของ FlowAccount)" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. food */}
+                    <div>
+                      <div className="text-xs font-semibold text-slate-700 mb-2">2. อาหาร</div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div>
+                          <label className={labelCls}>บุฟเฟต์ (สินค้าที่มีตัวแปร guests → ได้โต๊ะกลม/เก้าอี้อัตโนมัติ)</label>
+                          <ProductSelect value={r.buffetCode} onChange={(v) => setPkg(pkg.id, { buffetCode: v || null })} options={buffetProducts.length ? buffetProducts : allProducts} allowEmpty />
+                        </div>
+                        <div>
+                          <label className={labelCls}>โต๊ะจีน (คิดต่อโต๊ะ)</label>
+                          <ProductSelect value={r.chineseTableCode} onChange={(v) => setPkg(pkg.id, { chineseTableCode: v || null })} options={allProducts} allowEmpty />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className={labelCls}>สินค้าพิธีสงฆ์</label>
+                      <ProductSelect value={r.monkCode} onChange={(v) => setPkg(pkg.id, { monkCode: v })} options={monkProducts.length ? monkProducts : allProducts} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>หมายเหตุในใบเสนอราคา</label>
+                      <RemarkSelect value={r.remarkCode} onChange={(v) => setPkg(pkg.id, { remarkCode: v })} emptyLabel="(ใช้เทมเพลตค่าเริ่มต้นของ FlowAccount)" />
+                    </div>
                   </div>
-                  <div>
-                    <label className={labelCls}>สินค้าบุฟเฟต์ (แพ็กเกจที่มีตัวแปร guests → โต๊ะ/เก้าอี้อัตโนมัติ)</label>
-                    <ProductSelect value={r.buffetCode} onChange={(v) => setPkg(pkg.id, { buffetCode: v || null })} options={buffetProducts.length ? buffetProducts : packageProducts} allowEmpty />
-                  </div>
-                  <div>
-                    <label className={labelCls}>สินค้าโต๊ะจีน (จำนวน = โต๊ะ)</label>
-                    <ProductSelect value={r.chineseTableCode} onChange={(v) => setPkg(pkg.id, { chineseTableCode: v || null })} options={packageProducts} allowEmpty />
-                  </div>
-                </>
-              )}
-            </div>
+                )}
+
+                {/* advanced */}
+                <div className="border-t border-slate-100 pt-2">
+                  <button type="button" onClick={() => setAdvanced((a) => ({ ...a, [pkg.id]: !open }))} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
+                    {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />} ตั้งค่าขั้นสูง
+                    <span className="text-slate-400">· รายการรับ-ส่งพระ{isFull ? " · ขั้นที่แสดงบนหน้า booking" : ""}</span>
+                  </button>
+                  {open && (
+                    <div className="grid gap-3 md:grid-cols-3 mt-3">
+                      <div className={isFull ? "" : "md:col-span-3"}>
+                        <label className={labelCls}>รายการย่อย "นิมนต์รับ-ส่งพระ" ในสินค้าพิธีสงฆ์ (ตัดออกเมื่อลูกค้านิมนต์เอง)</label>
+                        <TransportField productCode={r.monkCode} value={r.transportCode} onChange={(v) => setPkg(pkg.id, { transportCode: v })} />
+                      </div>
+                      {isFull &&
+                        (["buffet", "table"] as const).map((mode) => (
+                          <div key={mode}>
+                            <label className={labelCls}>{mode === "buffet" ? "ขั้นแขกที่แสดงบนหน้า booking (คน)" : "ขั้นโต๊ะจีนที่แสดง (โต๊ะ)"}</label>
+                            <input
+                              value={tiersText[`${pkg.id}:${mode}`] ?? (r.displayTiers?.[mode] || []).join(", ")}
+                              onChange={(e) => {
+                                setTiersText((t) => ({ ...t, [`${pkg.id}:${mode}`]: e.target.value }));
+                                const list = e.target.value.split(/[,\s]+/).map((s) => Number(s)).filter((n) => Number.isFinite(n) && n > 0);
+                                setPkg(pkg.id, { displayTiers: { buffet: r.displayTiers?.buffet || [], table: r.displayTiers?.table || [], [mode]: Array.from(new Set(list)).sort((a, b) => a - b) } });
+                              }}
+                              className={selectCls}
+                              placeholder={mode === "buffet" ? "20, 30, 40, 50" : "8, 10, 20"}
+                            />
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
           );
         })}
       </div>
 
-      <div className="rounded-xl ring-1 ring-slate-100 bg-slate-50/60 p-4">
-        <div className="font-medium text-slate-800 mb-3">ออปชั่นเสริม</div>
-        <div className="grid gap-3 md:grid-cols-3">
+      {/* add-ons */}
+      <section className="rounded-xl ring-1 ring-slate-200 overflow-hidden">
+        <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-slate-400" />
+          <span className="font-semibold text-slate-800">ออปชั่นเสริม</span>
+          <span className="text-[11px] text-slate-400">· แต่ละรายการเป็นบรรทัดแยกในใบเสนอราคา ราคาจากสินค้า</span>
+        </header>
+        <div className="p-4 grid gap-3 md:grid-cols-3">
           {data.addons.map((a) => (
             <div key={a.id}>
               <label className={labelCls}>
-                {a.label} · {a.price.toLocaleString("th-TH")} บาท <span className="font-mono text-slate-400">({a.id})</span>
+                {a.label} <span className="font-mono text-slate-400">({a.id})</span>
               </label>
-              <ProductSelect value={config.addons[a.id]} onChange={(v) => setAddon(a.id, v)} options={packageProducts} allowEmpty />
+              <ProductSelect value={config.addons[a.id]} onChange={(v) => setAddon(a.id, v)} options={allProducts} allowEmpty />
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-slate-400 mt-2">ราคาของทุกรายการยังมาจากตารางราคาของหน้า booking (packages.config.ts) ไม่ใช่ราคาในสินค้า</p>
-      </div>
+      </section>
     </div>
   );
 }
