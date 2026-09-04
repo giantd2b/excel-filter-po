@@ -134,10 +134,14 @@ export class BookingsService {
   async recipeSettings() {
     const config = await this.getRecipeConfig();
     let products: any[] = [];
+    let remarkTemplates: any[] = [];
     let catalogError: string | null = null;
     try {
-      products = this.flowAccount.isConfigured ? await this.flowAccount.listProducts() : [];
-      if (!this.flowAccount.isConfigured) catalogError = 'ยังไม่ได้ตั้งค่า FA_API_KEY';
+      if (!this.flowAccount.isConfigured) throw new Error('ยังไม่ได้ตั้งค่า FA_API_KEY');
+      [products, remarkTemplates] = await Promise.all([
+        this.flowAccount.listProducts(),
+        this.flowAccount.listRemarkTemplates().catch(() => []),
+      ]);
     } catch (e: any) {
       catalogError = e?.message || 'โหลดรายการสินค้าจาก flowaccount-app ไม่สำเร็จ';
     }
@@ -154,6 +158,7 @@ export class BookingsService {
         variables: (p.variables || []).map((v: any) => v.key),
         components: (p.components || []).map((c: any) => ({ code: c.code, title: c.title, optional: !!c.optional })),
       })),
+      remarkTemplates: remarkTemplates.map((t: any) => ({ id: t.id, code: t.code || null, name: t.name, isDefault: !!t.isDefault })),
       catalogError,
       appUrl: this.flowAccount.appUrl,
     };
@@ -207,6 +212,8 @@ export class BookingsService {
       customer: { name: b.customerName, phone: b.phone, address: bookingAddress(b) },
       project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}`,
       vatRate: built.vatRate,
+      // printed หมายเหตุ: the package's remark template in flowaccount-app (falls back to FA's default there)
+      remarkCode: config.packages[b.packageId]?.remarkCode || undefined,
       internalNotes: notes.join('\n'),
       items: built.items,
     });

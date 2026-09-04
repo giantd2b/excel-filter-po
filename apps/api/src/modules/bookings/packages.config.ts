@@ -374,6 +374,8 @@ export interface FaRecipe {
   chineseTableCode?: string | null;
   /** VAT rate for the document: booking FAQ says packages with guest catering exclude 7% VAT */
   vatRate: 0 | 7;
+  /** flowaccount-app remark template code used as the printed หมายเหตุ (null = FA's default template) */
+  remarkCode?: string | null;
 }
 
 export interface FaRecipeConfig {
@@ -499,6 +501,7 @@ export function mergeFaRecipes(saved: Partial<FaRecipeConfig> | null | undefined
       buffetCode: optionalCode(s.buffetCode, d.buffetCode),
       chineseTableCode: optionalCode(s.chineseTableCode, d.chineseTableCode),
       vatRate: s.vatRate === 0 || s.vatRate === 7 ? s.vatRate : d.vatRate,
+      remarkCode: typeof s.remarkCode === 'string' && s.remarkCode.trim() ? s.remarkCode.trim().toUpperCase() : null,
     };
   }
   const addons: Record<string, string> = {};

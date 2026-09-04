@@ -43,6 +43,12 @@ export class FlowAccountClient {
     return res.data?.data || [];
   }
 
+  /** Remark (หมายเหตุ) templates: { id, code, name, text, isDefault }. */
+  async listRemarkTemplates(): Promise<any[]> {
+    const res = await this.client().get('/remark-templates');
+    return res.data?.data || [];
+  }
+
   async listQuotations(page: number, limit: number): Promise<any> {
     const res = await this.client().get(`/quotations?page=${page}&limit=${limit}`);
     return res.data;

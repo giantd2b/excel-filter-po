@@ -563,6 +563,7 @@ export interface FaRecipe {
   buffetCode?: string | null;
   chineseTableCode?: string | null;
   vatRate: 0 | 7;
+  remarkCode?: string | null;
 }
 
 export interface FaRecipeConfig {
@@ -585,6 +586,7 @@ export interface BookingRecipeSettings {
   packages: { id: string; name: string; kind: "ceremony" | "full" }[];
   addons: { id: string; label: string; price: number }[];
   products: FaCatalogProduct[];
+  remarkTemplates: { id: number; code: string | null; name: string; isDefault: boolean }[];
   catalogError: string | null;
   appUrl: string;
 }

@@ -182,6 +182,25 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
                 <label className={labelCls}>รายการย่อย "นิมนต์รับ-ส่งพระ" ในสินค้านั้น (ตัดออกเมื่อลูกค้านิมนต์เอง)</label>
                 <TransportSelect productCode={r.monkCode} value={r.transportCode} onChange={(v) => setPkg(pkg.id, { transportCode: v })} />
               </div>
+              <div>
+                <label className={labelCls}>หมายเหตุในใบเสนอราคา (เทมเพลตหมายเหตุใน FlowAccount app)</label>
+                <select value={r.remarkCode || ""} onChange={(e) => setPkg(pkg.id, { remarkCode: e.target.value || null })} className={selectCls}>
+                  <option value="">(ใช้เทมเพลตค่าเริ่มต้นของ FlowAccount)</option>
+                  {r.remarkCode && !(data.remarkTemplates || []).some((t) => t.code === r.remarkCode) && (
+                    <option value={r.remarkCode}>{r.remarkCode} (ไม่พบใน FlowAccount)</option>
+                  )}
+                  {(data.remarkTemplates || [])
+                    .filter((t) => t.code)
+                    .map((t) => (
+                      <option key={t.code!} value={t.code!}>
+                        {t.code} · {t.name}{t.isDefault ? " (ค่าเริ่มต้น)" : ""}
+                      </option>
+                    ))}
+                </select>
+                {!(data.remarkTemplates || []).some((t) => t.code) && (
+                  <p className="text-[11px] text-slate-400 mt-1">ยังไม่มีเทมเพลตหมายเหตุที่ตั้ง "รหัส (สำหรับ API)" ใน FlowAccount app → หน้าเทมเพลต</p>
+                )}
+              </div>
 
               {isFull && (
                 <>
