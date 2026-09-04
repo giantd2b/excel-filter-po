@@ -386,7 +386,7 @@ export const FA_RECIPES_SETTING_KEY = 'fa_booking_recipes';
 
 export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
   packages: {
-    ceremony: { monkCode: 'CEREMONY', transportCode: 'transport', vatRate: 0 },
+    ceremony: { monkCode: 'CEREMONY', transportCode: 'item8', vatRate: 0 }, // list copied from MONK_FULL203040
     'ceremony-prime': { monkCode: 'CEREMONY_PRIME', transportCode: 'transport', vatRate: 0 },
     full: {
       monkCode: 'MONK_FULL203040',
