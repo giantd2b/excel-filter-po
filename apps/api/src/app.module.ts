@@ -17,6 +17,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { ExternalModule } from './modules/external/external.module';
 import { AgendaModule } from './modules/agenda/agenda.module';
 import { QuotationsModule } from './modules/quotations/quotations.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { QuotationsModule } from './modules/quotations/quotations.module';
     ExternalModule,
     AgendaModule,
     QuotationsModule,
+    BookingsModule,
   ],
 })
 export class AppModule {}

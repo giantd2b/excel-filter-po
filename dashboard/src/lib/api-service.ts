@@ -500,6 +500,51 @@ export async function syncQuotations() {
   return api.get<any>("/quotations/sync");
 }
 
+// ─── Merit Bookings (หน้าจองแพคเกจ /booking) ─────────────────────
+
+export interface MeritBooking {
+  id: string;
+  code: string;
+  status: "NEW" | "CONTACTED" | "CONFIRMED" | "DONE";
+  occasion: string;
+  eventDate: string;
+  timeSlot: string;
+  tambon?: string | null;
+  amphoe?: string | null;
+  province?: string | null;
+  zip?: string | null;
+  venue?: string | null;
+  packageId: string;
+  packageName: string;
+  foodMode: string;
+  guests: number;
+  tables: number;
+  monks: number;
+  selfTransport: boolean;
+  addons: string[];
+  budget?: string | null;
+  customerName: string;
+  phone: string;
+  note?: string | null;
+  estimatedTotal: number;
+  createdAt: string;
+}
+
+export async function getBookings(status?: string) {
+  const qs = status && status !== "ALL" ? `?status=${status}` : "";
+  return api.get<{ bookings: MeritBooking[]; statusCounts: Record<string, number>; total: number }>(
+    `/bookings${qs}`
+  );
+}
+
+export async function updateBookingStatus(id: string, status: string) {
+  return api.patch<MeritBooking>(`/bookings/${id}/status`, { status });
+}
+
+export async function deleteBooking(id: string) {
+  return api.delete<{ success: boolean }>(`/bookings/${id}`);
+}
+
 export async function getUnmatchedCandidates(page = 1, limit = 20) {
   return api.get<any>(`/quotations/unmatched-candidates?page=${page}&limit=${limit}`);
 }

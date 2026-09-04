@@ -48,6 +48,13 @@ export const api = {
       signal,
     }),
 
+  patch: <T>(path: string, body: unknown, signal?: AbortSignal) =>
+    request<T>(path, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      signal,
+    }),
+
   delete: <T>(path: string, signal?: AbortSignal) =>
     request<T>(path, { method: "DELETE", signal }),
 

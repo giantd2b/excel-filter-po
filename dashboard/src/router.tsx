@@ -19,6 +19,7 @@ const KnowledgePage = lazy(() => import("@/pages/KnowledgePage"));
 const ApiKeysPage = lazy(() => import("@/pages/ApiKeysPage"));
 const AgendaGeneratorPage = lazy(() => import("@/pages/AgendaGeneratorPage"));
 const QuotationsPage = lazy(() => import("@/pages/QuotationsPage"));
+const BookingsPage = lazy(() => import("@/pages/BookingsPage"));
 const QuoteMatchPage = lazy(() => import("@/pages/QuoteMatchPage"));
 
 function PageLoader() {
@@ -107,6 +108,10 @@ export const router = createBrowserRouter([
       {
         path: "quote-match",
         element: <SuspenseWrapper><QuoteMatchPage /></SuspenseWrapper>,
+      },
+      {
+        path: "bookings",
+        element: <SuspenseWrapper><BookingsPage /></SuspenseWrapper>,
       },
     ],
   },
