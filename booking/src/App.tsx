@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LINE_URL, PHONE, pkgById, type Pkg } from './data/packages';
 import { initialForm, type BookingForm } from './lib/calc';
+import { loadPricing } from './lib/pricing';
 import Home from './screens/Home';
 import Detail from './screens/Detail';
 import Wizard from './screens/Wizard';
@@ -21,6 +22,11 @@ export default function App() {
   const [pkgId, setPkgId] = useState('ceremony-prime');
   const [form, setForm] = useState<BookingForm>(initialForm);
   const [saved, setSaved] = useState<SavedBooking | null>(null);
+  // Live prices come from the CRM (edited in the dashboard); bump state to re-render once applied
+  const [, setPricingVersion] = useState(0);
+  useEffect(() => {
+    loadPricing().then(() => setPricingVersion((v) => v + 1));
+  }, []);
 
   const goHome = () => {
     setScreen('home');

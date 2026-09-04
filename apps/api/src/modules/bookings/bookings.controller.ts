@@ -35,6 +35,19 @@ export class BookingsController {
     return this.bookingsService.list(status);
   }
 
+  /** Public: live package prices for the /booking page (no auth). */
+  @Get('pricing')
+  async pricing() {
+    return this.bookingsService.pricingSettings();
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Put('pricing')
+  async savePricing(@Body() body: any) {
+    const pricing = await this.bookingsService.savePricing(body || {});
+    return { pricing };
+  }
+
   /** Package → flowaccount-app product mapping used when creating quotations. */
   @UseGuards(FirebaseAuthGuard)
   @Get('recipes')

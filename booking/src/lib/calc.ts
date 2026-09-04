@@ -1,7 +1,6 @@
 import {
   ADDONS,
-  FIVE_MONKS_DISCOUNT,
-  SELF_TRANSPORT_DISCOUNT,
+  DISCOUNTS,
   baht,
   pkgById,
   type FoodMode,
@@ -94,13 +93,13 @@ export function calc(f: BookingForm): CalcResult {
     }
   }
   if (f.selfTransport) {
-    total -= SELF_TRANSPORT_DISCOUNT;
-    rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: '−1,000' });
+    total -= DISCOUNTS.selfTransport;
+    rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: '−' + baht(DISCOUNTS.selfTransport) });
   }
-  // every package: 5 monks instead of 9 = −1,500 (new-package-2025 sheet)
+  // every package: 5 monks instead of 9 (new-package-2025 sheet)
   if (f.monks === 5) {
-    total -= FIVE_MONKS_DISCOUNT;
-    rows.push({ k: 'พระ 5 รูป', v: '−1,500' });
+    total -= DISCOUNTS.fiveMonks;
+    rows.push({ k: 'พระ 5 รูป', v: '−' + baht(DISCOUNTS.fiveMonks) });
   }
   return { pkg, total, rows };
 }

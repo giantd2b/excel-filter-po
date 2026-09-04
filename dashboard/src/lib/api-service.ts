@@ -588,6 +588,41 @@ export interface BookingRecipeSettings {
   appUrl: string;
 }
 
+// ─── Package pricing (single source of truth, served to /booking) ──
+
+export interface TierConfig {
+  tiers: [number, number][]; // [min count, package price]
+  extra: number; // per extra guest / table above the tier
+}
+
+export interface PackagePricing {
+  base?: number | null;
+  buffet?: TierConfig | null;
+  table?: TierConfig | null;
+}
+
+export interface PricingConfig {
+  packages: Record<string, PackagePricing>;
+  addons: Record<string, number>;
+  selfTransportDiscount: number;
+  fiveMonksDiscount: number;
+}
+
+export interface BookingPricingSettings {
+  pricing: PricingConfig;
+  defaults: PricingConfig;
+  packages: { id: string; name: string; kind: "ceremony" | "full" }[];
+  addons: { id: string; label: string }[];
+}
+
+export async function getBookingPricing() {
+  return api.get<BookingPricingSettings>("/bookings/pricing");
+}
+
+export async function saveBookingPricing(pricing: PricingConfig) {
+  return api.put<{ pricing: PricingConfig }>("/bookings/pricing", pricing);
+}
+
 export async function getBookingRecipes() {
   return api.get<BookingRecipeSettings>("/bookings/recipes");
 }

@@ -249,8 +249,42 @@ export const LINE_URL = 'https://line.me/R/ti/p/@temboon';
 export const PHONE = '0805838383';
 export const PHONE_LABEL = '080-583-8383 ต่อ 2';
 
-export const SELF_TRANSPORT_DISCOUNT = 1000;
-export const FIVE_MONKS_DISCOUNT = 1500;
+// Discounts — defaults only; live values arrive from GET /api/bookings/pricing (see applyPricing)
+export const DISCOUNTS = { selfTransport: 1000, fiveMonks: 1500 };
+
+export interface PricingPayload {
+  pricing: {
+    packages: Record<string, { base?: number | null; buffet?: TierConfig | null; table?: TierConfig | null }>;
+    addons: Record<string, number>;
+    selfTransportDiscount: number;
+    fiveMonksDiscount: number;
+  };
+}
+
+/**
+ * Overwrite the bundled default prices with the live ones from the API.
+ * Mutates PKGS / ADDONS / DISCOUNTS in place; callers must re-render afterwards.
+ */
+export function applyPricing(payload: PricingPayload) {
+  const p = payload?.pricing;
+  if (!p) return;
+  for (const pkg of PKGS) {
+    const s = p.packages?.[pkg.id];
+    if (!s) continue;
+    if (pkg.kind === 'ceremony') {
+      if (typeof s.base === 'number') pkg.base = s.base;
+    } else {
+      if (s.buffet?.tiers?.length) pkg.buffet = { tiers: s.buffet.tiers, extra: s.buffet.extra };
+      if (s.table?.tiers?.length) pkg.table = { tiers: s.table.tiers, extra: s.table.extra };
+    }
+  }
+  for (const a of ADDONS) {
+    const v = p.addons?.[a.id];
+    if (typeof v === 'number') a.price = v;
+  }
+  if (typeof p.selfTransportDiscount === 'number') DISCOUNTS.selfTransport = p.selfTransportDiscount;
+  if (typeof p.fiveMonksDiscount === 'number') DISCOUNTS.fiveMonks = p.fiveMonksDiscount;
+}
 
 export function pkgById(id: string): Pkg {
   return PKGS.find((p) => p.id === id) || PKGS[1];

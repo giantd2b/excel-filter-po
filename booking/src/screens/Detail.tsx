@@ -1,4 +1,4 @@
-import { baht, type Pkg } from '../data/packages';
+import { DISCOUNTS, baht, type Pkg } from '../data/packages';
 import { BackLink, charm } from '../ui';
 
 interface Props {
@@ -162,8 +162,8 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-accent-800)', marginBottom: 7 }}>ส่วนลด</div>
             <div style={{ fontSize: 13.5, lineHeight: 1.75, color: 'var(--color-accent-800)' }}>
               {pkg.kind === 'full'
-                ? 'นิมนต์รับ-ส่งพระเอง ลด 1,000 บาท'
-                : 'นิมนต์รับ-ส่งพระเอง ลด 1,000 บาท / พระ 5 รูป ลด 1,500 บาท'}
+                ? `นิมนต์รับ-ส่งพระเอง ลด ${baht(DISCOUNTS.selfTransport)} บาท`
+                : `นิมนต์รับ-ส่งพระเอง ลด ${baht(DISCOUNTS.selfTransport)} บาท / พระ 5 รูป ลด ${baht(DISCOUNTS.fiveMonks)} บาท`}
             </div>
           </div>
         </div>

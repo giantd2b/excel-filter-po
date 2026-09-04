@@ -9,7 +9,11 @@ import {
   FA_RECIPES_SETTING_KEY,
   BOOKING_PACKAGES,
   BOOKING_ADDONS,
+  mergePricing,
+  DEFAULT_PRICING,
+  PRICING_SETTING_KEY,
   type FaRecipeConfig,
+  type PricingConfig,
 } from './packages.config';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { FlowAccountClient } from '../quotations/flowaccount.client';
@@ -31,6 +35,41 @@ export class BookingsService {
     private readonly prisma: PrismaService,
     private readonly flowAccount: FlowAccountClient,
   ) {}
+
+  // ── Pricing (editable from the dashboard; served to the public /booking page) ──
+
+  async getPricing(): Promise<PricingConfig> {
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: PRICING_SETTING_KEY } });
+    let saved: Partial<PricingConfig> | null = null;
+    if (row?.value) {
+      try {
+        saved = JSON.parse(row.value);
+      } catch {
+        saved = null;
+      }
+    }
+    return mergePricing(saved);
+  }
+
+  async savePricing(input: Partial<PricingConfig>): Promise<PricingConfig> {
+    const merged = mergePricing(input);
+    await this.prisma.systemSetting.upsert({
+      where: { key: PRICING_SETTING_KEY },
+      update: { value: JSON.stringify(merged) },
+      create: { key: PRICING_SETTING_KEY, value: JSON.stringify(merged) },
+    });
+    return merged;
+  }
+
+  /** Public payload for the /booking page and the settings UI. */
+  async pricingSettings() {
+    return {
+      pricing: await this.getPricing(),
+      defaults: DEFAULT_PRICING,
+      packages: BOOKING_PACKAGES.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
+      addons: BOOKING_ADDONS.map((a) => ({ id: a.id, label: a.label })),
+    };
+  }
 
   // ── Package → flowaccount-app product mapping (editable from the dashboard) ──
 
@@ -94,7 +133,7 @@ export class BookingsService {
     const b = await this.prisma.booking.findUnique({ where: { id } });
     if (!b) throw new NotFoundException('Booking not found');
 
-    const config = await this.getRecipeConfig();
+    const [config, pricing] = await Promise.all([this.getRecipeConfig(), this.getPricing()]);
     const built = buildFaItems(
       {
         packageId: b.packageId,
@@ -106,6 +145,7 @@ export class BookingsService {
         addons: b.addons,
       },
       config,
+      pricing,
     );
     if (!built) throw new BadRequestException(`ไม่มีสูตรใบเสนอราคาสำหรับแพ็กเกจ "${b.packageId}"`);
 
@@ -149,15 +189,18 @@ export class BookingsService {
       throw new BadRequestException('กรุณาเลือกวันที่จัดงาน');
     }
 
-    const calc = calcEstimatedTotal({
-      packageId: dto.packageId,
-      foodMode: dto.foodMode,
-      guests: dto.guests,
-      tables: dto.tables,
-      monks: dto.monks,
-      selfTransport: dto.selfTransport,
-      addons: dto.addons,
-    });
+    const calc = calcEstimatedTotal(
+      {
+        packageId: dto.packageId,
+        foodMode: dto.foodMode,
+        guests: dto.guests,
+        tables: dto.tables,
+        monks: dto.monks,
+        selfTransport: dto.selfTransport,
+        addons: dto.addons,
+      },
+      await this.getPricing(),
+    );
     if (!calc) throw new BadRequestException('ไม่พบแพ็กเกจที่เลือก');
 
     const code = await this.nextCode();

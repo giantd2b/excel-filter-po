@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText, Settings2 } from "lucide-react";
 import BookingRecipeSettings from "@/components/BookingRecipeSettings";
+import BookingPricingSettings from "@/components/BookingPricingSettings";
 import {
   getBookings,
   updateBookingStatus,
@@ -126,6 +127,7 @@ export default function BookingsPage() {
 
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"pricing" | "recipes">("pricing");
 
   const createQuote = async (b: MeritBooking) => {
     setBusyId(b.id);
@@ -192,7 +194,29 @@ export default function BookingsPage() {
         </div>
       </div>
 
-      {showSettings && <BookingRecipeSettings onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <div className="space-y-3">
+          <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+            {([
+              ["pricing", "ราคาแพ็กเกจ"],
+              ["recipes", "ผูกสินค้า FlowAccount"],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setSettingsTab(key)}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold ${settingsTab === key ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {settingsTab === "pricing" ? (
+            <BookingPricingSettings onClose={() => setShowSettings(false)} />
+          ) : (
+            <BookingRecipeSettings onClose={() => setShowSettings(false)} />
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2 flex-wrap">
         {tabs.map((t) => (

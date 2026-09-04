@@ -52,6 +52,78 @@ export const BOOKING_ADDONS: { id: string; label: string; price: number }[] = [
 export const SELF_TRANSPORT_DISCOUNT = 1000;
 export const FIVE_MONKS_DISCOUNT = 1500; // every package (new-package-2025 sheet)
 
+// ── Editable pricing ──────────────────────────────────────────────────
+// The numbers above are only DEFAULTS. The live prices are edited in the
+// dashboard (จองงานบุญ → ตั้งค่าใบเสนอราคา → ราคา), stored in SystemSetting
+// (PRICING_SETTING_KEY) and served to the public /booking page by
+// GET /bookings/pricing, so there is a single source of truth.
+export interface PackagePricing {
+  base?: number | null; // ceremony packages
+  buffet?: TierConfig | null; // full packages
+  table?: TierConfig | null;
+}
+
+export interface PricingConfig {
+  packages: Record<string, PackagePricing>;
+  addons: Record<string, number>;
+  selfTransportDiscount: number;
+  fiveMonksDiscount: number;
+}
+
+export const PRICING_SETTING_KEY = 'booking_pricing';
+
+export const DEFAULT_PRICING: PricingConfig = {
+  packages: Object.fromEntries(
+    BOOKING_PACKAGES.map((p) => [p.id, { base: p.base ?? null, buffet: p.buffet ?? null, table: p.table ?? null }]),
+  ),
+  addons: Object.fromEntries(BOOKING_ADDONS.map((a) => [a.id, a.price])),
+  selfTransportDiscount: SELF_TRANSPORT_DISCOUNT,
+  fiveMonksDiscount: FIVE_MONKS_DISCOUNT,
+};
+
+/** Merge a saved pricing config over the defaults, dropping anything malformed. */
+export function mergePricing(saved: Partial<PricingConfig> | null | undefined): PricingConfig {
+  const num = (v: unknown, fallback: number) => {
+    const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+  };
+  const tierCfg = (v: unknown, fallback: TierConfig | null | undefined): TierConfig | null => {
+    if (v === undefined) return fallback ?? null;
+    if (!v || typeof v !== 'object') return null;
+    const raw = v as any;
+    const tiers = (Array.isArray(raw.tiers) ? raw.tiers : [])
+      .map((t: any) => [num(t?.[0], NaN), num(t?.[1], NaN)] as [number, number])
+      .filter((t: [number, number]) => Number.isFinite(t[0]) && Number.isFinite(t[1]) && t[0] > 0)
+      .sort((a: [number, number], b: [number, number]) => a[0] - b[0]);
+    if (!tiers.length) return fallback ?? null;
+    return { tiers, extra: num(raw.extra, fallback?.extra ?? 0) };
+  };
+  const packages: Record<string, PackagePricing> = {};
+  for (const p of BOOKING_PACKAGES) {
+    const d = DEFAULT_PRICING.packages[p.id];
+    const s = (saved?.packages?.[p.id] || {}) as Partial<PackagePricing>;
+    packages[p.id] =
+      p.kind === 'ceremony'
+        ? { base: num(s.base, d.base ?? 0), buffet: null, table: null }
+        : { base: null, buffet: tierCfg(s.buffet, d.buffet), table: tierCfg(s.table, d.table) };
+  }
+  const addons: Record<string, number> = {};
+  for (const a of BOOKING_ADDONS) addons[a.id] = num(saved?.addons?.[a.id], DEFAULT_PRICING.addons[a.id]);
+  return {
+    packages,
+    addons,
+    selfTransportDiscount: num(saved?.selfTransportDiscount, SELF_TRANSPORT_DISCOUNT),
+    fiveMonksDiscount: num(saved?.fiveMonksDiscount, FIVE_MONKS_DISCOUNT),
+  };
+}
+
+/** Price of a package tier for a count, using the given pricing. */
+function tierTotalFor(cfg: TierConfig, count: number): { tierTotal: number; extra: number } {
+  let tier = cfg.tiers[0];
+  for (const t of cfg.tiers) if (count >= t[0]) tier = t;
+  return { tierTotal: tier[1] + Math.max(0, count - tier[0]) * cfg.extra, extra: cfg.extra };
+}
+
 // ── FlowAccount-app quotation recipes ──────────────────────────────────
 // How each booking package is assembled into quotation lines for
 // POST /api/v1/quotations on flowaccount-app. Product codes must exist in
@@ -217,15 +289,18 @@ export function buildFaItems(
     addons: string[];
   },
   config: FaRecipeConfig = DEFAULT_FA_RECIPES,
+  pricing: PricingConfig = DEFAULT_PRICING,
 ): { items: FaItem[]; vatRate: 0 | 7; pkg: BookingPackage } | null {
   const pkg = BOOKING_PACKAGES.find((p) => p.id === input.packageId);
   const recipe = config.packages[input.packageId];
-  if (!pkg || !recipe) return null;
+  const pp = pricing.packages[input.packageId];
+  if (!pkg || !recipe || !pp) return null;
 
   const items: FaItem[] = [];
   const exclude = input.selfTransport ? [recipe.transportCode] : [];
-  // 5 monks instead of 9 = −1,500 on every package; self-transport becomes a line discount in flowaccount-app
-  const monksDiscount = input.monks === 5 ? FIVE_MONKS_DISCOUNT : 0;
+  // 5 monks instead of 9 = discount on every package; self-transport becomes a line discount in flowaccount-app
+  // (the flowaccount-app product must carry the same amount as pricing.selfTransportDiscount)
+  const monksDiscount = input.monks === 5 ? pricing.fiveMonksDiscount : 0;
 
   if (pkg.kind === 'ceremony') {
     items.push({
@@ -233,15 +308,14 @@ export function buildFaItems(
       quantity: 1,
       variables: { monks: input.monks },
       exclude,
-      unitPrice: Math.max(0, pkg.base! - monksDiscount),
+      unitPrice: Math.max(0, (pp.base ?? 0) - monksDiscount),
     });
   } else {
     const isTable = input.foodMode === 'table';
-    const cfg = isTable ? pkg.table! : pkg.buffet!;
+    const cfg = isTable ? pp.table : pp.buffet;
+    if (!cfg) return null;
     const count = isTable ? input.tables : input.guests;
-    let tier = cfg.tiers[0];
-    for (const t of cfg.tiers) if (count >= t[0]) tier = t;
-    const tierTotal = tier[1] + Math.max(0, count - tier[0]) * cfg.extra;
+    const { tierTotal } = tierTotalFor(cfg, count);
     const foodTotal = cfg.extra * count;
     const monkPrice = Math.max(0, tierTotal - foodTotal - monksDiscount);
 
@@ -271,45 +345,48 @@ export function buildFaItems(
   for (const a of BOOKING_ADDONS) {
     if (!input.addons.includes(a.id)) continue;
     const code = config.addons[a.id];
+    const price = pricing.addons[a.id] ?? a.price;
     items.push(
       code
-        ? { productCode: code, quantity: 1, unitPrice: a.price }
-        : { description: a.label, quantity: 1, unit: 'ชุด', unitPrice: a.price },
+        ? { productCode: code, quantity: 1, unitPrice: price }
+        : { description: a.label, quantity: 1, unit: 'ชุด', unitPrice: price },
     );
   }
 
   return { items, vatRate: recipe.vatRate, pkg };
 }
 
-export function calcEstimatedTotal(input: {
-  packageId: string;
-  foodMode: string;
-  guests: number;
-  tables: number;
-  monks: number;
-  selfTransport: boolean;
-  addons: string[];
-}): { total: number; pkg: BookingPackage } | null {
+export function calcEstimatedTotal(
+  input: {
+    packageId: string;
+    foodMode: string;
+    guests: number;
+    tables: number;
+    monks: number;
+    selfTransport: boolean;
+    addons: string[];
+  },
+  pricing: PricingConfig = DEFAULT_PRICING,
+): { total: number; pkg: BookingPackage } | null {
   const pkg = BOOKING_PACKAGES.find((p) => p.id === input.packageId);
-  if (!pkg) return null;
+  const pp = pricing.packages[input.packageId];
+  if (!pkg || !pp) return null;
 
   let total: number;
   if (pkg.kind === 'ceremony') {
-    total = pkg.base!;
+    total = pp.base ?? 0;
   } else {
-    const cfg = input.foodMode === 'table' ? pkg.table! : pkg.buffet!;
+    const cfg = input.foodMode === 'table' ? pp.table : pp.buffet;
+    if (!cfg) return null;
     const count = input.foodMode === 'table' ? input.tables : input.guests;
-    let tier = cfg.tiers[0];
-    for (const t of cfg.tiers) if (count >= t[0]) tier = t;
-    const over = Math.max(0, count - tier[0]);
-    total = tier[1] + over * cfg.extra;
+    total = tierTotalFor(cfg, count).tierTotal;
   }
 
   for (const a of BOOKING_ADDONS) {
-    if (input.addons.includes(a.id)) total += a.price;
+    if (input.addons.includes(a.id)) total += pricing.addons[a.id] ?? a.price;
   }
-  if (input.selfTransport) total -= SELF_TRANSPORT_DISCOUNT;
-  if (input.monks === 5) total -= FIVE_MONKS_DISCOUNT;
+  if (input.selfTransport) total -= pricing.selfTransportDiscount;
+  if (input.monks === 5) total -= pricing.fiveMonksDiscount;
 
-  return { total, pkg };
+  return { total: Math.max(0, total), pkg };
 }
