@@ -12,7 +12,6 @@ import {
 import { TH_AREAS } from '../data/th-areas';
 import { calc, summary, type BookingForm } from '../lib/calc';
 import { submitBooking } from '../lib/api';
-import { downloadQuote } from '../lib/quote';
 import { BackLink, CheckIcon, FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
 import type { SavedBooking } from '../App';
 
@@ -74,6 +73,8 @@ export default function Wizard({ form: f, setForm, onExit, onDone }: Props) {
         onDone({
           code: result.code,
           total: result.estimatedTotal,
+          quotationUrl: result.quotationUrl || null,
+          quotationDocNo: result.quotationDocNo || null,
           rows: summary(f),
           f: { ...f },
         });
@@ -824,29 +825,6 @@ export default function Wizard({ form: f, setForm, onExit, onDone }: Props) {
               ))}
             </div>
 
-            <div
-              onClick={() => downloadQuote(f)}
-              className="hoverable"
-              style={{
-                padding: 15,
-                borderRadius: 999,
-                border: '1.5px solid var(--color-accent-400)',
-                color: 'var(--color-accent-700)',
-                textAlign: 'center',
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-            >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
-              </svg>
-              ดาวน์โหลดใบเสนอราคา
-            </div>
           </div>
         )}
       </div>

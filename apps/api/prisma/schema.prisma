@@ -465,6 +465,7 @@ model Booking {
   // Quotation created in flowaccount-app (externalRef = booking code)
   quotationDocNo     String?   @map("quotation_doc_no")
   quotationUrl       String?   @map("quotation_url")
+  quotationPublicUrl String?   @map("quotation_public_url") // read-only link the customer can open without login
   quotationCreatedAt DateTime? @map("quotation_created_at")
 
   createdAt      DateTime      @default(now()) @map("created_at")

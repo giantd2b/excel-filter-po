@@ -11,6 +11,8 @@ import { PhoneIcon, charm } from './ui';
 export interface SavedBooking {
   code: string;
   total: number;
+  quotationUrl?: string | null;
+  quotationDocNo?: string | null;
   rows: { k: string; v: string }[];
   f: BookingForm;
 }

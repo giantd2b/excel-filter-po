@@ -5,6 +5,9 @@ export interface BookingResult {
   code: string;
   estimatedTotal: number;
   packageName: string;
+  /** public read-only quotation link from flowaccount-app (null when it could not be created) */
+  quotationUrl?: string | null;
+  quotationDocNo?: string | null;
 }
 
 export async function submitBooking(f: BookingForm): Promise<BookingResult> {

@@ -26,6 +26,9 @@ export class BookingsController {
       code: booking.code,
       estimatedTotal: booking.estimatedTotal,
       packageName: booking.packageName,
+      // public read-only quotation link (null when flowaccount-app was unreachable)
+      quotationUrl: booking.quotationPublicUrl || null,
+      quotationDocNo: booking.quotationDocNo || null,
     };
   }
 

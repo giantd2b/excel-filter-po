@@ -529,6 +529,7 @@ export interface MeritBooking {
   estimatedTotal: number;
   quotationDocNo?: string | null;
   quotationUrl?: string | null;
+  quotationPublicUrl?: string | null;
   quotationCreatedAt?: string | null;
   createdAt: string;
 }
@@ -537,6 +538,7 @@ export interface BookingQuotationResult {
   booking: MeritBooking;
   docNo: string;
   quotationUrl: string;
+  publicUrl: string | null;
   reused: boolean;
   grandTotal: string;
   warnings: string[];

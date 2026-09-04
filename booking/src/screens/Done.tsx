@@ -16,6 +16,7 @@ export default function Done({ saved, onHome }: Props) {
       .concat(saved.rows.map((x) => x.k + ': ' + x.v))
       .concat([
         'ราคาประเมิน: ' + baht(saved.total) + ' บาท',
+        saved.quotationUrl ? 'ใบเสนอราคา: ' + saved.quotationUrl : '',
         'ผู้จอง: ' + saved.f.name + ' ' + saved.f.phone,
         saved.f.note ? 'หมายเหตุ: ' + saved.f.note : '',
       ])
@@ -50,7 +51,9 @@ export default function Done({ saved, onHome }: Props) {
         รับคำขอจองแล้ว
       </h1>
       <p style={{ margin: '0 0 20px', fontSize: 15, lineHeight: 1.75, color: 'var(--color-neutral-700)', textWrap: 'pretty' }}>
-        ขั้นตอนสุดท้าย กรุณากดปุ่มด้านล่างเพื่อส่งรายละเอียดให้ทีมงานทาง LINE ทีมงานจะตรวจสอบคิววันงานและยืนยันกลับ
+        {saved.quotationUrl
+          ? 'ใบเสนอราคาของท่านพร้อมแล้ว เปิดดูหรือบันทึกเป็น PDF ได้จากปุ่มด้านล่าง แล้วส่งรายละเอียดให้ทีมงานทาง LINE เพื่อตรวจสอบคิววันงาน'
+          : 'ทีมงานจะจัดทำใบเสนอราคาและส่งให้ทาง LINE หลังตรวจสอบคิววันงาน กรุณากดปุ่มด้านล่างเพื่อส่งรายละเอียด'}
       </p>
       <div
         style={{
@@ -102,6 +105,26 @@ export default function Done({ saved, onHome }: Props) {
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 20 }}>
+        {saved.quotationUrl && (
+          <a
+            href={saved.quotationUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              padding: 16,
+              borderRadius: 999,
+              background: 'var(--color-accent-700)',
+              color: '#f5ead8',
+              textAlign: 'center',
+              fontSize: 17,
+              fontWeight: 600,
+              boxShadow: 'var(--shadow-md)',
+              display: 'block',
+            }}
+          >
+            ดูใบเสนอราคา{saved.quotationDocNo ? ' ' + saved.quotationDocNo : ''}
+          </a>
+        )}
         <a
           href={LINE_URL}
           target="_blank"

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText, Settings2 } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText, Settings2, Link2 } from "lucide-react";
 import BookingRecipeSettings from "@/components/BookingRecipeSettings";
 import BookingPricingSettings from "@/components/BookingPricingSettings";
 import {
@@ -128,6 +128,7 @@ export default function BookingsPage() {
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"pricing" | "recipes">("pricing");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const createQuote = async (b: MeritBooking) => {
     setBusyId(b.id);
@@ -137,7 +138,7 @@ export default function BookingsPage() {
       setBookings((list) =>
         list.map((x) =>
           x.id === b.id
-            ? { ...x, quotationDocNo: res.docNo, quotationUrl: res.quotationUrl, quotationCreatedAt: new Date().toISOString() }
+            ? { ...x, quotationDocNo: res.docNo, quotationUrl: res.quotationUrl, quotationPublicUrl: res.publicUrl, quotationCreatedAt: new Date().toISOString() }
             : x
         )
       );
@@ -303,7 +304,23 @@ export default function BookingsPage() {
                       {b.quotationDocNo}
                       <ExternalLink className="w-3 h-3" />
                     </a>
-                  ) : (
+                  ) : null}
+                  {b.quotationPublicUrl ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try { await navigator.clipboard.writeText(b.quotationPublicUrl!); } catch { /* ignore */ }
+                        setCopiedId(b.id);
+                        setTimeout(() => setCopiedId((c) => (c === b.id ? null : c)), 2000);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full ring-1 ring-slate-200 text-slate-500 text-xs hover:text-brand-700 hover:ring-brand-200"
+                      title="คัดลอกลิงก์ใบเสนอราคาสำหรับส่งให้ลูกค้า (เปิดได้ไม่ต้อง login)"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      {copiedId === b.id ? "คัดลอกแล้ว" : "ลิงก์ลูกค้า"}
+                    </button>
+                  ) : null}
+                  {!b.quotationUrl ? (
                     <button
                       onClick={() => createQuote(b)}
                       disabled={busyId === b.id}
@@ -313,7 +330,7 @@ export default function BookingsPage() {
                       {busyId === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                       ใบเสนอราคา
                     </button>
-                  )}
+                  ) : null}
                   <button
                     onClick={() => advance(b)}
                     disabled={busyId === b.id}

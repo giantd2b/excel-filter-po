@@ -227,14 +227,16 @@ export class BookingsService {
 
     const docNo: string = res.data.docNo;
     const quotationUrl = `${this.flowAccount.appUrl}${res.data.url || `/quotations/${encodeURIComponent(docNo)}`}`;
+    const publicUrl: string | null = res.data.publicUrl || null;
     const updated = await this.prisma.booking.update({
       where: { id },
-      data: { quotationDocNo: docNo, quotationUrl, quotationCreatedAt: new Date() },
+      data: { quotationDocNo: docNo, quotationUrl, quotationPublicUrl: publicUrl, quotationCreatedAt: new Date() },
     });
     return {
       booking: updated,
       docNo,
       quotationUrl,
+      publicUrl,
       reused: !!res.reused,
       grandTotal: res.data.grandTotal,
       warnings: res.warnings || [],
@@ -266,7 +268,7 @@ export class BookingsService {
 
     const code = await this.nextCode();
 
-    return this.prisma.booking.create({
+    const booking = await this.prisma.booking.create({
       data: {
         code,
         occasion: dto.occasion,
@@ -292,6 +294,17 @@ export class BookingsService {
         estimatedTotal: calc.total,
       },
     });
+
+    // Create the real quotation in flowaccount-app right away so the customer gets a
+    // public link on the final step. A failure must never break the booking itself —
+    // sales can still create it later from the dashboard.
+    try {
+      const q = await this.createQuotation(booking.id);
+      return { ...q.booking, quotationPublicUrl: q.publicUrl || q.booking.quotationPublicUrl };
+    } catch (e: any) {
+      console.warn(`[Bookings] auto quotation failed for ${booking.code}: ${e?.message || e}`);
+      return booking;
+    }
   }
 
   private async nextCode(): Promise<string> {
