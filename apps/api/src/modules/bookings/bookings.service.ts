@@ -183,6 +183,19 @@ export class BookingsService {
     );
     if (!built) throw new BadRequestException(`ไม่มีสูตรใบเสนอราคาสำหรับแพ็กเกจ "${b.packageId}"`);
 
+    // Products are edited freely in flowaccount-app: if the configured transport component code
+    // no longer exists on the product, fall back to the component whose title mentions นิมนต์.
+    const { catalog } = await this.getCatalog();
+    for (const item of built.items) {
+      if (!item.productCode || !item.exclude?.length) continue;
+      const comps = catalog[item.productCode]?.components || [];
+      item.exclude = item.exclude.map((code) => {
+        if (comps.some((c) => c.code === code)) return code;
+        const alt = comps.find((c) => c.optional && /นิมนต์|รับ.?ส่งพระ/.test(c.title));
+        return alt ? alt.code : code;
+      });
+    }
+
     const notes = [
       b.note ? `หมายเหตุลูกค้า: ${b.note}` : '',
       b.budget ? `งบประมาณ: ${b.budget}` : '',

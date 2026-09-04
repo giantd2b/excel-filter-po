@@ -414,7 +414,7 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
         { mode: 'table', from: 20, code: 'MONK_PLUS_T20' },
       ],
       displayTiers: { buffet: [20, 30, 40, 50], table: [8, 10, 20] },
-      transportCode: 'transport',
+      transportCode: 'item8', // the พลัส products copy the user-made MONG_PLUS2030 list (item1…item11)
       buffetCode: 'BUFFET_PRIME_MONK',
       chineseTableCode: 'CHINESE_TABLE_PRIME',
       vatRate: 7,
