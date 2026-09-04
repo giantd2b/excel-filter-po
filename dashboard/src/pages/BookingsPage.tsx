@@ -67,6 +67,13 @@ function foodLine(b: MeritBooking) {
   return "ไม่รวมอาหารเลี้ยงแขก";
 }
 
+/** Big-tent rule: 50+ guests / 8+ tables include one 5x12 tent (≈64 guests = 8 tables); 20 tables include two. */
+function tentAdvice(b: MeritBooking): string | null {
+  if (b.foodMode === "buffet" && b.guests > 64) return `แขก ${b.guests} ท่าน เกินความจุเต้นท์ใหญ่ 1 หลัง (64 ท่าน)`;
+  if (b.foodMode === "table" && b.tables > 8 && b.tables < 20) return `โต๊ะจีน ${b.tables} โต๊ะ เกินความจุเต้นท์ใหญ่ 1 หลัง (8 โต๊ะ)`;
+  return null;
+}
+
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<MeritBooking[]>([]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
@@ -274,6 +281,13 @@ export default function BookingsPage() {
                 <div className="font-medium text-slate-700">
                   {b.packageName} · พระ {b.monks} รูป · {foodLine(b)}
                 </div>
+                {tentAdvice(b) && (
+                  <div className={`text-xs rounded-md px-2 py-1 ${b.addons?.includes("tent") ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                    {b.addons?.includes("tent")
+                      ? `เลือกเต้นท์ใหญ่เพิ่ม 1 หลังแล้ว (${tentAdvice(b)})`
+                      : `แนะนำเพิ่มเต้นท์ใหญ่ 5x12 อีก 1 หลัง: ${tentAdvice(b)} — ลูกค้ายังไม่ได้เลือก`}
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5">
                   <CalendarDays className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   {b.eventDate} · {b.timeSlot} · {b.occasion}

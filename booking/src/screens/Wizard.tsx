@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ADDONS,
   DISCOUNTS,
@@ -10,7 +10,7 @@ import {
   pkgById,
 } from '../data/packages';
 import { TH_AREAS } from '../data/th-areas';
-import { calc, summary, type BookingForm } from '../lib/calc';
+import { calc, summary, tentRecommendation, type BookingForm } from '../lib/calc';
 import { submitBooking } from '../lib/api';
 import { BackLink, CheckIcon, FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
 import type { SavedBooking } from '../App';
@@ -60,6 +60,9 @@ export default function Wizard({ form: f, setForm, onExit, onDone }: Props) {
     });
   }, [q, f]);
 
+  const tentSuggested = useRef(false);
+  const tentReason = tentRecommendation(f);
+
   const next = async () => {
     if (step === 0 && !f.date) return setErr('กรุณาเลือกวันที่จัดงาน');
     if (step === 0 && !f.tambon && !f.venue.trim()) return setErr('กรุณาเลือกตำบล/แขวง ที่จัดงาน');
@@ -84,6 +87,11 @@ export default function Wizard({ form: f, setForm, onExit, onDone }: Props) {
         setSubmitting(false);
       }
       return;
+    }
+    // entering the add-on step: pre-select the extra big tent when the party outgrows the included one
+    if (step === 2 && tentRecommendation(f) && !f.addons.includes('tent') && !tentSuggested.current) {
+      tentSuggested.current = true;
+      setF('addons', [...f.addons, 'tent']);
     }
     setStep(step + 1);
     setErr('');
@@ -659,8 +667,16 @@ export default function Wizard({ form: f, setForm, onExit, onDone }: Props) {
                     >
                       <div style={checkStyle(on, 'var(--color-accent)')}>{on ? '✓' : ''}</div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{a.label}</div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {a.label}
+                          {a.id === 'tent' && tentReason && (
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--color-accent-2-500)', color: '#fff' }}>แนะนำ</span>
+                          )}
+                        </div>
                         <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>{a.sub}</div>
+                        {a.id === 'tent' && tentReason && (
+                          <div style={{ fontSize: 12, color: 'var(--color-accent-2-700)', marginTop: 4, lineHeight: 1.5 }}>{tentReason}</div>
+                        )}
                       </div>
                       <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-accent-700)', whiteSpace: 'nowrap' }}>
                         +{baht(a.price)}

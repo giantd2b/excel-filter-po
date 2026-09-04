@@ -75,6 +75,22 @@ export function tierPrice(pkg: Pkg, f: BookingForm): { base: number; label: stri
   return { base: tier[1] + over * cfg.extra, label: `ราคาแพ็กเกจ (${count} ${unit})` };
 }
 
+/**
+ * Big-tent rule: the 50+ guest / 8+ table tiers include ONE 5x12 tent (≈64 guests or 8 Chinese
+ * tables); the 20-table tier includes two. Between those sizes one more tent is recommended.
+ */
+export function tentRecommendation(f: BookingForm): string | null {
+  const pkg = pkgById(f.pkg);
+  if (pkg.kind !== 'full') return null;
+  if (f.foodMode === 'buffet' && f.guests > 64) {
+    return `แขก ${f.guests} ท่าน เกินความจุเต้นท์ใหญ่ 1 หลัง (ประมาณ 64 ท่าน) แนะนำเพิ่มเต้นท์ใหญ่อีก 1 หลัง`;
+  }
+  if (f.foodMode === 'table' && f.tables > 8 && f.tables < 20) {
+    return `โต๊ะจีน ${f.tables} โต๊ะ เกินความจุเต้นท์ใหญ่ 1 หลัง (8 โต๊ะ) แนะนำเพิ่มเต้นท์ใหญ่อีก 1 หลัง`;
+  }
+  return null;
+}
+
 export interface CalcResult {
   pkg: Pkg;
   total: number;
