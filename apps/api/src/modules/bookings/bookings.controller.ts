@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
@@ -34,8 +35,35 @@ export class BookingsController {
 
   @UseGuards(FirebaseAuthGuard)
   @Get()
-  async list(@Query('status') status?: string) {
-    return this.bookingsService.list(status);
+  async list(
+    @Query('status') status?: string,
+    @Query('source') source?: string,
+    @Query('q') q?: string,
+  ) {
+    return this.bookingsService.list(status, source, q);
+  }
+
+  /** Public: identity behind a /booking/?ref=<token> link (name/phone prefill + channel label). */
+  @Get('link/:token')
+  async linkInfo(@Param('token') token: string) {
+    return this.bookingsService.linkInfo(token);
+  }
+
+  /** Create (or reuse) the unique booking link for a chat customer. */
+  @UseGuards(FirebaseAuthGuard)
+  @Post('link')
+  async createLink(@Body() body: { customerId: string; packageId?: string }, @Req() req: any) {
+    return this.bookingsService.createLink(body?.customerId, body?.packageId, {
+      id: req.admin?.id || req.user?.uid,
+      name: req.admin?.name || req.user?.name || req.admin?.email || req.user?.email,
+    });
+  }
+
+  /** Bookings attributed to one chat customer (by link/customerId or by phone). */
+  @UseGuards(FirebaseAuthGuard)
+  @Get('by-customer/:customerId')
+  async byCustomer(@Param('customerId') customerId: string) {
+    return this.bookingsService.listForCustomer(customerId);
   }
 
   /** Public: package prices for the /booking page, derived from the flowaccount-app catalog (no auth). */

@@ -20,9 +20,11 @@ interface Props {
   setForm: (f: BookingForm) => void;
   onExit: () => void;
   onDone: (saved: SavedBooking) => void;
+  /** token from /booking/?ref=… (attributes the booking to a chat customer) */
+  linkRef?: string | null;
 }
 
-export default function Wizard({ form: f, setForm, onExit, onDone }: Props) {
+export default function Wizard({ form: f, setForm, onExit, onDone, linkRef }: Props) {
   const [step, setStep] = useState(0);
   const [err, setErr] = useState('');
   const [areaOpen, setAreaOpen] = useState(false);
@@ -72,7 +74,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone }: Props) {
       if (submitting) return;
       setSubmitting(true);
       try {
-        const result = await submitBooking(f);
+        const result = await submitBooking(f, linkRef);
         onDone({
           code: result.code,
           total: result.estimatedTotal,

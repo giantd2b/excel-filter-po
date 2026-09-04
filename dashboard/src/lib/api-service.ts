@@ -527,6 +527,12 @@ export interface MeritBooking {
   phone: string;
   note?: string | null;
   estimatedTotal: number;
+  // attribution (chat customer / channel / sales who sent the booking link)
+  source?: string; // web | chat_link
+  customerId?: string | null;
+  channel?: string | null;
+  chatCustomerName?: string | null;
+  salesName?: string | null;
   quotationDocNo?: string | null;
   quotationUrl?: string | null;
   quotationPublicUrl?: string | null;
@@ -644,10 +650,38 @@ export async function saveBookingRecipes(config: FaRecipeConfig) {
   return api.put<{ config: FaRecipeConfig }>("/bookings/recipes", config);
 }
 
-export async function getBookings(status?: string) {
-  const qs = status && status !== "ALL" ? `?status=${status}` : "";
+export async function getBookings(status?: string, opts: { source?: string; q?: string } = {}) {
+  const params = new URLSearchParams();
+  if (status && status !== "ALL") params.set("status", status);
+  if (opts.source && opts.source !== "ALL") params.set("source", opts.source);
+  if (opts.q?.trim()) params.set("q", opts.q.trim());
+  const qs = params.toString();
   return api.get<{ bookings: MeritBooking[]; statusCounts: Record<string, number>; total: number }>(
-    `/bookings${qs}`
+    `/bookings${qs ? `?${qs}` : ""}`
+  );
+}
+
+/** Unique /booking/?ref=<token> link for one chat customer. */
+export interface BookingLink {
+  token: string;
+  url: string;
+  customerName: string;
+  channel: string;
+  packageId: string | null;
+  createdAt: string;
+  createdByName: string | null;
+  openCount: number;
+  lastOpenedAt: string | null;
+  bookingCount: number;
+}
+
+export async function createBookingLink(customerId: string, packageId?: string) {
+  return api.post<BookingLink>("/bookings/link", { customerId, packageId });
+}
+
+export async function getCustomerBookings(customerId: string) {
+  return api.get<{ bookings: MeritBooking[]; links: BookingLink[] }>(
+    `/bookings/by-customer/${encodeURIComponent(customerId)}`
   );
 }
 

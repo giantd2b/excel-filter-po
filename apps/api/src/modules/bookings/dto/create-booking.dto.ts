@@ -96,4 +96,10 @@ export class CreateBookingDto {
   @IsString()
   @MaxLength(1000)
   note?: string;
+
+  /** Token from a /booking/?ref=<token> link created in the inbox (attributes the booking to a chat customer). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  ref?: string;
 }

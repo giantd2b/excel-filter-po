@@ -57,6 +57,8 @@ model Customer {
   // slips relation added after migration
   orders            Order[]
   payments          Payment[]
+  bookings          Booking[]
+  bookingLinks      BookingLink[]
 
   @@index([platformUserId])
   @@index([channel])
@@ -462,6 +464,17 @@ model Booking {
   note           String?
   estimatedTotal Int           @map("estimated_total")
 
+  // Attribution: which chat customer / channel / sales the booking came from
+  source           String       @default("web") // web | chat_link
+  customerId       String?      @map("customer_id")
+  linkId           String?      @map("link_id")
+  channel          String?
+  chatCustomerName String?      @map("chat_customer_name")
+  salesId          String?      @map("sales_id")
+  salesName        String?      @map("sales_name")
+  customer         Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  link             BookingLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+
   // Quotation created in flowaccount-app (externalRef = booking code)
   quotationDocNo     String?   @map("quotation_doc_no")
   quotationUrl       String?   @map("quotation_url")
@@ -473,5 +486,31 @@ model Booking {
 
   @@index([status, createdAt])
   @@index([createdAt])
+  @@index([customerId])
+  @@index([phone])
   @@map("bookings")
+}
+
+/// Unique /booking/?ref=<token> link handed to a chat customer, so bookings made through it
+/// are attributed to that customer, channel and the sales admin who sent it.
+model BookingLink {
+  id            String    @id @default(uuid())
+  token         String    @unique
+  customerId    String    @map("customer_id")
+  channel       String
+  channelType   String    @map("channel_type")
+  customerName  String    @map("customer_name")
+  phone         String?
+  packageId     String?   @map("package_id")
+  createdById   String?   @map("created_by_id")
+  createdByName String?   @map("created_by_name")
+  openCount     Int       @default(0) @map("open_count")
+  lastOpenedAt  DateTime? @map("last_opened_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  bookings      Booking[]
+
+  @@index([customerId])
+  @@map("booking_links")
 }

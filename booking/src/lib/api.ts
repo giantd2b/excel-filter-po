@@ -10,7 +10,25 @@ export interface BookingResult {
   quotationDocNo?: string | null;
 }
 
-export async function submitBooking(f: BookingForm): Promise<BookingResult> {
+/** Identity behind a /booking/?ref=<token> link created by sales in the CRM inbox. */
+export interface BookingLinkInfo {
+  customerName: string;
+  phone: string | null;
+  channel: string;
+  packageId: string | null;
+}
+
+export async function getBookingLink(token: string): Promise<BookingLinkInfo | null> {
+  try {
+    const res = await fetch(`/api/bookings/link/${encodeURIComponent(token)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as BookingLinkInfo;
+  } catch {
+    return null;
+  }
+}
+
+export async function submitBooking(f: BookingForm, ref?: string | null): Promise<BookingResult> {
   const body = {
     occasion: f.occasion,
     eventDate: f.date,
@@ -31,6 +49,7 @@ export async function submitBooking(f: BookingForm): Promise<BookingResult> {
     name: f.name,
     phone: f.phone,
     note: f.note || undefined,
+    ref: ref || undefined,
   };
   const res = await fetch('/api/bookings', {
     method: 'POST',

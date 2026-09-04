@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText, Settings2, Link2 } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText, Settings2, Link2, Search, MessageCircle } from "lucide-react";
 import BookingRecipeSettings from "@/components/BookingRecipeSettings";
 import BookingPricingSettings from "@/components/BookingPricingSettings";
 import {
@@ -80,12 +80,15 @@ export default function BookingsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("ALL");
+  const [source, setSource] = useState("ALL");
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getBookings(filter);
+      const res = await getBookings(filter, { source, q: debouncedQuery });
       setBookings(res.bookings || []);
       setStatusCounts(res.statusCounts || {});
       setTotal(res.total || 0);
@@ -94,7 +97,12 @@ export default function BookingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, source, debouncedQuery]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
 
   useEffect(() => {
     fetchData();
@@ -226,6 +234,35 @@ export default function BookingsPage() {
         </div>
       )}
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="ค้นหา รหัส / ชื่อ / เบอร์ / ชื่อในแชต / เลขใบเสนอราคา"
+            className="pl-9 pr-3 py-2 rounded-lg ring-1 ring-slate-200 text-sm w-80 max-w-full focus:outline-none focus:ring-brand-400"
+          />
+        </div>
+        <div className="flex gap-1 bg-white ring-1 ring-slate-200 rounded-full p-0.5">
+          {[
+            { key: "ALL", label: "ทุกช่องทาง" },
+            { key: "chat_link", label: "จากลิงก์แชต" },
+            { key: "web", label: "เว็บ" },
+          ].map((o) => (
+            <button
+              key={o.key}
+              onClick={() => setSource(o.key)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                source === o.key ? "bg-violet-600 text-white" : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex gap-2 flex-wrap">
         {tabs.map((t) => (
           <button
@@ -268,6 +305,25 @@ export default function BookingsPage() {
                       <Phone className="w-3 h-3" />
                       {b.phone}
                     </a>
+                  </div>
+                  <div className="mt-1">
+                    {b.customerId ? (
+                      <span
+                        className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full ${
+                          b.source === "chat_link" ? "bg-violet-50 text-violet-700" : "bg-slate-100 text-slate-600"
+                        }`}
+                        title={b.source === "chat_link" ? "จองผ่านลิงก์ที่ส่งจากแชต" : "จองจากหน้าเว็บ จับคู่ลูกค้าแชตด้วยเบอร์โทร"}
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        {b.channel || "แชต"} · {b.chatCustomerName || "-"}
+                        {b.salesName ? ` · เซลล์ ${b.salesName}` : ""}
+                        {b.source !== "chat_link" ? " (จับคู่ด้วยเบอร์)" : ""}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                        เว็บ · ไม่พบในแชต
+                      </span>
+                    )}
                   </div>
                 </div>
                 <span

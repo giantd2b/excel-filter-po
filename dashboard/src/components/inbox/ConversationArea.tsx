@@ -16,9 +16,11 @@ import {
   CheckCircle2,
   ChevronUp,
   Briefcase,
+  Link2,
 } from "lucide-react";
 import { setCustomerStatus } from "@/lib/api-service";
 import CreateJobModal from "./CreateJobModal";
+import BookingLinkModal from "./BookingLinkModal";
 
 interface ConversationAreaProps {
   selectedUser: ChatUser | null;
@@ -34,6 +36,7 @@ export function ConversationArea({
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showCreateJob, setShowCreateJob] = useState(false);
+  const [showBookingLink, setShowBookingLink] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
@@ -246,6 +249,14 @@ export function ConversationArea({
             สร้างงาน
           </button>
           <button
+            onClick={() => setShowBookingLink(true)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-100 transition-all duration-150"
+            title="สร้างลิงก์จองงานบุญเฉพาะลูกค้ารายนี้ (ระบุที่มาของ booking/ใบเสนอราคา)"
+          >
+            <Link2 className="w-3 h-3" />
+            ลิงก์จอง
+          </button>
+          <button
             onClick={() => {
               setCustomerStatus(selectedUser.id, "FOLLOW_UP");
               onMessageSent();
@@ -381,6 +392,18 @@ export function ConversationArea({
 
       {showCreateJob && (
         <CreateJobModal user={selectedUser} onClose={() => setShowCreateJob(false)} />
+      )}
+      {showBookingLink && (
+        <BookingLinkModal
+          customer={{
+            id: selectedUser.id,
+            oduserId: selectedUser.oduserId,
+            channel: selectedUser.channel,
+            displayName: selectedUser.displayName,
+          }}
+          onClose={() => setShowBookingLink(false)}
+          onSent={onMessageSent}
+        />
       )}
     </div>
   );

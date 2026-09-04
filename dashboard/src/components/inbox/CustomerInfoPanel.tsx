@@ -12,7 +12,10 @@ import {
   setCustomerStatus,
   setCustomerNickname,
   getCustomerJobs,
+  getCustomerBookings,
+  type MeritBooking,
 } from "@/lib/api-service";
+import BookingLinkModal from "./BookingLinkModal";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 import {
@@ -36,6 +39,7 @@ import {
   Briefcase,
   ExternalLink,
   FileText,
+  Link2,
 } from "lucide-react";
 
 interface CustomerInfoPanelProps {
@@ -71,6 +75,8 @@ export function CustomerInfoPanel({
   const [jobsLoading, setJobsLoading] = useState(false);
 
   // Quotations (FlowAccount)
+  const [bookings, setBookings] = useState<MeritBooking[]>([]);
+  const [showBookingLink, setShowBookingLink] = useState(false);
   const [quotations, setQuotations] = useState<any[]>([]);
   const [quotationsLoading, setQuotationsLoading] = useState(false);
 
@@ -114,6 +120,10 @@ export function CustomerInfoPanel({
             .catch(() => { if (!cancelled) setJobs([]); })
             .finally(() => { if (!cancelled) setJobsLoading(false); });
         }
+        // Merit bookings attributed to this customer (by booking link or phone)
+        getCustomerBookings(userId)
+          .then((res) => { if (!cancelled) setBookings(res.bookings || []); })
+          .catch(() => { if (!cancelled) setBookings([]); });
         // Auto-fetch quotations from FlowAccount
         setQuotationsLoading(true);
         api.get<{ data: any[]; total: number }>(`/users/${userId}/quotations`)
@@ -608,6 +618,82 @@ export function CustomerInfoPanel({
             </div>
           )}
         </div>
+      )}
+
+      {/* Merit bookings (from /booking, attributed via booking link or phone) */}
+      <div className="px-4 py-3.5 border-b border-slate-100/80">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-1.5">
+            <Link2 className="w-3.5 h-3.5 text-violet-500" />
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.06em]">
+              การจองงานบุญ
+            </span>
+            {bookings.length > 0 && (
+              <span className="text-[9px] text-violet-500 font-semibold ml-1">{bookings.length}</span>
+            )}
+          </div>
+          <button
+            onClick={() => setShowBookingLink(true)}
+            className="text-[10px] font-medium text-violet-600 hover:text-violet-800"
+          >
+            + สร้างลิงก์จอง
+          </button>
+        </div>
+        {bookings.length === 0 ? (
+          <p className="text-[11px] text-slate-400">ยังไม่มีการจอง — ส่งลิงก์จองให้ลูกค้าเพื่อผูกการจองกับแชตนี้</p>
+        ) : (
+          <div className="space-y-1.5">
+            {bookings.map((b) => (
+              <div key={b.id} className="p-2.5 rounded-lg bg-slate-50 ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-mono font-semibold text-slate-700">{b.code}</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${
+                    b.status === "DONE" ? "bg-emerald-50 text-emerald-600"
+                    : b.status === "CONFIRMED" ? "bg-blue-50 text-blue-600"
+                    : b.status === "CONTACTED" ? "bg-amber-50 text-amber-600"
+                    : "bg-slate-100 text-slate-500"
+                  }`}>
+                    {b.status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                  {b.packageName} · {b.eventDate}
+                  {b.source === "chat_link" ? " · ผ่านลิงก์จอง" : ""}
+                  {b.salesName ? ` · ${b.salesName}` : ""}
+                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[11px] font-semibold text-slate-700">
+                    ฿{Number(b.estimatedTotal || 0).toLocaleString()}
+                  </span>
+                  {b.quotationPublicUrl && (
+                    <a
+                      href={b.quotationPublicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-brand-600 hover:underline"
+                    >
+                      ใบเสนอราคา {b.quotationDocNo}
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {showBookingLink && details && userId && (
+        <BookingLinkModal
+          customer={{
+            id: userId,
+            oduserId: details.oduserId || details.platformUserId,
+            channel: details.channel,
+            displayName: details.nickname || details.displayName || "",
+          }}
+          onClose={() => {
+            setShowBookingLink(false);
+            getCustomerBookings(userId).then((res) => setBookings(res.bookings || [])).catch(() => {});
+          }}
+        />
       )}
 
       {/* Quotations (FlowAccount) */}

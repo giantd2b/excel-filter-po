@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { BookingStatus } from '@prisma/client';
 import { PrismaService } from '../../common/providers/prisma.service';
 import {
@@ -21,6 +22,13 @@ const CATALOG_CACHE_KEY = 'fa_catalog_cache';
 const CATALOG_TTL_MS = 5 * 60 * 1000;
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { FlowAccountClient } from '../quotations/flowaccount.client';
+
+const CHANNEL_LABELS: Record<string, string> = { LINE: 'LINE', FACEBOOK: 'Facebook' };
+function channelLabel(channel: string, channelType?: string | null) {
+  const pretty = channel.replace(/^(Line|FB)_/i, '').replace(/_/g, ' ');
+  const type = CHANNEL_LABELS[String(channelType || '').toUpperCase()];
+  return type ? `${type} ${pretty}` : pretty;
+}
 
 function bookingAddress(b: { venue?: string | null; tambon?: string | null; amphoe?: string | null; province?: string | null; zip?: string | null }) {
   const bkk = b.province === 'กรุงเทพฯ';
@@ -202,15 +210,25 @@ export class BookingsService {
       });
     }
 
+    const attributed = !!b.customerId;
     const notes = [
       b.note ? `หมายเหตุลูกค้า: ${b.note}` : '',
       b.budget ? `งบประมาณ: ${b.budget}` : '',
-      `จองผ่านหน้าเว็บ ${b.code} · ราคาประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท`,
+      `${b.source === 'chat_link' ? 'จองผ่านลิงก์จากแชต' : 'จองผ่านหน้าเว็บ'} ${b.code} · ราคาประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท`,
+      attributed
+        ? `ช่องทาง: ${b.channel || '-'} · ลูกค้าแชต: ${b.chatCustomerName || '-'} (${b.customerId})${b.salesName ? ` · เซลล์: ${b.salesName}` : ''}`
+        : '',
     ].filter(Boolean);
 
     const res = await this.flowAccount.createQuotation({
       externalRef: b.code,
-      customer: { name: b.customerName, phone: b.phone, address: bookingAddress(b) },
+      customer: {
+        name: b.customerName,
+        phone: b.phone,
+        address: bookingAddress(b),
+        contactPerson: b.chatCustomerName && b.chatCustomerName !== b.customerName ? b.chatCustomerName : undefined,
+      },
+      salesName: b.salesName || undefined,
       project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}`,
       vatRate: built.vatRate,
       // printed หมายเหตุ: the matched tier's remark template, else the package's (FA falls back to its default)
@@ -267,10 +285,12 @@ export class BookingsService {
     if (!calc) throw new BadRequestException('ไม่พบแพ็กเกจที่เลือก');
 
     const code = await this.nextCode();
+    const attribution = await this.resolveAttribution(dto.ref, phoneDigits);
 
     const booking = await this.prisma.booking.create({
       data: {
         code,
+        ...attribution,
         occasion: dto.occasion,
         eventDate: dto.eventDate,
         timeSlot: dto.timeSlot,
@@ -321,11 +341,166 @@ export class BookingsService {
     return `${prefix}${String(todayCount + 1).padStart(3, '0')}`;
   }
 
-  async list(status?: string) {
-    const where =
-      status && status !== 'ALL'
-        ? { status: status as BookingStatus }
-        : undefined;
+  /**
+   * Who is this booking from? A valid `ref` token wins (chat customer + channel + sales admin
+   * who sent the link); otherwise fall back to matching a chat customer by phone number.
+   */
+  private async resolveAttribution(ref: string | undefined, phoneDigits: string) {
+    if (ref) {
+      const link = await this.prisma.bookingLink.findUnique({ where: { token: ref }, include: { customer: true } });
+      if (link) {
+        return {
+          source: 'chat_link',
+          customerId: link.customerId,
+          linkId: link.id,
+          channel: channelLabel(link.customer.channel, link.customer.channelType),
+          chatCustomerName: link.customer.nickname || link.customer.displayName || link.customerName,
+          salesId: link.createdById,
+          salesName: link.createdByName,
+        };
+      }
+      console.warn(`[Bookings] unknown booking link token ${ref}`);
+    }
+    const customer = await this.findCustomerByPhone(phoneDigits);
+    if (customer) {
+      return {
+        source: 'web',
+        customerId: customer.id,
+        channel: channelLabel(customer.channel, customer.channelType),
+        chatCustomerName: customer.nickname || customer.displayName,
+      };
+    }
+    return { source: 'web' };
+  }
+
+  private async findCustomerByPhone(phoneDigits: string) {
+    if (!phoneDigits) return null;
+    return this.prisma.customer.findFirst({
+      where: { OR: [{ phoneClean: phoneDigits }, { additionalPhones: { has: phoneDigits } }] },
+      orderBy: { lastMessageAt: 'desc' },
+    });
+  }
+
+  private bookingPublicUrl(token: string) {
+    const base = (process.env.BOOKING_PUBLIC_URL || 'https://crm.iristermboon.com').replace(/\/$/, '');
+    return `${base}/booking/?ref=${token}`;
+  }
+
+  private shapeLink(
+    link: {
+      token: string;
+      customerName: string;
+      channel: string;
+      channelType: string;
+      packageId: string | null;
+      createdAt: Date;
+      createdByName: string | null;
+      openCount: number;
+      lastOpenedAt: Date | null;
+    },
+    bookingCount: number,
+  ) {
+    return {
+      token: link.token,
+      url: this.bookingPublicUrl(link.token),
+      customerName: link.customerName,
+      channel: channelLabel(link.channel, link.channelType),
+      packageId: link.packageId,
+      createdAt: link.createdAt,
+      createdByName: link.createdByName,
+      openCount: link.openCount,
+      lastOpenedAt: link.lastOpenedAt,
+      bookingCount,
+    };
+  }
+
+  /** One stable link per chat customer (+ optional preselected package). */
+  async createLink(customerId: string | undefined, packageId: string | undefined, admin: { id?: string; name?: string }) {
+    if (!customerId) throw new BadRequestException('customerId is required');
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (packageId && !BOOKING_PACKAGES.some((p) => p.id === packageId)) {
+      throw new BadRequestException(`ไม่พบแพ็กเกจ "${packageId}"`);
+    }
+    const pkg = packageId || null;
+    let link = await this.prisma.bookingLink.findFirst({
+      where: { customerId, packageId: pkg },
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { bookings: true } } },
+    });
+    if (!link) {
+      link = await this.prisma.bookingLink.create({
+        data: {
+          token: randomBytes(16).toString('base64url'),
+          customerId,
+          channel: customer.channel,
+          channelType: customer.channelType,
+          customerName: customer.nickname || customer.displayName,
+          phone: customer.phoneClean || null,
+          packageId: pkg,
+          createdById: admin.id || null,
+          createdByName: admin.name || null,
+        },
+        include: { _count: { select: { bookings: true } } },
+      });
+    }
+    return this.shapeLink(link, link._count.bookings);
+  }
+
+  /** Public prefill for the booking page; counts the open. */
+  async linkInfo(token: string) {
+    const link = await this.prisma.bookingLink.findUnique({ where: { token }, include: { customer: true } });
+    if (!link) throw new NotFoundException('ไม่พบลิงก์จอง');
+    await this.prisma.bookingLink.update({
+      where: { id: link.id },
+      data: { openCount: { increment: 1 }, lastOpenedAt: new Date() },
+    });
+    const c = link.customer;
+    return {
+      customerName: c.nickname || c.displayName || link.customerName,
+      phone: c.phoneClean || link.phone || null,
+      channel: channelLabel(c.channel, c.channelType),
+      packageId: link.packageId,
+    };
+  }
+
+  async listForCustomer(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) throw new NotFoundException('Customer not found');
+    const phones = [customer.phoneClean, ...(customer.additionalPhones || [])].filter((p): p is string => !!p);
+    const [bookings, links] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: { OR: [{ customerId }, ...(phones.length ? [{ phone: { in: phones } }] : [])] },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      this.prisma.bookingLink.findMany({
+        where: { customerId },
+        orderBy: { createdAt: 'desc' },
+        include: { _count: { select: { bookings: true } } },
+      }),
+    ]);
+    return { bookings, links: links.map((l) => this.shapeLink(l, l._count.bookings)) };
+  }
+
+  async list(status?: string, source?: string, q?: string) {
+    const and: any[] = [];
+    if (status && status !== 'ALL') and.push({ status: status as BookingStatus });
+    if (source === 'chat_link') and.push({ source: 'chat_link' });
+    else if (source === 'web') and.push({ source: { not: 'chat_link' } });
+    const term = (q || '').trim();
+    if (term) {
+      and.push({
+        OR: [
+          { code: { contains: term, mode: 'insensitive' } },
+          { customerName: { contains: term, mode: 'insensitive' } },
+          { chatCustomerName: { contains: term, mode: 'insensitive' } },
+          { phone: { contains: term.replace(/[^0-9]/g, '') || term } },
+          { quotationDocNo: { contains: term, mode: 'insensitive' } },
+        ],
+      });
+    }
+    const where = and.length ? { AND: and } : undefined;
     const [bookings, counts] = await Promise.all([
       this.prisma.booking.findMany({
         where,

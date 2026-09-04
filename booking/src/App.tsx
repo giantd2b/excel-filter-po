@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { LINE_URL, PHONE, pkgById, type Pkg } from './data/packages';
 import { initialForm, type BookingForm } from './lib/calc';
+import { getBookingLink, type BookingLinkInfo } from './lib/api';
 import { loadPricing } from './lib/pricing';
 import Home from './screens/Home';
 import Detail from './screens/Detail';
@@ -29,6 +30,25 @@ export default function App() {
   useEffect(() => {
     loadPricing().then(() => setPricingVersion((v) => v + 1));
   }, []);
+
+  // /booking/?ref=<token>: a link sales created for one chat customer. Prefill what we know and
+  // send the token back on submit so the booking is attributed to that customer/channel/sales.
+  const [linkRef] = useState(() => new URLSearchParams(window.location.search).get('ref'));
+  const [linkInfo, setLinkInfo] = useState<BookingLinkInfo | null>(null);
+  useEffect(() => {
+    if (!linkRef) return;
+    getBookingLink(linkRef).then((info) => {
+      if (!info) return;
+      setLinkInfo(info);
+      setForm((f) => ({
+        ...f,
+        name: f.name || info.customerName || '',
+        phone: f.phone || info.phone || '',
+        pkg: info.packageId && pkgById(info.packageId) ? info.packageId : f.pkg,
+      }));
+      if (info.packageId && pkgById(info.packageId)) setPkgId(info.packageId);
+    });
+  }, [linkRef]);
 
   const goHome = () => {
     setScreen('home');
@@ -93,6 +113,24 @@ export default function App() {
         </div>
       </div>
 
+      {linkInfo && screen !== 'done' && (
+        <div
+          style={{
+            margin: '10px 18px 0',
+            padding: '8px 12px',
+            borderRadius: 10,
+            background: 'rgba(131,87,204,.10)',
+            border: '1px solid rgba(131,87,204,.25)',
+            fontSize: 12.5,
+            color: 'var(--color-accent-800)',
+            lineHeight: 1.5,
+          }}
+        >
+          ลิงก์จองสำหรับ คุณ{linkInfo.customerName} · {linkInfo.channel}
+          <span style={{ color: 'var(--color-neutral-600)' }}> — ทีมงานจะติดตามผ่านแชตนี้</span>
+        </div>
+      )}
+
       {screen === 'home' && (
         <Home
           onStartBooking={() => {
@@ -123,6 +161,7 @@ export default function App() {
         <Wizard
           form={form}
           setForm={setForm}
+          linkRef={linkRef}
           onExit={goHome}
           onDone={(s) => {
             setSaved(s);
