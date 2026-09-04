@@ -404,7 +404,7 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
       vatRate: 7,
     },
     'full-plus': {
-      monkCode: 'MONK_PLUS',
+      monkCode: 'MONK_PLUS_2030',
       // sheet: buffet 20-30 → 14,990 · 40 → 14,490 · 50+ and Chinese 8-10 → 16,990 · 20 tables → 19,490
       monkTiers: [
         { mode: 'buffet', from: 0, code: 'MONK_PLUS_2030' },
@@ -420,7 +420,7 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
       vatRate: 7,
     },
     prime: {
-      monkCode: 'MONK_PRIME',
+      monkCode: 'MONK_PRIME_2040',
       // sheet: buffet 20-40 → 18,990 · 50+ and Chinese 8-10 → 21,490 · 20 tables → 23,990
       monkTiers: [
         { mode: 'buffet', from: 0, code: 'MONK_PRIME_2040' },
@@ -439,8 +439,17 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
 };
 
 /** Merge a saved (possibly partial / older) config over the defaults and normalise codes. */
+/** Product codes that were removed from the catalog → their replacement (keeps saved settings valid). */
+const RETIRED_CODES: Record<string, string> = {
+  MONK_PLUS: 'MONK_PLUS_2030',
+  MONK_PRIME: 'MONK_PRIME_2040',
+};
+
 export function mergeFaRecipes(saved: Partial<FaRecipeConfig> | null | undefined): FaRecipeConfig {
-  const code = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().toUpperCase() : null);
+  const code = (v: unknown) => {
+    const c = typeof v === 'string' && v.trim() ? v.trim().toUpperCase() : null;
+    return c && RETIRED_CODES[c] ? RETIRED_CODES[c] : c;
+  };
   // A field that is absent from the saved config falls back to the default; an explicitly
   // empty string means "no product — send that line as plain text" and is kept as null.
   const optionalCode = (v: unknown, fallback: string | null | undefined) => (v === undefined ? fallback ?? null : code(v));
