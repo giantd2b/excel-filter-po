@@ -27,6 +27,8 @@ export interface BookingForm {
   budget: string;
   name: string;
   phone: string;
+  /** billing address for the quotation (optional; defaults to the event address) */
+  customerAddress: string;
   note: string;
 }
 
@@ -50,6 +52,7 @@ export const initialForm: BookingForm = {
   budget: '',
   name: '',
   phone: '',
+  customerAddress: '',
   note: '',
 };
 

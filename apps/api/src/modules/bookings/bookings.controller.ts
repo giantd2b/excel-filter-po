@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { BookingPresetDto, CreateBookingLinkDto } from './dto/booking-preset.dto';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
 
 @Controller('bookings')
@@ -49,14 +50,21 @@ export class BookingsController {
     return this.bookingsService.linkInfo(token);
   }
 
-  /** Create (or reuse) the unique booking link for a chat customer. */
+  /** Create the booking link for a chat customer: reused per customer, or a fresh one when sales fixed a package preset. */
   @UseGuards(FirebaseAuthGuard)
   @Post('link')
-  async createLink(@Body() body: { customerId: string; packageId?: string }, @Req() req: any) {
-    return this.bookingsService.createLink(body?.customerId, body?.packageId, {
+  async createLink(@Body() body: CreateBookingLinkDto, @Req() req: any) {
+    return this.bookingsService.createLink(body.customerId, body.packageId, body.preset, {
       id: req.admin?.id || req.user?.uid,
       name: req.admin?.name || req.user?.name || req.admin?.email || req.user?.email,
     });
+  }
+
+  /** Live price for a package preset while sales configures a quick booking link. */
+  @UseGuards(FirebaseAuthGuard)
+  @Post('estimate')
+  async estimate(@Body() preset: BookingPresetDto) {
+    return this.bookingsService.estimate(preset);
   }
 
   /** Bookings attributed to one chat customer (by link/customerId or by phone). */

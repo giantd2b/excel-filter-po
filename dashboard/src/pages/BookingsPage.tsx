@@ -337,6 +337,9 @@ export default function BookingsPage() {
                 <div className="font-medium text-slate-700">
                   {b.packageName} · พระ {b.monks} รูป · {foodLine(b)}
                 </div>
+                {b.customerAddress && (
+                  <div className="text-xs text-slate-500">ที่อยู่ออกใบเสนอราคา: {b.customerAddress}</div>
+                )}
                 {tentAdvice(b) && (
                   <div className={`text-xs rounded-md px-2 py-1 ${b.addons?.includes("tent") ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
                     {b.addons?.includes("tent")

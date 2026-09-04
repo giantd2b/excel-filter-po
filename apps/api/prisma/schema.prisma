@@ -461,6 +461,7 @@ model Booking {
 
   customerName   String        @map("customer_name")
   phone          String
+  customerAddress String?      @map("customer_address") // billing address for the quotation (event address is venue/tambon/...)
   note           String?
   estimatedTotal Int           @map("estimated_total")
 
@@ -502,6 +503,10 @@ model BookingLink {
   customerName  String    @map("customer_name")
   phone         String?
   packageId     String?   @map("package_id")
+  // Quick booking: sales fixed the whole package; the customer only fills personal details
+  preset        Json?
+  packageName   String?   @map("package_name")
+  estimatedTotal Int?     @map("estimated_total")
   createdById   String?   @map("created_by_id")
   createdByName String?   @map("created_by_name")
   openCount     Int       @default(0) @map("open_count")

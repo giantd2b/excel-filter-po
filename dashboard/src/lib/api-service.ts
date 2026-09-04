@@ -533,6 +533,7 @@ export interface MeritBooking {
   channel?: string | null;
   chatCustomerName?: string | null;
   salesName?: string | null;
+  customerAddress?: string | null;
   quotationDocNo?: string | null;
   quotationUrl?: string | null;
   quotationPublicUrl?: string | null;
@@ -661,6 +662,31 @@ export async function getBookings(status?: string, opts: { source?: string; q?: 
   );
 }
 
+/** Package configuration sales fixes for a quick booking link (customer fills personal details only). */
+export interface BookingPreset {
+  occasion?: string;
+  eventDate?: string;
+  timeSlot?: string;
+  packageId: string;
+  foodMode: "buffet" | "table";
+  guests: number;
+  tables: number;
+  monks: number;
+  selfTransport: boolean;
+  addons: string[];
+  note?: string;
+}
+
+export interface BookingEstimate {
+  total: number;
+  packageName: string;
+  rows: { k: string; v: string }[];
+}
+
+export async function estimateBooking(preset: BookingPreset) {
+  return api.post<BookingEstimate>("/bookings/estimate", preset);
+}
+
 /** Unique /booking/?ref=<token> link for one chat customer. */
 export interface BookingLink {
   token: string;
@@ -668,6 +694,9 @@ export interface BookingLink {
   customerName: string;
   channel: string;
   packageId: string | null;
+  preset: BookingPreset | null;
+  packageName: string | null;
+  estimatedTotal: number | null;
   createdAt: string;
   createdByName: string | null;
   openCount: number;
@@ -675,8 +704,11 @@ export interface BookingLink {
   bookingCount: number;
 }
 
-export async function createBookingLink(customerId: string, packageId?: string) {
-  return api.post<BookingLink>("/bookings/link", { customerId, packageId });
+export async function createBookingLink(
+  customerId: string,
+  opts: { packageId?: string; preset?: BookingPreset } = {},
+) {
+  return api.post<BookingLink>("/bookings/link", { customerId, ...opts });
 }
 
 export async function getCustomerBookings(customerId: string) {

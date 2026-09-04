@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ADDONS,
   DISCOUNTS,
@@ -9,7 +9,7 @@ import {
   baht,
   pkgById,
 } from '../data/packages';
-import { TH_AREAS } from '../data/th-areas';
+import AreaSearch from '../components/AreaSearch';
 import { calc, summary, tentRecommendation, type BookingForm } from '../lib/calc';
 import { submitBooking } from '../lib/api';
 import { BackLink, CheckIcon, FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
@@ -22,12 +22,13 @@ interface Props {
   onDone: (saved: SavedBooking) => void;
   /** token from /booking/?ref=… (attributes the booking to a chat customer) */
   linkRef?: string | null;
+  /** open at a later step (quick booking → "ปรับแพ็กเกจเอง") */
+  initialStep?: number;
 }
 
-export default function Wizard({ form: f, setForm, onExit, onDone, linkRef }: Props) {
-  const [step, setStep] = useState(0);
+export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, initialStep = 0 }: Props) {
+  const [step, setStep] = useState(initialStep);
   const [err, setErr] = useState('');
-  const [areaOpen, setAreaOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
@@ -41,26 +42,6 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef }: Pr
   const hasFood = mode === 'full';
   const c = calc(f);
 
-  const q = (f.areaQuery || '').trim();
-  const suggestions = useMemo(() => {
-    if (q.length < 1) return [];
-    const starts = TH_AREAS.filter((x) => x.split('|')[0].indexOf(q) === 0);
-    const rest = TH_AREAS.filter((x) => !starts.includes(x) && x.includes(q));
-    return starts.concat(rest).slice(0, 8).map((x) => {
-      const t = x.split('|');
-      const bkk = t[2] === 'กรุงเทพฯ';
-      return {
-        key: x,
-        main: (bkk ? 'แขวง' : 'ต.') + t[0],
-        sub: (bkk ? t[1] : 'อ.' + t[1]) + ' · จ.' + t[2] + ' · ' + t[3],
-        pick: () => {
-          setForm({ ...f, areaQuery: t[0], tambon: t[0], amphoe: t[1], province: t[2], zip: t[3] });
-          setAreaOpen(false);
-          setErr('');
-        },
-      };
-    });
-  }, [q, f]);
 
   const tentSuggested = useRef(false);
   const tentReason = tentRecommendation(f);
@@ -168,75 +149,13 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef }: Pr
                 ))}
               </div>
             </div>
-            <div style={{ position: 'relative' }}>
-              <FieldLabel>ตำบล / แขวง ที่จัดงาน</FieldLabel>
-              <input
-                type="text"
-                placeholder="พิมพ์ชื่อตำบล เช่น บ้านสวน"
-                value={f.areaQuery}
-                onChange={(e) => {
-                  setForm({ ...f, areaQuery: e.target.value, tambon: '', amphoe: '', province: '', zip: '' });
-                  setAreaOpen(true);
-                  setErr('');
-                }}
-                onFocus={() => setAreaOpen(true)}
-                style={inputStyle}
-              />
-              {areaOpen && suggestions.length > 0 && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    top: '100%',
-                    marginTop: 6,
-                    zIndex: 20,
-                    background: 'var(--color-neutral-100)',
-                    border: '1.5px solid var(--color-neutral-300)',
-                    borderRadius: 20,
-                    boxShadow: 'var(--shadow-lg)',
-                    overflow: 'hidden',
-                    maxHeight: 264,
-                    overflowY: 'auto',
-                  }}
-                >
-                  {suggestions.map((sg) => (
-                    <div
-                      key={sg.key}
-                      onClick={sg.pick}
-                      style={{ padding: '12px 18px', cursor: 'pointer', borderBottom: '1px solid var(--color-divider)' }}
-                    >
-                      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{sg.main}</div>
-                      <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>{sg.sub}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {areaOpen && q.length >= 2 && suggestions.length === 0 && (
-                <div style={{ fontSize: 13, color: 'var(--color-neutral-600)', marginTop: 8, lineHeight: 1.6 }}>
-                  ไม่พบตำบลนี้ในพื้นที่บริการ กรุณาพิมพ์ที่อยู่ในช่องด้านล่าง แล้วทีมงานจะตรวจสอบให้
-                </div>
-              )}
-            </div>
-            {!!f.tambon && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }}>
-                {[
-                  ['อำเภอ / เขต', f.amphoe],
-                  ['จังหวัด', f.province],
-                  ['รหัสไปรษณีย์', f.zip],
-                ].map(([label, val]) => (
-                  <div
-                    key={label}
-                    style={{ background: 'var(--color-accent-2-200)', borderRadius: 'var(--radius-md)', padding: '11px 13px' }}
-                  >
-                    <div style={{ fontSize: 11.5, color: 'var(--color-accent-2-700)' }}>{label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-accent-2-800)', marginTop: 2 }}>
-                      {val}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <AreaSearch
+              form={f}
+              setForm={(nf) => {
+                setForm(nf);
+                setErr('');
+              }}
+            />
             <div>
               <FieldLabel>บ้านเลขที่ / หมู่ / ถนน หรือชื่อสถานที่</FieldLabel>
               <input
@@ -736,6 +655,16 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef }: Pr
                 onChange={(e) => setF('phone', e.target.value)}
                 style={inputStyle}
               />
+            </div>
+            <div>
+              <FieldLabel>ที่อยู่สำหรับออกใบเสนอราคา (ไม่บังคับ)</FieldLabel>
+              <textarea
+                placeholder="ชื่อบริษัท/บุคคล และที่อยู่ในใบเสนอราคา หากเว้นว่างจะใช้ที่อยู่สถานที่จัดงาน"
+                value={f.customerAddress}
+                onChange={(e) => setF('customerAddress', e.target.value)}
+                rows={2}
+                style={{ ...inputStyle, borderRadius: 22, padding: '14px 18px', resize: 'vertical' }}
+              ></textarea>
             </div>
             <div>
               <FieldLabel>รายละเอียดเพิ่มเติม (ไม่บังคับ)</FieldLabel>

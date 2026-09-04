@@ -11,11 +11,29 @@ export interface BookingResult {
 }
 
 /** Identity behind a /booking/?ref=<token> link created by sales in the CRM inbox. */
+export interface BookingPreset {
+  occasion?: string | null;
+  eventDate?: string | null;
+  timeSlot?: string | null;
+  packageId: string;
+  foodMode: 'buffet' | 'table';
+  guests: number;
+  tables: number;
+  monks: number;
+  selfTransport: boolean;
+  addons: string[];
+  note?: string | null;
+}
+
 export interface BookingLinkInfo {
   customerName: string;
   phone: string | null;
   channel: string;
   packageId: string | null;
+  /** set when sales fixed the whole package (quick booking) */
+  preset: BookingPreset | null;
+  packageName: string | null;
+  estimatedTotal: number | null;
 }
 
 export async function getBookingLink(token: string): Promise<BookingLinkInfo | null> {
@@ -48,6 +66,7 @@ export async function submitBooking(f: BookingForm, ref?: string | null): Promis
     budget: f.budget || undefined,
     name: f.name,
     phone: f.phone,
+    customerAddress: f.customerAddress.trim() || undefined,
     note: f.note || undefined,
     ref: ref || undefined,
   };

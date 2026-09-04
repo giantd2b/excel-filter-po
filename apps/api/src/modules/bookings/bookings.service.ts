@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/providers/prisma.service';
 import {
   buildFaItems,
@@ -11,6 +11,7 @@ import {
   BOOKING_PACKAGES,
   BOOKING_ADDONS,
   derivePricing,
+  estimateBooking,
   pickRemarkCode,
   DEFAULT_PRICING,
   type FaRecipeConfig,
@@ -21,6 +22,7 @@ import {
 const CATALOG_CACHE_KEY = 'fa_catalog_cache';
 const CATALOG_TTL_MS = 5 * 60 * 1000;
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { BookingPresetDto } from './dto/booking-preset.dto';
 import { FlowAccountClient } from '../quotations/flowaccount.client';
 
 const CHANNEL_LABELS: Record<string, string> = { LINE: 'LINE', FACEBOOK: 'Facebook' };
@@ -215,6 +217,7 @@ export class BookingsService {
       b.note ? `หมายเหตุลูกค้า: ${b.note}` : '',
       b.budget ? `งบประมาณ: ${b.budget}` : '',
       `${b.source === 'chat_link' ? 'จองผ่านลิงก์จากแชต' : 'จองผ่านหน้าเว็บ'} ${b.code} · ราคาประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท`,
+      b.customerAddress ? `สถานที่จัดงาน: ${bookingAddress(b) || '-'}` : '',
       attributed
         ? `ช่องทาง: ${b.channel || '-'} · ลูกค้าแชต: ${b.chatCustomerName || '-'} (${b.customerId})${b.salesName ? ` · เซลล์: ${b.salesName}` : ''}`
         : '',
@@ -225,11 +228,11 @@ export class BookingsService {
       customer: {
         name: b.customerName,
         phone: b.phone,
-        address: bookingAddress(b),
+        address: b.customerAddress || bookingAddress(b),
         contactPerson: b.chatCustomerName && b.chatCustomerName !== b.customerName ? b.chatCustomerName : undefined,
       },
       salesName: b.salesName || undefined,
-      project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}`,
+      project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}${b.customerAddress && b.venue ? ` · ${b.venue}` : ''}`,
       vatRate: built.vatRate,
       // printed หมายเหตุ: the matched tier's remark template, else the package's (FA falls back to its default)
       remarkCode:
@@ -310,6 +313,7 @@ export class BookingsService {
         budget: dto.budget || null,
         customerName: dto.name.trim(),
         phone: phoneDigits,
+        customerAddress: dto.customerAddress?.trim() || null,
         note: dto.note || null,
         estimatedTotal: calc.total,
       },
@@ -397,6 +401,9 @@ export class BookingsService {
       createdByName: string | null;
       openCount: number;
       lastOpenedAt: Date | null;
+      preset?: any;
+      packageName?: string | null;
+      estimatedTotal?: number | null;
     },
     bookingCount: number,
   ) {
@@ -406,6 +413,9 @@ export class BookingsService {
       customerName: link.customerName,
       channel: channelLabel(link.channel, link.channelType),
       packageId: link.packageId,
+      preset: link.preset ?? null,
+      packageName: link.packageName ?? null,
+      estimatedTotal: link.estimatedTotal ?? null,
       createdAt: link.createdAt,
       createdByName: link.createdByName,
       openCount: link.openCount,
@@ -414,17 +424,57 @@ export class BookingsService {
     };
   }
 
-  /** One stable link per chat customer (+ optional preselected package). */
-  async createLink(customerId: string | undefined, packageId: string | undefined, admin: { id?: string; name?: string }) {
+  /** Live estimate for a preset (same numbers the booking page shows). */
+  async estimate(preset: BookingPresetDto) {
+    const est = estimateBooking(preset, await this.getPricing());
+    if (!est) throw new BadRequestException(`ไม่พบแพ็กเกจ "${preset.packageId}"`);
+    return est;
+  }
+
+  /**
+   * Booking link for a chat customer. Without a preset there is one stable link per
+   * customer(+package); with a preset (sales fixed the whole package) every call makes a
+   * fresh link so different offers to the same customer stay distinct.
+   */
+  async createLink(
+    customerId: string | undefined,
+    packageId: string | undefined,
+    preset: BookingPresetDto | undefined,
+    admin: { id?: string; name?: string },
+  ) {
     if (!customerId) throw new BadRequestException('customerId is required');
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
     if (!customer) throw new NotFoundException('Customer not found');
+    if (preset) {
+      if (preset.eventDate && !/^\d{4}-\d{2}-\d{2}$/.test(preset.eventDate)) {
+        throw new BadRequestException('รูปแบบวันที่ไม่ถูกต้อง');
+      }
+      const est = await this.estimate(preset);
+      const link = await this.prisma.bookingLink.create({
+        data: {
+          token: randomBytes(16).toString('base64url'),
+          customerId,
+          channel: customer.channel,
+          channelType: customer.channelType,
+          customerName: customer.nickname || customer.displayName,
+          phone: customer.phoneClean || null,
+          packageId: preset.packageId,
+          preset: { ...preset } as any,
+          packageName: est.packageName,
+          estimatedTotal: est.total,
+          createdById: admin.id || null,
+          createdByName: admin.name || null,
+        },
+        include: { _count: { select: { bookings: true } } },
+      });
+      return this.shapeLink(link, link._count.bookings);
+    }
     if (packageId && !BOOKING_PACKAGES.some((p) => p.id === packageId)) {
       throw new BadRequestException(`ไม่พบแพ็กเกจ "${packageId}"`);
     }
     const pkg = packageId || null;
     let link = await this.prisma.bookingLink.findFirst({
-      where: { customerId, packageId: pkg },
+      where: { customerId, packageId: pkg, preset: { equals: Prisma.DbNull } },
       orderBy: { createdAt: 'desc' },
       include: { _count: { select: { bookings: true } } },
     });
@@ -461,6 +511,9 @@ export class BookingsService {
       phone: c.phoneClean || link.phone || null,
       channel: channelLabel(c.channel, c.channelType),
       packageId: link.packageId,
+      preset: link.preset ?? null,
+      packageName: link.packageName ?? null,
+      estimatedTotal: link.estimatedTotal ?? null,
     };
   }
 

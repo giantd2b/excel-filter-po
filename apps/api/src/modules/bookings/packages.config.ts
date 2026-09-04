@@ -672,3 +672,29 @@ export function calcEstimatedTotal(
 
   return { total: Math.max(0, total), pkg };
 }
+
+/** Estimated total plus the price lines the booking page shows (mirrors booking/src/lib/calc.ts `calc`). */
+export function estimateBooking(
+  input: Parameters<typeof calcEstimatedTotal>[0],
+  pricing: PricingConfig = DEFAULT_PRICING,
+): { total: number; packageName: string; rows: { k: string; v: string }[] } | null {
+  const calc = calcEstimatedTotal(input, pricing);
+  if (!calc) return null;
+  const pp = pricing.packages[input.packageId];
+  const fmt = (n: number) => `${n.toLocaleString('th-TH')} บาท`;
+  const rows: { k: string; v: string }[] = [];
+  if (calc.pkg.kind === 'ceremony') {
+    rows.push({ k: 'ราคาแพ็กเกจ', v: fmt(pp.base ?? 0) });
+  } else {
+    const cfg = input.foodMode === 'table' ? pp.table : pp.buffet;
+    const count = input.foodMode === 'table' ? input.tables : input.guests;
+    const unit = input.foodMode === 'table' ? 'โต๊ะ' : 'ท่าน';
+    rows.push({ k: `ราคาแพ็กเกจ (${count} ${unit})`, v: fmt(cfg ? tierTotalFor(cfg, count).tierTotal : 0) });
+  }
+  for (const a of BOOKING_ADDONS) {
+    if (input.addons.includes(a.id)) rows.push({ k: a.label, v: `+${fmt(pricing.addons[a.id] ?? a.price)}` });
+  }
+  if (input.selfTransport) rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: `−${fmt(pricing.selfTransportDiscount)}` });
+  if (input.monks === 5) rows.push({ k: 'พระ 5 รูป', v: `−${fmt(pricing.fiveMonksDiscount)}` });
+  return { total: calc.total, packageName: calc.pkg.name, rows };
+}

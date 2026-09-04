@@ -92,6 +92,12 @@ export class CreateBookingDto {
   @MaxLength(30)
   phone: string;
 
+  /** Billing address printed on the quotation (optional; defaults to the event address). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  customerAddress?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(1000)

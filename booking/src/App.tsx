@@ -7,6 +7,7 @@ import Home from './screens/Home';
 import Detail from './screens/Detail';
 import Wizard from './screens/Wizard';
 import Done from './screens/Done';
+import QuickBooking from './screens/QuickBooking';
 import { PhoneIcon, charm } from './ui';
 
 export interface SavedBooking {
@@ -18,13 +19,14 @@ export interface SavedBooking {
   f: BookingForm;
 }
 
-type Screen = 'home' | 'detail' | 'book' | 'done';
+type Screen = 'home' | 'detail' | 'book' | 'quick' | 'done';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [pkgId, setPkgId] = useState('ceremony-prime');
   const [form, setForm] = useState<BookingForm>(initialForm);
   const [saved, setSaved] = useState<SavedBooking | null>(null);
+  const [wizardStep, setWizardStep] = useState(0);
   // Live prices come from the CRM (edited in the dashboard); bump state to re-render once applied
   const [, setPricingVersion] = useState(0);
   useEffect(() => {
@@ -40,13 +42,29 @@ export default function App() {
     getBookingLink(linkRef).then((info) => {
       if (!info) return;
       setLinkInfo(info);
+      const p = info.preset;
       setForm((f) => ({
         ...f,
         name: f.name || info.customerName || '',
         phone: f.phone || info.phone || '',
         pkg: info.packageId && pkgById(info.packageId) ? info.packageId : f.pkg,
+        ...(p
+          ? {
+              foodMode: p.foodMode,
+              guests: p.guests,
+              tables: p.tables,
+              monks: p.monks,
+              selfTransport: p.selfTransport,
+              addons: p.addons || [],
+              occasion: p.occasion || f.occasion,
+              date: p.eventDate || f.date,
+              time: p.timeSlot || f.time,
+            }
+          : {}),
       }));
       if (info.packageId && pkgById(info.packageId)) setPkgId(info.packageId);
+      // sales fixed the package: skip straight to the short confirmation form
+      if (p) setScreen('quick');
     });
   }, [linkRef]);
 
@@ -157,12 +175,32 @@ export default function App() {
         />
       )}
 
+      {screen === 'quick' && linkInfo && (
+        <QuickBooking
+          form={form}
+          setForm={setForm}
+          linkInfo={linkInfo}
+          linkRef={linkRef}
+          onEditPackage={() => {
+            setWizardStep(1);
+            setScreen('book');
+            window.scrollTo(0, 0);
+          }}
+          onDone={(s) => {
+            setSaved(s);
+            setScreen('done');
+            window.scrollTo(0, 0);
+          }}
+        />
+      )}
+
       {screen === 'book' && (
         <Wizard
           form={form}
           setForm={setForm}
           linkRef={linkRef}
-          onExit={goHome}
+          initialStep={wizardStep}
+          onExit={linkInfo?.preset ? () => setScreen('quick') : goHome}
           onDone={(s) => {
             setSaved(s);
             setScreen('done');

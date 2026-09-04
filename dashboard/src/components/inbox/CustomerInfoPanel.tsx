@@ -14,6 +14,7 @@ import {
   getCustomerJobs,
   getCustomerBookings,
   type MeritBooking,
+  type BookingLink,
 } from "@/lib/api-service";
 import BookingLinkModal from "./BookingLinkModal";
 import { useAuth } from "@/context/AuthContext";
@@ -76,6 +77,7 @@ export function CustomerInfoPanel({
 
   // Quotations (FlowAccount)
   const [bookings, setBookings] = useState<MeritBooking[]>([]);
+  const [bookingLinks, setBookingLinks] = useState<BookingLink[]>([]);
   const [showBookingLink, setShowBookingLink] = useState(false);
   const [quotations, setQuotations] = useState<any[]>([]);
   const [quotationsLoading, setQuotationsLoading] = useState(false);
@@ -122,8 +124,8 @@ export function CustomerInfoPanel({
         }
         // Merit bookings attributed to this customer (by booking link or phone)
         getCustomerBookings(userId)
-          .then((res) => { if (!cancelled) setBookings(res.bookings || []); })
-          .catch(() => { if (!cancelled) setBookings([]); });
+          .then((res) => { if (!cancelled) { setBookings(res.bookings || []); setBookingLinks(res.links || []); } })
+          .catch(() => { if (!cancelled) { setBookings([]); setBookingLinks([]); } });
         // Auto-fetch quotations from FlowAccount
         setQuotationsLoading(true);
         api.get<{ data: any[]; total: number }>(`/users/${userId}/quotations`)
@@ -680,6 +682,31 @@ export function CustomerInfoPanel({
             ))}
           </div>
         )}
+        {bookingLinks.length > 0 && (
+          <div className="mt-2.5 space-y-1">
+            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-[0.06em]">ลิงก์ที่ส่งให้ลูกค้า</span>
+            {bookingLinks.map((l) => (
+              <div key={l.token} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-violet-50/60 ring-1 ring-violet-100">
+                <div className="min-w-0">
+                  <p className="text-[11px] text-slate-700 truncate">
+                    {l.packageName || "ให้ลูกค้าเลือกแพ็กเกจเอง"}
+                    {l.estimatedTotal != null ? ` · ฿${l.estimatedTotal.toLocaleString("th-TH")}` : ""}
+                  </p>
+                  <p className="text-[9px] text-slate-400">
+                    เปิด {l.openCount} ครั้ง · จอง {l.bookingCount} รายการ{l.createdByName ? ` · ${l.createdByName}` : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigator.clipboard.writeText(l.url).catch(() => {})}
+                  className="text-[10px] text-violet-600 hover:text-violet-800 shrink-0"
+                  title={l.url}
+                >
+                  คัดลอก
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       {showBookingLink && details && userId && (
         <BookingLinkModal
@@ -691,7 +718,9 @@ export function CustomerInfoPanel({
           }}
           onClose={() => {
             setShowBookingLink(false);
-            getCustomerBookings(userId).then((res) => setBookings(res.bookings || [])).catch(() => {});
+            getCustomerBookings(userId)
+              .then((res) => { setBookings(res.bookings || []); setBookingLinks(res.links || []); })
+              .catch(() => {});
           }}
         />
       )}
