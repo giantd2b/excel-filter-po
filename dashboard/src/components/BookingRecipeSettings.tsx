@@ -220,35 +220,57 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
                       {(r.monkTiers || []).map((t, i) => {
                         const setTier = (patch: Partial<MonkTier>) =>
                           setPkg(pkg.id, { monkTiers: (r.monkTiers || []).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+                        const remarkOptions = (data.remarkTemplates || []).filter((x) => x.code);
                         return (
-                          <div key={i} className="grid grid-cols-12 gap-1.5 items-center">
-                            <select value={t.mode} onChange={(e) => setTier({ mode: e.target.value as MonkTier["mode"] })} className={selectCls + " col-span-3"}>
-                              <option value="buffet">บุฟเฟต์</option>
-                              <option value="table">โต๊ะจีน</option>
-                              <option value="any">ทุกโหมด</option>
-                            </select>
-                            <div className="col-span-3 flex items-center gap-1">
-                              <span className="text-[11px] text-slate-400 whitespace-nowrap">ตั้งแต่</span>
-                              <input
-                                type="number"
-                                min={0}
-                                value={t.from}
-                                onChange={(e) => setTier({ from: Math.max(0, Number(e.target.value) || 0) })}
-                                className={selectCls}
-                                title={t.mode === "table" ? "จำนวนโต๊ะจีน" : "จำนวนแขก"}
-                              />
+                          <div key={i} className="rounded-lg bg-white ring-1 ring-slate-100 p-1.5 space-y-1">
+                            <div className="grid grid-cols-12 gap-1.5 items-center">
+                              <select value={t.mode} onChange={(e) => setTier({ mode: e.target.value as MonkTier["mode"] })} className={selectCls + " col-span-3"}>
+                                <option value="buffet">บุฟเฟต์</option>
+                                <option value="table">โต๊ะจีน</option>
+                                <option value="any">ทุกโหมด</option>
+                              </select>
+                              <div className="col-span-3 flex items-center gap-1">
+                                <span className="text-[11px] text-slate-400 whitespace-nowrap">ตั้งแต่</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={t.from}
+                                  onChange={(e) => setTier({ from: Math.max(0, Number(e.target.value) || 0) })}
+                                  className={selectCls}
+                                  title={t.mode === "table" ? "จำนวนโต๊ะจีน" : "จำนวนแขก"}
+                                />
+                              </div>
+                              <div className="col-span-5">
+                                <ProductSelect value={t.code} onChange={(v) => setTier({ code: v })} options={packageProducts} />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setPkg(pkg.id, { monkTiers: (r.monkTiers || []).filter((_, j) => j !== i) })}
+                                className="col-span-1 text-slate-400 hover:text-red-500 text-xs"
+                                title="ลบขั้น"
+                              >
+                                ✕
+                              </button>
                             </div>
-                            <div className="col-span-5">
-                              <ProductSelect value={t.code} onChange={(v) => setTier({ code: v })} options={packageProducts} />
+                            <div className="grid grid-cols-12 gap-1.5 items-center">
+                              <span className="col-span-3 text-[11px] text-slate-400 pl-1">หมายเหตุของขั้นนี้</span>
+                              <select
+                                value={t.remarkCode || ""}
+                                onChange={(e) => setTier({ remarkCode: e.target.value || null })}
+                                className={selectCls + " col-span-8 text-xs"}
+                                title="เทมเพลตหมายเหตุที่ใช้เมื่อเข้าขั้นนี้ (ว่าง = ใช้ของแพ็กเกจ)"
+                              >
+                                <option value="">(ใช้หมายเหตุของแพ็กเกจ)</option>
+                                {t.remarkCode && !remarkOptions.some((x) => x.code === t.remarkCode) && (
+                                  <option value={t.remarkCode}>{t.remarkCode} (ไม่พบ)</option>
+                                )}
+                                {remarkOptions.map((x) => (
+                                  <option key={x.code!} value={x.code!}>
+                                    {x.code} · {x.name}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setPkg(pkg.id, { monkTiers: (r.monkTiers || []).filter((_, j) => j !== i) })}
-                              className="col-span-1 text-slate-400 hover:text-red-500 text-xs"
-                              title="ลบขั้น"
-                            >
-                              ✕
-                            </button>
                           </div>
                         );
                       })}

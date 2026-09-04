@@ -553,6 +553,7 @@ export interface MonkTier {
   mode: "buffet" | "table" | "any";
   from: number;
   code: string;
+  remarkCode?: string | null;
 }
 
 export interface FaRecipe {

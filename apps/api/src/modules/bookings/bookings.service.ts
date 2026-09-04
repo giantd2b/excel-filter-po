@@ -10,6 +10,7 @@ import {
   BOOKING_PACKAGES,
   BOOKING_ADDONS,
   derivePricing,
+  pickRemarkCode,
   DEFAULT_PRICING,
   type FaRecipeConfig,
   type FaCatalog,
@@ -212,8 +213,14 @@ export class BookingsService {
       customer: { name: b.customerName, phone: b.phone, address: bookingAddress(b) },
       project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}`,
       vatRate: built.vatRate,
-      // printed หมายเหตุ: the package's remark template in flowaccount-app (falls back to FA's default there)
-      remarkCode: config.packages[b.packageId]?.remarkCode || undefined,
+      // printed หมายเหตุ: the matched tier's remark template, else the package's (FA falls back to its default)
+      remarkCode:
+        (config.packages[b.packageId] &&
+          pickRemarkCode(
+            config.packages[b.packageId],
+            b.foodMode === 'table' ? 'table' : b.foodMode === 'buffet' ? 'buffet' : 'any',
+            b.foodMode === 'table' ? b.tables : b.guests,
+          )) || undefined,
       internalNotes: notes.join('\n'),
       items: built.items,
     });

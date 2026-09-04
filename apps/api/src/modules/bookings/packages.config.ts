@@ -355,6 +355,8 @@ export interface MonkTier {
   mode: 'buffet' | 'table' | 'any';
   from: number;
   code: string;
+  /** remark template code for quotations that use this tier (overrides the package's remarkCode) */
+  remarkCode?: string | null;
 }
 
 export interface FaRecipe {
@@ -464,6 +466,7 @@ export function mergeFaRecipes(saved: Partial<FaRecipeConfig> | null | undefined
         mode: t?.mode === 'buffet' || t?.mode === 'table' ? t.mode : 'any',
         from: Math.max(0, Number(t?.from) || 0),
         code: code(t?.code) || '',
+        remarkCode: typeof t?.remarkCode === 'string' && t.remarkCode.trim() ? t.remarkCode.trim().toUpperCase() : null,
       }))
       .filter((t) => t.code)
       .sort((a, b) => a.from - b.from);
@@ -523,14 +526,23 @@ export interface FaItem {
 }
 
 /** Ceremony product for a food mode + size: matching mode (or 'any'), largest `from` ≤ count; else monkCode. */
-export function pickMonkCode(recipe: FaRecipe, mode: 'buffet' | 'table' | 'any', count: number): string {
+export function pickMonkTier(recipe: FaRecipe, mode: 'buffet' | 'table' | 'any', count: number): MonkTier | null {
   let best: MonkTier | null = null;
   for (const t of recipe.monkTiers || []) {
     if (t.mode !== 'any' && mode !== 'any' && t.mode !== mode) continue;
     if (t.from > count) continue;
     if (!best || t.from >= best.from) best = t;
   }
-  return best?.code || recipe.monkCode;
+  return best;
+}
+
+export function pickMonkCode(recipe: FaRecipe, mode: 'buffet' | 'table' | 'any', count: number): string {
+  return pickMonkTier(recipe, mode, count)?.code || recipe.monkCode;
+}
+
+/** Remark template for a booking: the matched tier's remarkCode, else the package's. */
+export function pickRemarkCode(recipe: FaRecipe, mode: 'buffet' | 'table' | 'any', count: number): string | null {
+  return pickMonkTier(recipe, mode, count)?.remarkCode || recipe.remarkCode || null;
 }
 
 /** Build the quotation lines for a booking. Returns null when the package has no recipe. */
