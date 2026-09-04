@@ -39,7 +39,7 @@ export const BOOKING_PACKAGES: BookingPackage[] = [
     name: 'PRIME ครบวงจร',
     kind: 'full',
     buffet: { tiers: [[20, 25990], [30, 29490], [40, 32990], [50, 38990]], extra: 350 },
-    table: { tiers: [[8, 42290], [10, 47490], [20, 75490]], extra: 2600 },
+    table: { tiers: [[8, 42290], [10, 47490], [20, 75990]], extra: 2600 },
   },
 ];
 
@@ -50,7 +50,7 @@ export const BOOKING_ADDONS: { id: string; label: string; price: number }[] = [
 ];
 
 export const SELF_TRANSPORT_DISCOUNT = 1000;
-export const FIVE_MONKS_DISCOUNT = 1500; // ceremony packages only
+export const FIVE_MONKS_DISCOUNT = 1500; // every package (new-package-2025 sheet)
 
 // ── FlowAccount-app quotation recipes ──────────────────────────────────
 // How each booking package is assembled into quotation lines for
@@ -62,10 +62,25 @@ export const FIVE_MONKS_DISCOUNT = 1500; // ceremony packages only
 // in SystemSetting (key FA_RECIPES_SETTING_KEY). DEFAULT_FA_RECIPES is used
 // until something is saved, and fills in any package/add-on missing from the
 // saved config.
+/**
+ * Ceremony-line product per food mode and size. The ceremony portion of a tiered
+ * package differs by tier (e.g. a big tent is included from 50 guests / 8 Chinese
+ * tables, a bigger one from 20 tables), so the product — and its printed contents —
+ * is picked by (mode, count): the row whose mode matches ('any' matches both) and
+ * whose `from` is the largest value ≤ count. `from` = guests for buffet, tables for
+ * Chinese tables. No matching row → `monkCode`.
+ */
+export interface MonkTier {
+  mode: 'buffet' | 'table' | 'any';
+  from: number;
+  code: string;
+}
+
 export interface FaRecipe {
-  /** ceremony line product code */
+  /** ceremony line product code (fallback when no tier matches) */
   monkCode: string;
-  /** optional: use a different ceremony product when guests exceed this count (tiered packages) */
+  monkTiers?: MonkTier[];
+  /** legacy (pre-tier) fields, migrated into monkTiers by mergeFaRecipes */
   largeGuestsAbove?: number | null;
   monkCodeLarge?: string | null;
   /** component code of "นิมนต์รับ-ส่งพระ" inside that product (excluded when the customer handles it) */
@@ -92,8 +107,13 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
     'ceremony-prime': { monkCode: 'CEREMONY_PRIME', transportCode: 'transport', vatRate: 0 },
     full: {
       monkCode: 'MONK_FULL203040',
-      largeGuestsAbove: 40,
-      monkCodeLarge: 'MONK_FULL50',
+      // sheet: buffet 20-40 → 14,490 · buffet 50+ and Chinese 8-10 tables → 15,490 (big tent) · 20 tables → 17,990
+      monkTiers: [
+        { mode: 'buffet', from: 0, code: 'MONK_FULL203040' },
+        { mode: 'buffet', from: 50, code: 'MONK_FULL50' },
+        { mode: 'table', from: 0, code: 'MONK_FULL50' },
+        { mode: 'table', from: 20, code: 'MONK_FULL_T20' },
+      ],
       transportCode: 'item8',
       buffetCode: 'BUFFET_STANDARD_MONK',
       chineseTableCode: 'CHINESE_TABLE',
@@ -123,15 +143,33 @@ export function mergeFaRecipes(saved: Partial<FaRecipeConfig> | null | undefined
   // A field that is absent from the saved config falls back to the default; an explicitly
   // empty string means "no product — send that line as plain text" and is kept as null.
   const optionalCode = (v: unknown, fallback: string | null | undefined) => (v === undefined ? fallback ?? null : code(v));
+  const normaliseTiers = (raw: unknown): MonkTier[] =>
+    (Array.isArray(raw) ? raw : [])
+      .map((t: any) => ({
+        mode: t?.mode === 'buffet' || t?.mode === 'table' ? t.mode : 'any',
+        from: Math.max(0, Number(t?.from) || 0),
+        code: code(t?.code) || '',
+      }))
+      .filter((t) => t.code)
+      .sort((a, b) => a.from - b.from);
   const packages: Record<string, FaRecipe> = {};
   for (const id of Object.keys(DEFAULT_FA_RECIPES.packages)) {
     const d = DEFAULT_FA_RECIPES.packages[id];
     const s = (saved?.packages?.[id] || {}) as Partial<FaRecipe>;
-    const above = s.largeGuestsAbove === undefined ? d.largeGuestsAbove : Number(s.largeGuestsAbove);
+    let monkTiers: MonkTier[];
+    if (s.monkTiers !== undefined) {
+      monkTiers = normaliseTiers(s.monkTiers);
+    } else if (s.largeGuestsAbove || s.monkCodeLarge) {
+      // migrate a config saved before tiers existed
+      const above = Number(s.largeGuestsAbove);
+      const large = code(s.monkCodeLarge);
+      monkTiers = large && Number.isFinite(above) && above > 0 ? [{ mode: 'buffet', from: above + 1, code: large }] : [];
+    } else {
+      monkTiers = normaliseTiers(d.monkTiers);
+    }
     packages[id] = {
       monkCode: code(s.monkCode) || d.monkCode,
-      largeGuestsAbove: Number.isFinite(above as number) && (above as number) > 0 ? (above as number) : null,
-      monkCodeLarge: optionalCode(s.monkCodeLarge, d.monkCodeLarge),
+      monkTiers,
       transportCode: (typeof s.transportCode === 'string' && s.transportCode.trim()) || d.transportCode,
       buffetCode: optionalCode(s.buffetCode, d.buffetCode),
       chineseTableCode: optionalCode(s.chineseTableCode, d.chineseTableCode),
@@ -156,6 +194,17 @@ export interface FaItem {
   detail?: string[];
 }
 
+/** Ceremony product for a food mode + size: matching mode (or 'any'), largest `from` ≤ count; else monkCode. */
+export function pickMonkCode(recipe: FaRecipe, mode: 'buffet' | 'table' | 'any', count: number): string {
+  let best: MonkTier | null = null;
+  for (const t of recipe.monkTiers || []) {
+    if (t.mode !== 'any' && mode !== 'any' && t.mode !== mode) continue;
+    if (t.from > count) continue;
+    if (!best || t.from >= best.from) best = t;
+  }
+  return best?.code || recipe.monkCode;
+}
+
 /** Build the quotation lines for a booking. Returns null when the package has no recipe. */
 export function buildFaItems(
   input: {
@@ -175,20 +224,16 @@ export function buildFaItems(
 
   const items: FaItem[] = [];
   const exclude = input.selfTransport ? [recipe.transportCode] : [];
-  const monkCode =
-    recipe.monkCodeLarge && recipe.largeGuestsAbove && input.guests > recipe.largeGuestsAbove
-      ? recipe.monkCodeLarge
-      : recipe.monkCode;
+  // 5 monks instead of 9 = −1,500 on every package; self-transport becomes a line discount in flowaccount-app
+  const monksDiscount = input.monks === 5 ? FIVE_MONKS_DISCOUNT : 0;
 
   if (pkg.kind === 'ceremony') {
-    // flat price; the 5-monk discount is applied here, self-transport becomes a line discount in flowaccount-app
-    const price = pkg.base! - (input.monks === 5 ? FIVE_MONKS_DISCOUNT : 0);
     items.push({
-      productCode: monkCode,
+      productCode: pickMonkCode(recipe, 'any', 0),
       quantity: 1,
       variables: { monks: input.monks },
       exclude,
-      unitPrice: price,
+      unitPrice: Math.max(0, pkg.base! - monksDiscount),
     });
   } else {
     const isTable = input.foodMode === 'table';
@@ -198,10 +243,10 @@ export function buildFaItems(
     for (const t of cfg.tiers) if (count >= t[0]) tier = t;
     const tierTotal = tier[1] + Math.max(0, count - tier[0]) * cfg.extra;
     const foodTotal = cfg.extra * count;
-    const monkPrice = Math.max(0, tierTotal - foodTotal);
+    const monkPrice = Math.max(0, tierTotal - foodTotal - monksDiscount);
 
     items.push({
-      productCode: monkCode,
+      productCode: pickMonkCode(recipe, isTable ? 'table' : 'buffet', count),
       quantity: 1,
       variables: { monks: input.monks },
       exclude,
@@ -264,7 +309,7 @@ export function calcEstimatedTotal(input: {
     if (input.addons.includes(a.id)) total += a.price;
   }
   if (input.selfTransport) total -= SELF_TRANSPORT_DISCOUNT;
-  if (pkg.kind === 'ceremony' && input.monks === 5) total -= FIVE_MONKS_DISCOUNT;
+  if (input.monks === 5) total -= FIVE_MONKS_DISCOUNT;
 
   return { total, pkg };
 }

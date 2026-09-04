@@ -14,6 +14,11 @@ echo "Copying frontend to API public..."
 rm -rf apps/api/public
 cp -r dashboard/dist apps/api/public
 
+echo "Building booking page (outputs into apps/api/public/booking)..."
+cd booking
+npm run build
+cd ..
+
 echo "Deploying to Railway..."
 cd apps/api
 railway up

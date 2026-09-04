@@ -549,10 +549,15 @@ export async function createBookingQuotation(id: string) {
 
 // ─── Package → flowaccount-app product mapping ───────────────────
 
+export interface MonkTier {
+  mode: "buffet" | "table" | "any";
+  from: number;
+  code: string;
+}
+
 export interface FaRecipe {
   monkCode: string;
-  largeGuestsAbove?: number | null;
-  monkCodeLarge?: string | null;
+  monkTiers?: MonkTier[];
   transportCode: string;
   buffetCode?: string | null;
   chineseTableCode?: string | null;

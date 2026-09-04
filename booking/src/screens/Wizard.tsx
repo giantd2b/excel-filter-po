@@ -529,7 +529,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone }: Props) {
                   >
                     <div style={{ fontSize: 16, fontWeight: 600 }}>พระ {m} รูป</div>
                     <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', marginTop: 2 }}>
-                      {m === 9 ? 'นิยมที่สุด' : 'ลด 1,500 (เฉพาะพิธีสงฆ์)'}
+                      {m === 9 ? 'นิยมที่สุด' : 'ลด 1,500'}
                     </div>
                   </div>
                 ))}

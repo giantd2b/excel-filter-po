@@ -97,7 +97,8 @@ export function calc(f: BookingForm): CalcResult {
     total -= SELF_TRANSPORT_DISCOUNT;
     rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: '−1,000' });
   }
-  if (pkg.kind === 'ceremony' && f.monks === 5) {
+  // every package: 5 monks instead of 9 = −1,500 (new-package-2025 sheet)
+  if (f.monks === 5) {
     total -= FIVE_MONKS_DISCOUNT;
     rows.push({ k: 'พระ 5 รูป', v: '−1,500' });
   }

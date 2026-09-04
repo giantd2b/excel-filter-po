@@ -6,6 +6,7 @@ import {
   type BookingRecipeSettings as Settings,
   type FaRecipeConfig,
   type FaRecipe,
+  type MonkTier,
 } from "@/lib/api-service";
 
 const selectCls =
@@ -182,21 +183,56 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
 
               {isFull && (
                 <>
-                  <div className="grid grid-cols-5 gap-2">
-                    <div className="col-span-2">
-                      <label className={labelCls}>ถ้าแขกเกิน (คน)</label>
-                      <input
-                        type="number"
-                        value={r.largeGuestsAbove ?? ""}
-                        onChange={(e) => setPkg(pkg.id, { largeGuestsAbove: e.target.value ? Number(e.target.value) : null })}
-                        className={selectCls}
-                        placeholder="เช่น 40"
-                      />
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={labelCls + " mb-0"}>สินค้าพิธีสงฆ์ตามขั้น (ส่วนพิธีสงฆ์ต่างกันเมื่อรวมเต้นท์ใหญ่)</label>
+                      <button
+                        type="button"
+                        onClick={() => setPkg(pkg.id, { monkTiers: [...(r.monkTiers || []), { mode: "buffet", from: 0, code: r.monkCode }] })}
+                        className="text-[11px] text-brand-600 hover:underline"
+                      >
+                        + เพิ่มขั้น
+                      </button>
                     </div>
-                    <div className="col-span-3">
-                      <label className={labelCls}>ใช้สินค้าพิธีสงฆ์นี้แทน</label>
-                      <ProductSelect value={r.monkCodeLarge} onChange={(v) => setPkg(pkg.id, { monkCodeLarge: v || null })} options={packageProducts} allowEmpty />
+                    {(r.monkTiers || []).length === 0 && <p className="text-[11px] text-slate-400 italic">ไม่มีขั้น — ใช้สินค้าพิธีสงฆ์ด้านบนทุกกรณี</p>}
+                    <div className="space-y-1.5">
+                      {(r.monkTiers || []).map((t, i) => {
+                        const setTier = (patch: Partial<MonkTier>) =>
+                          setPkg(pkg.id, { monkTiers: (r.monkTiers || []).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+                        return (
+                          <div key={i} className="grid grid-cols-12 gap-1.5 items-center">
+                            <select value={t.mode} onChange={(e) => setTier({ mode: e.target.value as MonkTier["mode"] })} className={selectCls + " col-span-3"}>
+                              <option value="buffet">บุฟเฟต์</option>
+                              <option value="table">โต๊ะจีน</option>
+                              <option value="any">ทุกโหมด</option>
+                            </select>
+                            <div className="col-span-3 flex items-center gap-1">
+                              <span className="text-[11px] text-slate-400 whitespace-nowrap">ตั้งแต่</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={t.from}
+                                onChange={(e) => setTier({ from: Math.max(0, Number(e.target.value) || 0) })}
+                                className={selectCls}
+                                title={t.mode === "table" ? "จำนวนโต๊ะจีน" : "จำนวนแขก"}
+                              />
+                            </div>
+                            <div className="col-span-5">
+                              <ProductSelect value={t.code} onChange={(v) => setTier({ code: v })} options={packageProducts} />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setPkg(pkg.id, { monkTiers: (r.monkTiers || []).filter((_, j) => j !== i) })}
+                              className="col-span-1 text-slate-400 hover:text-red-500 text-xs"
+                              title="ลบขั้น"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
+                    <p className="text-[11px] text-slate-400 mt-1">ระบบเลือกแถวที่โหมดตรงกันและ "ตั้งแต่" มากที่สุดที่ไม่เกินจำนวนแขก/โต๊ะ (บุฟเฟต์นับแขก, โต๊ะจีนนับโต๊ะ)</p>
                   </div>
                   <div>
                     <label className={labelCls}>สินค้าบุฟเฟต์ (แพ็กเกจที่มีตัวแปร guests → โต๊ะ/เก้าอี้อัตโนมัติ)</label>
