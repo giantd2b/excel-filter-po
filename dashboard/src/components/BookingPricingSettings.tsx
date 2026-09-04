@@ -1,137 +1,37 @@
 import { useEffect, useState } from "react";
-import { Loader2, Save, RotateCcw, Plus, X } from "lucide-react";
-import {
-  getBookingPricing,
-  saveBookingPricing,
-  type BookingPricingSettings as Settings,
-  type PricingConfig,
-  type TierConfig,
-} from "@/lib/api-service";
+import { Loader2, RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
+import { getBookingPricing, refreshBookingPricing, type BookingPricingSettings as Settings } from "@/lib/api-service";
 
-const inputCls =
-  "w-full px-2.5 py-1.5 rounded-lg ring-1 ring-slate-200 bg-white text-sm text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-300";
-const labelCls = "text-[11px] text-slate-500 mb-1 block";
-
-const fmt = (n: number) => n.toLocaleString("th-TH");
+const fmt = (n: number | null | undefined) => (typeof n === "number" ? n.toLocaleString("th-TH") : "—");
 
 /**
- * Edits every package price the /booking page and the quotation builder use.
- * Stored in SystemSetting (booking_pricing) — the public page reads it on load.
+ * Read-only view of the booking prices. flowaccount-app is the single source of
+ * prices: each number here is derived from the mapped products (ceremony product per
+ * tier + food formula / Chinese-table price + add-ons + product discounts).
  */
 export default function BookingPricingSettings({ onClose }: { onClose?: () => void }) {
   const [data, setData] = useState<Settings | null>(null);
-  const [pricing, setPricing] = useState<PricingConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getBookingPricing()
-      .then((d) => {
-        setData(d);
-        setPricing(d.pricing);
-      })
-      .catch((e: any) => setMsg({ kind: "err", text: e?.message || "โหลดราคาไม่สำเร็จ" }))
+      .then(setData)
+      .catch((e: any) => setError(e?.message || "โหลดราคาไม่สำเร็จ"))
       .finally(() => setLoading(false));
   }, []);
 
-  const setPkg = (id: string, patch: Partial<PricingConfig["packages"][string]>) =>
-    setPricing((p) => p && { ...p, packages: { ...p.packages, [id]: { ...p.packages[id], ...patch } } });
-
-  const setTierCfg = (id: string, mode: "buffet" | "table", cfg: TierConfig) => setPkg(id, { [mode]: cfg });
-
-  const save = async () => {
-    if (!pricing) return;
-    setSaving(true);
-    setMsg(null);
+  const refresh = async () => {
+    setRefreshing(true);
+    setError(null);
     try {
-      const res = await saveBookingPricing(pricing);
-      setPricing(res.pricing);
-      setMsg({ kind: "ok", text: "บันทึกแล้ว หน้า /booking และใบเสนอราคาที่สร้างต่อจากนี้จะใช้ราคานี้" });
+      setData(await refreshBookingPricing());
     } catch (e: any) {
-      setMsg({ kind: "err", text: e?.message || "บันทึกไม่สำเร็จ" });
+      setError(e?.message || "รีเฟรชไม่สำเร็จ");
     } finally {
-      setSaving(false);
+      setRefreshing(false);
     }
-  };
-
-  const reset = () => data && setPricing(JSON.parse(JSON.stringify(data.defaults)));
-
-  const TierTable = ({
-    id,
-    mode,
-    cfg,
-    unit,
-  }: {
-    id: string;
-    mode: "buffet" | "table";
-    cfg: TierConfig | null | undefined;
-    unit: string;
-  }) => {
-    const c: TierConfig = cfg || { tiers: [], extra: 0 };
-    const update = (tiers: [number, number][], extra = c.extra) => setTierCfg(id, mode, { tiers, extra });
-    return (
-      <div className="rounded-lg bg-white ring-1 ring-slate-100 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs font-semibold text-slate-700">{mode === "buffet" ? "บุฟเฟต์ (ตามจำนวนแขก)" : "โต๊ะจีน (ตามจำนวนโต๊ะ)"}</div>
-          <button
-            type="button"
-            onClick={() => {
-              const last = c.tiers[c.tiers.length - 1];
-              update([...c.tiers, [last ? last[0] + 10 : 20, last ? last[1] : 0]]);
-            }}
-            className="inline-flex items-center gap-1 text-[11px] text-brand-600 hover:underline"
-          >
-            <Plus className="w-3 h-3" /> เพิ่มขั้น
-          </button>
-        </div>
-        <div className="grid grid-cols-12 gap-1.5 text-[11px] text-slate-400 mb-1 px-0.5">
-          <div className="col-span-4">ตั้งแต่ ({unit})</div>
-          <div className="col-span-7 text-right">ราคาแพ็กเกจรวมอาหาร (บาท)</div>
-          <div className="col-span-1" />
-        </div>
-        <div className="space-y-1.5">
-          {c.tiers.map((t, i) => (
-            <div key={i} className="grid grid-cols-12 gap-1.5 items-center">
-              <input
-                type="number"
-                min={1}
-                value={t[0]}
-                onChange={(e) => update(c.tiers.map((x, j) => (j === i ? [Number(e.target.value) || 0, x[1]] : x)))}
-                className={inputCls + " col-span-4"}
-              />
-              <input
-                type="number"
-                min={0}
-                step={10}
-                value={t[1]}
-                onChange={(e) => update(c.tiers.map((x, j) => (j === i ? [x[0], Number(e.target.value) || 0] : x)))}
-                className={inputCls + " col-span-7"}
-              />
-              <button
-                type="button"
-                onClick={() => update(c.tiers.filter((_, j) => j !== i))}
-                className="col-span-1 flex justify-center text-slate-400 hover:text-red-500"
-                title="ลบขั้น"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-12 gap-1.5 items-center mt-2 pt-2 border-t border-slate-100">
-          <div className="col-span-7 text-xs text-slate-600">เพิ่มต่อ 1 {unit} เมื่อเกินขั้น</div>
-          <input
-            type="number"
-            min={0}
-            step={10}
-            value={c.extra}
-            onChange={(e) => update(c.tiers, Number(e.target.value) || 0)}
-            className={inputCls + " col-span-4"}
-          />
-        </div>
-      </div>
-    );
   };
 
   if (loading) {
@@ -141,42 +41,62 @@ export default function BookingPricingSettings({ onClose }: { onClose?: () => vo
       </div>
     );
   }
-  if (!pricing || !data) {
-    return <div className="bg-white rounded-xl ring-1 ring-red-200 p-4 text-sm text-red-600">{msg?.text || "โหลดไม่สำเร็จ"}</div>;
-  }
+  if (!data) return <div className="bg-white rounded-xl ring-1 ring-red-200 p-4 text-sm text-red-600">{error || "โหลดไม่สำเร็จ"}</div>;
+
+  const p = data.pricing;
+  const productsUrl = `${data.appUrl}/products`;
+  const Code = ({ code }: { code?: string | null }) =>
+    code ? <span className="font-mono text-[10px] text-slate-400 ml-1">{code}</span> : null;
 
   return (
     <div className="bg-white rounded-xl ring-1 ring-slate-200 p-5 space-y-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="font-semibold text-slate-800">ราคาแพ็กเกจ</h2>
+          <h2 className="font-semibold text-slate-800">ราคาแพ็กเกจ (จาก FlowAccount app)</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            ราคาที่หน้า /booking แสดงและใช้คำนวณราคาประเมิน รวมถึงใบเสนอราคาที่สร้างจากรายการจอง · ส่วนพิธีสงฆ์ในใบเสนอราคา = ราคาแพ็กเกจ − (ราคาเพิ่มต่อคน/โต๊ะ × จำนวน)
+            ราคาทั้งหมดคำนวณจากสินค้าใน FlowAccount app ตามการผูกในแท็บ "ผูกสินค้า" · แก้ราคาได้ที่{" "}
+            <a href={productsUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline inline-flex items-center gap-0.5">
+              หน้าสินค้า FlowAccount <ExternalLink className="w-3 h-3" />
+            </a>{" "}
+            แล้วกดรีเฟรช · ราคาขั้น = พิธีสงฆ์ของขั้นนั้น + อาหาร (สูตรต่อหัว / โต๊ะจีน × โต๊ะ)
+          </p>
+          <p className="text-[11px] text-slate-400 mt-1">
+            แหล่งข้อมูล: {data.source === "flowaccount" ? "FlowAccount (สด)" : "สำเนาล่าสุดที่เก็บไว้"}
+            {data.fetchedAt ? ` · ดึงเมื่อ ${new Date(data.fetchedAt).toLocaleString("th-TH")}` : ""}
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={reset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg ring-1 ring-slate-200 text-xs text-slate-600 hover:bg-slate-50">
-            <RotateCcw className="w-3.5 h-3.5" /> ค่าเริ่มต้น
-          </button>
           {onClose && (
             <button onClick={onClose} className="px-3 py-1.5 rounded-lg ring-1 ring-slate-200 text-xs text-slate-600 hover:bg-slate-50">
               ปิด
             </button>
           )}
-          <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} บันทึก
+          <button onClick={refresh} disabled={refreshing} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50">
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> รีเฟรชจาก FlowAccount
           </button>
         </div>
       </div>
 
-      {msg && (
-        <div className={`text-xs rounded-lg px-3 py-2 ring-1 ${msg.kind === "ok" ? "text-emerald-700 bg-emerald-50 ring-emerald-200" : "text-red-600 bg-red-50 ring-red-200"}`}>{msg.text}</div>
+      {(data.catalogError || error) && (
+        <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-lg px-3 py-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error || `ดึงจาก FlowAccount ไม่ได้ (${data.catalogError}) — แสดงจากสำเนาล่าสุด`}</span>
+        </div>
+      )}
+      {data.missingCodes.length > 0 && (
+        <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 ring-1 ring-red-200 rounded-lg px-3 py-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>
+            ไม่พบสินค้าใน FlowAccount: <span className="font-mono">{data.missingCodes.join(", ")}</span> — ขั้นที่ใช้สินค้าเหล่านี้จะแสดงราคาสำรองจากโค้ด แก้ในแท็บ "ผูกสินค้า" หรือสร้างสินค้าให้ตรงรหัส
+          </span>
+        </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {data.packages.map((pkg) => {
-          const p = pricing.packages[pkg.id];
-          if (!p) return null;
+          const pp = p.packages[pkg.id];
+          const used = data.usedCodes[pkg.id];
+          if (!pp) return null;
           return (
             <div key={pkg.id} className="rounded-xl ring-1 ring-slate-100 bg-slate-50/60 p-4 space-y-3">
               <div>
@@ -184,15 +104,43 @@ export default function BookingPricingSettings({ onClose }: { onClose?: () => vo
                 <div className="text-[11px] font-mono text-slate-400">{pkg.id}</div>
               </div>
               {pkg.kind === "ceremony" ? (
-                <div>
-                  <label className={labelCls}>ราคาแพ็กเกจ (บาท)</label>
-                  <input type="number" min={0} step={10} value={p.base ?? 0} onChange={(e) => setPkg(pkg.id, { base: Number(e.target.value) || 0 })} className={inputCls} />
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="text-slate-600">
+                    ราคาแพ็กเกจ <Code code={used?.base} />
+                  </span>
+                  <span className="font-semibold tabular-nums">{fmt(pp.base)} บาท</span>
                 </div>
               ) : (
-                <>
-                  <TierTable id={pkg.id} mode="buffet" cfg={p.buffet} unit="คน" />
-                  <TierTable id={pkg.id} mode="table" cfg={p.table} unit="โต๊ะ" />
-                </>
+                (["buffet", "table"] as const).map((mode) => {
+                  const cfg = pp[mode];
+                  const unit = mode === "buffet" ? "คน" : "โต๊ะ";
+                  return (
+                    <div key={mode} className="rounded-lg bg-white ring-1 ring-slate-100 p-3">
+                      <div className="text-xs font-semibold text-slate-700 mb-1.5">{mode === "buffet" ? "บุฟเฟต์ (ตามจำนวนแขก)" : "โต๊ะจีน (ตามจำนวนโต๊ะ)"}</div>
+                      {cfg ? (
+                        <table className="w-full text-sm">
+                          <tbody>
+                            {cfg.tiers.map(([count, price]) => (
+                              <tr key={count} className="border-t border-slate-50">
+                                <td className="py-1 text-slate-600">
+                                  {count} {unit}
+                                  <Code code={used?.[mode]?.[count]} />
+                                </td>
+                                <td className="py-1 text-right font-semibold tabular-nums">{fmt(price)}</td>
+                              </tr>
+                            ))}
+                            <tr className="border-t border-slate-100">
+                              <td className="py-1 text-slate-500 text-xs">เพิ่มต่อ 1 {unit} เมื่อเกินขั้น</td>
+                              <td className="py-1 text-right text-xs tabular-nums">{fmt(cfg.extra)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">ไม่มีราคา (ยังไม่ได้ผูกสินค้า)</p>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           );
@@ -201,33 +149,36 @@ export default function BookingPricingSettings({ onClose }: { onClose?: () => vo
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl ring-1 ring-slate-100 bg-slate-50/60 p-4">
-          <div className="font-medium text-slate-800 mb-3">ออปชั่นเสริม (บาท)</div>
-          <div className="space-y-2">
-            {data.addons.map((a) => (
-              <div key={a.id} className="grid grid-cols-12 gap-2 items-center">
-                <div className="col-span-7 text-sm text-slate-700">
-                  {a.label} <span className="text-[11px] font-mono text-slate-400">({a.id})</span>
-                </div>
-                <input type="number" min={0} step={10} value={pricing.addons[a.id] ?? 0} onChange={(e) => setPricing((x) => x && { ...x, addons: { ...x.addons, [a.id]: Number(e.target.value) || 0 } })} className={inputCls + " col-span-5"} />
-              </div>
-            ))}
-          </div>
+          <div className="font-medium text-slate-800 mb-2">ออปชั่นเสริม</div>
+          <table className="w-full text-sm">
+            <tbody>
+              {data.addons.map((a) => (
+                <tr key={a.id} className="border-t border-slate-100">
+                  <td className="py-1 text-slate-600">
+                    {a.label}
+                    <Code code={a.code} />
+                  </td>
+                  <td className="py-1 text-right font-semibold tabular-nums">{fmt(p.addons[a.id])}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <div className="rounded-xl ring-1 ring-slate-100 bg-slate-50/60 p-4">
-          <div className="font-medium text-slate-800 mb-3">ส่วนลด (บาท)</div>
-          <div className="space-y-2">
-            <div className="grid grid-cols-12 gap-2 items-center">
-              <div className="col-span-7 text-sm text-slate-700">นิมนต์และรับ-ส่งพระเอง</div>
-              <input type="number" min={0} step={100} value={pricing.selfTransportDiscount} onChange={(e) => setPricing((x) => x && { ...x, selfTransportDiscount: Number(e.target.value) || 0 })} className={inputCls + " col-span-5"} />
-            </div>
-            <div className="grid grid-cols-12 gap-2 items-center">
-              <div className="col-span-7 text-sm text-slate-700">พระ 5 รูป (แทน 9 รูป)</div>
-              <input type="number" min={0} step={100} value={pricing.fiveMonksDiscount} onChange={(e) => setPricing((x) => x && { ...x, fiveMonksDiscount: Number(e.target.value) || 0 })} className={inputCls + " col-span-5"} />
-            </div>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-3">
-            ส่วนลดนิมนต์เองในใบเสนอราคามาจาก "ลดเมื่อไม่รับ" ของรายการรับ-ส่งพระในสินค้าฝั่ง FlowAccount app ถ้าเปลี่ยนตัวเลขนี้ต้องไปแก้ที่สินค้าให้ตรงกันด้วย (ตอนนี้ {fmt(pricing.selfTransportDiscount)})
-          </p>
+          <div className="font-medium text-slate-800 mb-2">ส่วนลด (จากสินค้าพิธีสงฆ์)</div>
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-t border-slate-100">
+                <td className="py-1 text-slate-600">นิมนต์และรับ-ส่งพระเอง (รายการ "ลดเมื่อไม่รับ")</td>
+                <td className="py-1 text-right font-semibold tabular-nums">−{fmt(p.selfTransportDiscount)}</td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="py-1 text-slate-600">พระ 5 รูป (ราคาฐาน 9 รูป − 5 รูป)</td>
+                <td className="py-1 text-right font-semibold tabular-nums">−{fmt(p.fiveMonksDiscount)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="text-[11px] text-slate-400 mt-2">ตัวเลขที่หน้า /booking แสดง ใช้ค่านี้ ส่วนใบเสนอราคาจริงใช้ส่วนลดของสินค้าแต่ละตัวโดยตรง</p>
         </div>
       </div>
     </div>

@@ -558,6 +558,7 @@ export interface MonkTier {
 export interface FaRecipe {
   monkCode: string;
   monkTiers?: MonkTier[];
+  displayTiers?: { buffet: number[]; table: number[] };
   transportCode: string;
   buffetCode?: string | null;
   chineseTableCode?: string | null;
@@ -612,15 +613,22 @@ export interface BookingPricingSettings {
   pricing: PricingConfig;
   defaults: PricingConfig;
   packages: { id: string; name: string; kind: "ceremony" | "full" }[];
-  addons: { id: string; label: string }[];
+  addons: { id: string; label: string; code: string | null }[];
+  source: "flowaccount" | "cache";
+  fetchedAt: string;
+  catalogError: string | null;
+  missingCodes: string[];
+  usedCodes: Record<string, { buffet: Record<number, string>; table: Record<number, string>; base?: string }>;
+  appUrl: string;
 }
 
 export async function getBookingPricing() {
   return api.get<BookingPricingSettings>("/bookings/pricing");
 }
 
-export async function saveBookingPricing(pricing: PricingConfig) {
-  return api.put<{ pricing: PricingConfig }>("/bookings/pricing", pricing);
+/** Re-fetch the flowaccount-app catalog and re-derive prices. */
+export async function refreshBookingPricing() {
+  return api.post<BookingPricingSettings>("/bookings/pricing/refresh", {});
 }
 
 export async function getBookingRecipes() {

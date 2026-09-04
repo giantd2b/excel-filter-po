@@ -117,6 +117,215 @@ export function mergePricing(saved: Partial<PricingConfig> | null | undefined): 
   };
 }
 
+// ── Pricing derived from the flowaccount-app catalog ──────────────────
+// flowaccount-app is the single source of prices. The CRM only knows which
+// product each package/tier maps to (FaRecipe) and derives the booking-page
+// tiers by pricing those products exactly the way flowaccount-app does.
+export interface FaCatalogProduct {
+  code: string | null;
+  name: string;
+  kind: 'SIMPLE' | 'PACKAGE' | string;
+  unitPrice: number;
+  priceFormula?: string | null;
+  priceTable?: { when: Record<string, number | string>; price: number }[];
+  variables?: { key: string; default?: number | string; formula?: string | null }[];
+  components?: { code: string; title: string; optional?: boolean; price?: number; pricePer?: string | null }[];
+}
+
+export type FaCatalog = Record<string, FaCatalogProduct>;
+
+/** Minimal arithmetic evaluator mirroring flowaccount-app's expression.ts (numbers, + - * / %, parens, ceil/floor/round/min/max/abs). */
+export function evalFormula(expr: string, vars: Record<string, number>): number {
+  const src = String(expr || '').trim();
+  if (!src) throw new Error('empty formula');
+  let i = 0;
+  const peek = () => src[i];
+  const skip = () => {
+    while (i < src.length && /\s/.test(src[i])) i++;
+  };
+  const fns: Record<string, (...a: number[]) => number> = {
+    ceil: Math.ceil, floor: Math.floor, round: Math.round, abs: Math.abs,
+    min: (...a) => Math.min(...a), max: (...a) => Math.max(...a),
+  };
+  const primary = (): number => {
+    skip();
+    const ch = peek();
+    if (ch === '(') { i++; const v = expr3(); skip(); if (peek() !== ')') throw new Error('paren'); i++; return v; }
+    if (ch === '-') { i++; return -primary(); }
+    if (ch === '+') { i++; return primary(); }
+    const num = /^\d*\.?\d+/.exec(src.slice(i));
+    if (num) { i += num[0].length; return parseFloat(num[0]); }
+    const id = /^[A-Za-z_][A-Za-z0-9_]*/.exec(src.slice(i));
+    if (id) {
+      i += id[0].length;
+      skip();
+      if (peek() === '(') {
+        i++;
+        const args: number[] = [];
+        skip();
+        if (peek() !== ')') { args.push(expr3()); skip(); while (peek() === ',') { i++; args.push(expr3()); skip(); } }
+        if (peek() !== ')') throw new Error('paren');
+        i++;
+        const fn = fns[id[0]];
+        if (!fn) throw new Error(`unknown function ${id[0]}`);
+        return fn(...args);
+      }
+      if (!(id[0] in vars)) throw new Error(`unknown variable ${id[0]}`);
+      return vars[id[0]];
+    }
+    throw new Error('syntax');
+  };
+  const expr2 = (): number => {
+    let v = primary();
+    for (;;) {
+      skip();
+      const op = peek();
+      if (op === '*' || op === '/' || op === '%') { i++; const r = primary(); v = op === '*' ? v * r : op === '/' ? v / r : v % r; } else return v;
+    }
+  };
+  const expr3 = (): number => {
+    let v = expr2();
+    for (;;) {
+      skip();
+      const op = peek();
+      if (op === '+' || op === '-') { i++; const r = expr2(); v = op === '+' ? v + r : v - r; } else return v;
+    }
+  };
+  const v = expr3();
+  skip();
+  if (i < src.length) throw new Error('trailing');
+  if (!Number.isFinite(v)) throw new Error('NaN');
+  return v;
+}
+
+/** Resolve a product's variables (defaults + derived formulas) with the given inputs. */
+function resolveVars(p: FaCatalogProduct, input: Record<string, number>): Record<string, number> {
+  const vars: Record<string, number> = {};
+  for (const v of p.variables || []) {
+    if (v.formula) {
+      try { vars[v.key] = evalFormula(v.formula, vars); } catch { /* leave unset */ }
+    } else {
+      const given = input[v.key];
+      const n = given !== undefined ? Number(given) : Number(v.default);
+      if (Number.isFinite(n)) vars[v.key] = n;
+    }
+  }
+  return { ...vars, ...input };
+}
+
+/** Price a catalog product the way flowaccount-app does: priceFormula > priceTable match > unitPrice. */
+export function productPrice(p: FaCatalogProduct | undefined, input: Record<string, number> = {}): number | null {
+  if (!p) return null;
+  if (p.kind !== 'PACKAGE') return Number(p.unitPrice) || 0;
+  const vars = resolveVars(p, input);
+  if (p.priceFormula && p.priceFormula.trim()) {
+    try { return Math.round(Math.max(0, evalFormula(p.priceFormula, vars)) * 100) / 100; } catch { return null; }
+  }
+  const rows = (p.priceTable || [])
+    .filter((r) => Object.entries(r.when || {}).every(([k, v]) => k in vars && String(vars[k]) === String(v)))
+    .sort((a, b) => Object.keys(b.when).length - Object.keys(a.when).length);
+  return rows.length ? Number(rows[0].price) : Number(p.unitPrice) || 0;
+}
+
+export interface DerivedPricing extends PricingConfig {
+  /** product codes referenced by the recipes that are missing from the catalog */
+  missingCodes: string[];
+  /** which product priced each displayed tier, for the settings UI */
+  usedCodes: Record<string, { buffet: Record<number, string>; table: Record<number, string>; base?: string }>;
+}
+
+/**
+ * Derive the booking-page price tiers from the catalog:
+ *   tier total = ceremony product (per monkTiers) at 9 monks + food (buffet formula at that guest count,
+ *   or Chinese-table product × tables); extra per unit = food(count + 1) − food(count).
+ * Discounts come from the products too (transport component price, 9-monk vs 5-monk price).
+ */
+export function derivePricing(config: FaRecipeConfig, catalog: FaCatalog): DerivedPricing {
+  const missing = new Set<string>();
+  const get = (code: string | null | undefined) => {
+    if (!code) return undefined;
+    const p = catalog[code];
+    if (!p) missing.add(code);
+    return p;
+  };
+  const packages: Record<string, PackagePricing> = {};
+  const usedCodes: DerivedPricing['usedCodes'] = {};
+  let transportDiscount: number | null = null;
+  let monksDiscount: number | null = null;
+
+  for (const pkg of BOOKING_PACKAGES) {
+    const r = config.packages[pkg.id];
+    const d = DEFAULT_PRICING.packages[pkg.id];
+    const used: DerivedPricing['usedCodes'][string] = { buffet: {}, table: {} };
+    if (!r) { packages[pkg.id] = d; continue; }
+
+    const monkProduct = (mode: 'buffet' | 'table' | 'any', count: number) => {
+      const code = pickMonkCode(r, mode, count);
+      return { code, product: get(code) };
+    };
+    // discounts: take them from the first package that defines them
+    const main = get(r.monkCode);
+    if (main) {
+      const tc = (main.components || []).find((c) => c.code === r.transportCode);
+      if (transportDiscount === null && tc && tc.price) transportDiscount = Number(tc.price);
+      const p9 = productPrice(main, { monks: 9 });
+      const p5 = productPrice(main, { monks: 5 });
+      if (monksDiscount === null && p9 !== null && p5 !== null && p9 > p5) monksDiscount = p9 - p5;
+    }
+
+    if (pkg.kind === 'ceremony') {
+      const { code, product } = monkProduct('any', 0);
+      const price = productPrice(product, { monks: 9 });
+      used.base = code;
+      packages[pkg.id] = { base: price ?? d.base ?? 0, buffet: null, table: null };
+    } else {
+      const tiersFor = (mode: 'buffet' | 'table'): TierConfig | null => {
+        const counts = r.displayTiers?.[mode] || (mode === 'buffet' ? [20, 30, 40, 50] : [8, 10, 20]);
+        const foodAt = (count: number): number | null => {
+          if (mode === 'buffet') {
+            const bp = get(r.buffetCode);
+            return bp ? productPrice(bp, { guests: count }) : null;
+          }
+          const tp = get(r.chineseTableCode);
+          return tp ? (productPrice(tp) ?? 0) * count : null;
+        };
+        const tiers: [number, number][] = [];
+        for (const count of counts) {
+          const { code, product } = monkProduct(mode, count);
+          const mp = productPrice(product, { monks: 9 });
+          const fp = foodAt(count);
+          if (mp === null || fp === null) continue;
+          used[mode][count] = code;
+          tiers.push([count, Math.round(mp + fp)]);
+        }
+        if (!tiers.length) return d[mode] ?? null;
+        const last = counts[counts.length - 1];
+        const f1 = foodAt(last);
+        const f2 = foodAt(last + 1);
+        const extra = f1 !== null && f2 !== null ? Math.round((f2 - f1) * 100) / 100 : d[mode]?.extra ?? 0;
+        return { tiers, extra };
+      };
+      packages[pkg.id] = { base: null, buffet: tiersFor('buffet'), table: tiersFor('table') };
+    }
+    usedCodes[pkg.id] = used;
+  }
+
+  const addons: Record<string, number> = {};
+  for (const a of BOOKING_ADDONS) {
+    const p = get(config.addons[a.id]);
+    addons[a.id] = p ? (productPrice(p) ?? a.price) : DEFAULT_PRICING.addons[a.id];
+  }
+
+  return {
+    packages,
+    addons,
+    selfTransportDiscount: transportDiscount ?? SELF_TRANSPORT_DISCOUNT,
+    fiveMonksDiscount: monksDiscount ?? FIVE_MONKS_DISCOUNT,
+    missingCodes: [...missing].sort(),
+    usedCodes,
+  };
+}
+
 /** Price of a package tier for a count, using the given pricing. */
 function tierTotalFor(cfg: TierConfig, count: number): { tierTotal: number; extra: number } {
   let tier = cfg.tiers[0];
@@ -152,6 +361,8 @@ export interface FaRecipe {
   /** ceremony line product code (fallback when no tier matches) */
   monkCode: string;
   monkTiers?: MonkTier[];
+  /** guest / table counts the /booking page lists as price tiers (prices come from flowaccount-app) */
+  displayTiers?: { buffet: number[]; table: number[] };
   /** legacy (pre-tier) fields, migrated into monkTiers by mergeFaRecipes */
   largeGuestsAbove?: number | null;
   monkCodeLarge?: string | null;
@@ -186,6 +397,7 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
         { mode: 'table', from: 0, code: 'MONK_FULL50' },
         { mode: 'table', from: 20, code: 'MONK_FULL_T20' },
       ],
+      displayTiers: { buffet: [20, 30, 40, 50], table: [8, 10, 20] },
       transportCode: 'item8',
       buffetCode: 'BUFFET_STANDARD_MONK',
       chineseTableCode: 'CHINESE_TABLE',
@@ -193,16 +405,33 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
     },
     'full-plus': {
       monkCode: 'MONK_PLUS',
+      // sheet: buffet 20-30 → 14,990 · 40 → 14,490 · 50+ and Chinese 8-10 → 16,990 · 20 tables → 19,490
+      monkTiers: [
+        { mode: 'buffet', from: 0, code: 'MONK_PLUS_2030' },
+        { mode: 'buffet', from: 40, code: 'MONK_PLUS_40' },
+        { mode: 'buffet', from: 50, code: 'MONK_PLUS_50' },
+        { mode: 'table', from: 0, code: 'MONK_PLUS_50' },
+        { mode: 'table', from: 20, code: 'MONK_PLUS_T20' },
+      ],
+      displayTiers: { buffet: [20, 30, 40, 50], table: [8, 10, 20] },
       transportCode: 'transport',
       buffetCode: 'BUFFET_PRIME_MONK',
-      chineseTableCode: 'CHINESE_TABLE',
+      chineseTableCode: 'CHINESE_TABLE_PRIME',
       vatRate: 7,
     },
     prime: {
       monkCode: 'MONK_PRIME',
+      // sheet: buffet 20-40 → 18,990 · 50+ and Chinese 8-10 → 21,490 · 20 tables → 23,990
+      monkTiers: [
+        { mode: 'buffet', from: 0, code: 'MONK_PRIME_2040' },
+        { mode: 'buffet', from: 50, code: 'MONK_PRIME_50' },
+        { mode: 'table', from: 0, code: 'MONK_PRIME_50' },
+        { mode: 'table', from: 20, code: 'MONK_PRIME_T20' },
+      ],
+      displayTiers: { buffet: [20, 30, 40, 50], table: [8, 10, 20] },
       transportCode: 'transport',
       buffetCode: 'BUFFET_PRIME_MONK',
-      chineseTableCode: 'CHINESE_TABLE',
+      chineseTableCode: 'CHINESE_TABLE_PRIME',
       vatRate: 7,
     },
   },
@@ -239,9 +468,21 @@ export function mergeFaRecipes(saved: Partial<FaRecipeConfig> | null | undefined
     } else {
       monkTiers = normaliseTiers(d.monkTiers);
     }
+    const counts = (raw: unknown, fallback: number[]) => {
+      if (!Array.isArray(raw)) return fallback;
+      const list = raw.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0);
+      return list.length ? Array.from(new Set(list)).sort((a, b) => a - b) : fallback;
+    };
+    const displayTiers = d.displayTiers
+      ? {
+          buffet: counts(s.displayTiers?.buffet, d.displayTiers.buffet),
+          table: counts(s.displayTiers?.table, d.displayTiers.table),
+        }
+      : undefined;
     packages[id] = {
       monkCode: code(s.monkCode) || d.monkCode,
       monkTiers,
+      ...(displayTiers ? { displayTiers } : {}),
       transportCode: (typeof s.transportCode === 'string' && s.transportCode.trim()) || d.transportCode,
       buffetCode: optionalCode(s.buffetCode, d.buffetCode),
       chineseTableCode: optionalCode(s.chineseTableCode, d.chineseTableCode),
@@ -302,13 +543,15 @@ export function buildFaItems(
   // (the flowaccount-app product must carry the same amount as pricing.selfTransportDiscount)
   const monksDiscount = input.monks === 5 ? pricing.fiveMonksDiscount : 0;
 
+  // Lines that reference a catalog product carry NO unitPrice: flowaccount-app prices them
+  // (price table by monks, priceFormula by guests, transport/5-monk discounts). Only the
+  // plain-text fallback lines (no product mapped) send a price, taken from the derived pricing.
   if (pkg.kind === 'ceremony') {
     items.push({
       productCode: pickMonkCode(recipe, 'any', 0),
       quantity: 1,
       variables: { monks: input.monks },
       exclude,
-      unitPrice: Math.max(0, (pp.base ?? 0) - monksDiscount),
     });
   } else {
     const isTable = input.foodMode === 'table';
@@ -317,26 +560,25 @@ export function buildFaItems(
     const count = isTable ? input.tables : input.guests;
     const { tierTotal } = tierTotalFor(cfg, count);
     const foodTotal = cfg.extra * count;
-    const monkPrice = Math.max(0, tierTotal - foodTotal - monksDiscount);
+    const monkPriceFallback = Math.max(0, tierTotal - foodTotal - monksDiscount);
 
-    items.push({
-      productCode: pickMonkCode(recipe, isTable ? 'table' : 'buffet', count),
-      quantity: 1,
-      variables: { monks: input.monks },
-      exclude,
-      unitPrice: monkPrice,
-    });
+    const monkCode = pickMonkCode(recipe, isTable ? 'table' : 'buffet', count);
+    items.push(
+      monkCode
+        ? { productCode: monkCode, quantity: 1, variables: { monks: input.monks }, exclude }
+        : { description: `${pkg.name} — พิธีสงฆ์ ${input.monks} รูป`, quantity: 1, unit: 'ชุด', unitPrice: monkPriceFallback },
+    );
 
     if (isTable) {
       items.push(
         recipe.chineseTableCode
-          ? { productCode: recipe.chineseTableCode, quantity: count, unit: 'โต๊ะ', unitPrice: cfg.extra }
+          ? { productCode: recipe.chineseTableCode, quantity: count, unit: 'โต๊ะ' }
           : { description: 'โต๊ะจีน', quantity: count, unit: 'โต๊ะ', unitPrice: cfg.extra },
       );
     } else {
       items.push(
         recipe.buffetCode
-          ? { productCode: recipe.buffetCode, quantity: 1, variables: { guests: count }, unitPrice: foodTotal }
+          ? { productCode: recipe.buffetCode, quantity: 1, variables: { guests: count } }
           : { description: `อาหารบุฟเฟต์ สำหรับแขก ${count} ท่าน`, quantity: 1, unit: 'ชุด', unitPrice: foodTotal },
       );
     }
@@ -345,11 +587,10 @@ export function buildFaItems(
   for (const a of BOOKING_ADDONS) {
     if (!input.addons.includes(a.id)) continue;
     const code = config.addons[a.id];
-    const price = pricing.addons[a.id] ?? a.price;
     items.push(
       code
-        ? { productCode: code, quantity: 1, unitPrice: price }
-        : { description: a.label, quantity: 1, unit: 'ชุด', unitPrice: price },
+        ? { productCode: code, quantity: 1 }
+        : { description: a.label, quantity: 1, unit: 'ชุด', unitPrice: pricing.addons[a.id] ?? a.price },
     );
   }
 

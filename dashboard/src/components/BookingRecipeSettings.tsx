@@ -23,6 +23,8 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  // raw text of the "display tiers" inputs so a trailing comma survives re-render; parsed on change
+  const [tiersText, setTiersText] = useState<Record<string, string>>({});
 
   useEffect(() => {
     getBookingRecipes()
@@ -233,6 +235,23 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
                       })}
                     </div>
                     <p className="text-[11px] text-slate-400 mt-1">ระบบเลือกแถวที่โหมดตรงกันและ "ตั้งแต่" มากที่สุดที่ไม่เกินจำนวนแขก/โต๊ะ (บุฟเฟต์นับแขก, โต๊ะจีนนับโต๊ะ)</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["buffet", "table"] as const).map((mode) => (
+                      <div key={mode}>
+                        <label className={labelCls}>{mode === "buffet" ? "ขั้นแขกที่แสดงบนหน้า booking (คน)" : "ขั้นโต๊ะจีนที่แสดง (โต๊ะ)"}</label>
+                        <input
+                          value={tiersText[`${pkg.id}:${mode}`] ?? (r.displayTiers?.[mode] || []).join(", ")}
+                          onChange={(e) => {
+                            setTiersText((t) => ({ ...t, [`${pkg.id}:${mode}`]: e.target.value }));
+                            const list = e.target.value.split(/[,\s]+/).map((s) => Number(s)).filter((n) => Number.isFinite(n) && n > 0);
+                            setPkg(pkg.id, { displayTiers: { buffet: r.displayTiers?.buffet || [], table: r.displayTiers?.table || [], [mode]: Array.from(new Set(list)).sort((a, b) => a - b) } });
+                          }}
+                          className={selectCls}
+                          placeholder={mode === "buffet" ? "20, 30, 40, 50" : "8, 10, 20"}
+                        />
+                      </div>
+                    ))}
                   </div>
                   <div>
                     <label className={labelCls}>สินค้าบุฟเฟต์ (แพ็กเกจที่มีตัวแปร guests → โต๊ะ/เก้าอี้อัตโนมัติ)</label>

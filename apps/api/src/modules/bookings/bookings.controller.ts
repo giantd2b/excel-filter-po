@@ -35,17 +35,17 @@ export class BookingsController {
     return this.bookingsService.list(status);
   }
 
-  /** Public: live package prices for the /booking page (no auth). */
+  /** Public: package prices for the /booking page, derived from the flowaccount-app catalog (no auth). */
   @Get('pricing')
   async pricing() {
     return this.bookingsService.pricingSettings();
   }
 
+  /** Re-fetch the flowaccount-app catalog now (bypasses the 5-minute cache). */
   @UseGuards(FirebaseAuthGuard)
-  @Put('pricing')
-  async savePricing(@Body() body: any) {
-    const pricing = await this.bookingsService.savePricing(body || {});
-    return { pricing };
+  @Post('pricing/refresh')
+  async refreshPricing() {
+    return this.bookingsService.pricingSettings(true);
   }
 
   /** Package → flowaccount-app product mapping used when creating quotations. */

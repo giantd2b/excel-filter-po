@@ -9,12 +9,15 @@ import {
   FA_RECIPES_SETTING_KEY,
   BOOKING_PACKAGES,
   BOOKING_ADDONS,
-  mergePricing,
+  derivePricing,
   DEFAULT_PRICING,
-  PRICING_SETTING_KEY,
   type FaRecipeConfig,
-  type PricingConfig,
+  type FaCatalog,
+  type DerivedPricing,
 } from './packages.config';
+
+const CATALOG_CACHE_KEY = 'fa_catalog_cache';
+const CATALOG_TTL_MS = 5 * 60 * 1000;
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { FlowAccountClient } from '../quotations/flowaccount.client';
 
@@ -36,38 +39,69 @@ export class BookingsService {
     private readonly flowAccount: FlowAccountClient,
   ) {}
 
-  // ── Pricing (editable from the dashboard; served to the public /booking page) ──
+  // ── Pricing derived from the flowaccount-app catalog (single source of prices) ──
 
-  async getPricing(): Promise<PricingConfig> {
-    const row = await this.prisma.systemSetting.findUnique({ where: { key: PRICING_SETTING_KEY } });
-    let saved: Partial<PricingConfig> | null = null;
+  private catalogMem: { catalog: FaCatalog; fetchedAt: string; source: 'flowaccount' | 'cache' } | null = null;
+
+  /**
+   * Catalog keyed by product code. Fresh from flowaccount-app (5-minute memory cache);
+   * the last good copy is kept in SystemSetting so pricing survives a flowaccount outage.
+   */
+  async getCatalog(force = false): Promise<{ catalog: FaCatalog; fetchedAt: string; source: 'flowaccount' | 'cache'; error?: string }> {
+    if (!force && this.catalogMem && Date.now() - Date.parse(this.catalogMem.fetchedAt) < CATALOG_TTL_MS) {
+      return this.catalogMem;
+    }
+    let error: string | undefined;
+    try {
+      if (!this.flowAccount.isConfigured) throw new Error('ยังไม่ได้ตั้งค่า FA_API_KEY');
+      const products = await this.flowAccount.listProducts();
+      const catalog: FaCatalog = {};
+      for (const p of products) if (p.code) catalog[String(p.code).toUpperCase()] = p;
+      const fetchedAt = new Date().toISOString();
+      await this.prisma.systemSetting.upsert({
+        where: { key: CATALOG_CACHE_KEY },
+        update: { value: JSON.stringify({ fetchedAt, catalog }) },
+        create: { key: CATALOG_CACHE_KEY, value: JSON.stringify({ fetchedAt, catalog }) },
+      });
+      this.catalogMem = { catalog, fetchedAt, source: 'flowaccount' };
+      return this.catalogMem;
+    } catch (e: any) {
+      error = e?.message || 'โหลดสินค้าจาก flowaccount-app ไม่สำเร็จ';
+    }
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: CATALOG_CACHE_KEY } });
     if (row?.value) {
       try {
-        saved = JSON.parse(row.value);
+        const saved = JSON.parse(row.value);
+        this.catalogMem = { catalog: saved.catalog || {}, fetchedAt: saved.fetchedAt || '', source: 'cache' };
+        return { ...this.catalogMem, error };
       } catch {
-        saved = null;
+        /* fall through */
       }
     }
-    return mergePricing(saved);
+    return { catalog: {}, fetchedAt: '', source: 'cache', error };
   }
 
-  async savePricing(input: Partial<PricingConfig>): Promise<PricingConfig> {
-    const merged = mergePricing(input);
-    await this.prisma.systemSetting.upsert({
-      where: { key: PRICING_SETTING_KEY },
-      update: { value: JSON.stringify(merged) },
-      create: { key: PRICING_SETTING_KEY, value: JSON.stringify(merged) },
-    });
-    return merged;
+  async getPricing(force = false): Promise<DerivedPricing> {
+    const [config, { catalog }] = await Promise.all([this.getRecipeConfig(), this.getCatalog(force)]);
+    return derivePricing(config, catalog);
   }
 
-  /** Public payload for the /booking page and the settings UI. */
-  async pricingSettings() {
+  /** Public payload for the /booking page and the read-only pricing view in the dashboard. */
+  async pricingSettings(force = false) {
+    const [config, cat] = await Promise.all([this.getRecipeConfig(), this.getCatalog(force)]);
+    const derived = derivePricing(config, cat.catalog);
+    const { missingCodes, usedCodes, ...pricing } = derived;
     return {
-      pricing: await this.getPricing(),
+      pricing,
       defaults: DEFAULT_PRICING,
       packages: BOOKING_PACKAGES.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
-      addons: BOOKING_ADDONS.map((a) => ({ id: a.id, label: a.label })),
+      addons: BOOKING_ADDONS.map((a) => ({ id: a.id, label: a.label, code: config.addons[a.id] || null })),
+      source: cat.source,
+      fetchedAt: cat.fetchedAt,
+      catalogError: cat.error || null,
+      missingCodes,
+      usedCodes,
+      appUrl: this.flowAccount.appUrl,
     };
   }
 
