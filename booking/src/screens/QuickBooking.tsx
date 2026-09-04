@@ -6,6 +6,15 @@ import { FieldLabel, cardStyle, charm, chipStyle, inputStyle } from '../ui';
 import AreaSearch from '../components/AreaSearch';
 import type { SavedBooking } from '../App';
 
+function fmtThaiDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  if (!m) return iso;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  return `${days[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()]} ${d} ${months[mo - 1]} ${y + 543}`;
+}
+
 interface Props {
   form: BookingForm;
   setForm: (f: BookingForm) => void;
@@ -109,7 +118,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
             ['ออปชั่นเสริม', chosenAddons.length ? chosenAddons.map((a) => a.label).join(', ') : '-'],
             ['นิมนต์รับ-ส่งพระ', f.selfTransport ? 'ดำเนินการเอง' : 'ทีมงานดำเนินการ'],
             ...(preset?.occasion ? [['ประเภทงาน', f.occasion]] : []),
-            ...(preset?.eventDate ? [['วันเวลา', `${f.date} · ${f.time}`]] : []),
+            ...(preset?.eventDate ? [['วันเวลา', `${fmtThaiDate(f.date)} · ${f.time}`]] : []),
           ].map(([k, v]) => (
             <div
               key={k}

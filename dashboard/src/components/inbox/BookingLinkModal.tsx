@@ -30,6 +30,17 @@ const TIME_SLOTS = [
   { v: "เพล 10.00-10.30 น.", label: "ถวายเพล 10.00-10.30 น." },
 ];
 
+/** "2026-09-30" → "พุธ 30 ก.ย. 2569" (parsed as plain y-m-d, never via the Date timezone path). */
+export function fmtThaiDate(iso?: string | null): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  if (!m) return iso || "";
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const days = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
+  const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  const dow = days[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()];
+  return `${dow} ${d} ${months[mo - 1]} ${y + 543}`;
+}
+
 const DEFAULT_PRESET: BookingPreset = {
   occasion: "ทำบุญขึ้นบ้านใหม่",
   eventDate: "",
@@ -148,7 +159,7 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
       const food = hasFood ? (p.foodMode === "table" ? `โต๊ะจีน ${p.tables} โต๊ะ` : `บุฟเฟต์ ${p.guests} ท่าน`) : "อาหารถวายพระ";
       const price = link.estimatedTotal != null ? `ราคาประเมิน ${link.estimatedTotal.toLocaleString("th-TH")} บาท` : "";
       return [
-        `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${link.packageName} · พระ ${p.monks} รูป · ${food}${p.eventDate ? ` · ${p.eventDate}` : ""}`,
+        `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${link.packageName} · พระ ${p.monks} รูป · ${food}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ""}${p.timeSlot ? ` (${p.timeSlot})` : ""}`,
         price,
         `กรอกชื่อ เบอร์ และสถานที่จัดงานที่ลิงก์นี้ ระบบจะออกใบเสนอราคาให้ทันทีค่ะ`,
         link.url,
@@ -233,6 +244,9 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
               <label className="block">
                 <span className={lbl}>วันที่จัดงาน (เว้นว่างให้ลูกค้าเลือก)</span>
                 <input type="date" value={preset.eventDate || ""} onChange={(e) => set("eventDate", e.target.value)} className={field} />
+                {preset.eventDate && (
+                  <span className="block mt-1 text-[11px] font-semibold text-violet-700">วันที่เลือก: {fmtThaiDate(preset.eventDate)}</span>
+                )}
               </label>
               <label className="block">
                 <span className={lbl}>ช่วงเวลาพิธี</span>
