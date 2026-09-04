@@ -37,6 +37,12 @@ export class FlowAccountClient {
     return this.http;
   }
 
+  /** Catalog (code, name, kind, variables, components) for the recipe settings UI. */
+  async listProducts(): Promise<any[]> {
+    const res = await this.client().get('/products');
+    return res.data?.data || [];
+  }
+
   async listQuotations(page: number, limit: number): Promise<any> {
     const res = await this.client().get(`/quotations?page=${page}&limit=${limit}`);
     return res.data;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText, Settings2 } from "lucide-react";
+import BookingRecipeSettings from "@/components/BookingRecipeSettings";
 import {
   getBookings,
   updateBookingStatus,
@@ -124,6 +125,7 @@ export default function BookingsPage() {
   };
 
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   const createQuote = async (b: MeritBooking) => {
     setBusyId(b.id);
@@ -168,15 +170,29 @@ export default function BookingsPage() {
             </a>
           </p>
         </div>
-        <button
-          onClick={fetchData}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white ring-1 ring-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          รีเฟรช
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowSettings((v) => !v)}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg ring-1 text-sm font-medium ${
+              showSettings ? "bg-brand-600 text-white ring-brand-600" : "bg-white ring-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+            title="ผูกแพ็กเกจกับสินค้าใน FlowAccount app"
+          >
+            <Settings2 className="w-4 h-4" />
+            ตั้งค่าใบเสนอราคา
+          </button>
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white ring-1 ring-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            รีเฟรช
+          </button>
+        </div>
       </div>
+
+      {showSettings && <BookingRecipeSettings onClose={() => setShowSettings(false)} />}
 
       <div className="flex gap-2 flex-wrap">
         {tabs.map((t) => (

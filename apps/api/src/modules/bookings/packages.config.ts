@@ -58,51 +58,92 @@ export const FIVE_MONKS_DISCOUNT = 1500; // ceremony packages only
 // that app's catalog (หน้า สินค้า/บริการ → รหัสสินค้า). Prices stay owned
 // by this file: the ceremony line is priced as (tier total − food × count)
 // so the document total always equals the booking's estimatedTotal.
+// The mapping is plain data so it can be edited from the dashboard and stored
+// in SystemSetting (key FA_RECIPES_SETTING_KEY). DEFAULT_FA_RECIPES is used
+// until something is saved, and fills in any package/add-on missing from the
+// saved config.
 export interface FaRecipe {
-  /** ceremony line product code; for tiered packages may depend on the guest count */
-  monkCode: (guests: number) => string;
+  /** ceremony line product code */
+  monkCode: string;
+  /** optional: use a different ceremony product when guests exceed this count (tiered packages) */
+  largeGuestsAbove?: number | null;
+  monkCodeLarge?: string | null;
   /** component code of "นิมนต์รับ-ส่งพระ" inside that product (excluded when the customer handles it) */
   transportCode: string;
   /** buffet product (a package with a `guests` variable → tables/chairs lines) */
-  buffetCode?: string;
+  buffetCode?: string | null;
   /** Chinese-table product (simple line, qty = tables) */
-  chineseTableCode?: string;
+  chineseTableCode?: string | null;
   /** VAT rate for the document: booking FAQ says packages with guest catering exclude 7% VAT */
   vatRate: 0 | 7;
 }
 
-export const FA_RECIPES: Record<string, FaRecipe> = {
-  ceremony: { monkCode: () => 'CEREMONY', transportCode: 'transport', vatRate: 0 },
-  'ceremony-prime': { monkCode: () => 'CEREMONY_PRIME', transportCode: 'transport', vatRate: 0 },
-  full: {
-    monkCode: (guests) => (guests > 40 ? 'MONK_FULL50' : 'MONK_FULL203040'),
-    transportCode: 'item8',
-    buffetCode: 'BUFFET_STANDARD_MONK',
-    chineseTableCode: 'CHINESE_TABLE',
-    vatRate: 7,
+export interface FaRecipeConfig {
+  packages: Record<string, FaRecipe>;
+  /** add-on id → catalog product code (price is still sent from BOOKING_ADDONS) */
+  addons: Record<string, string>;
+}
+
+export const FA_RECIPES_SETTING_KEY = 'fa_booking_recipes';
+
+export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
+  packages: {
+    ceremony: { monkCode: 'CEREMONY', transportCode: 'transport', vatRate: 0 },
+    'ceremony-prime': { monkCode: 'CEREMONY_PRIME', transportCode: 'transport', vatRate: 0 },
+    full: {
+      monkCode: 'MONK_FULL203040',
+      largeGuestsAbove: 40,
+      monkCodeLarge: 'MONK_FULL50',
+      transportCode: 'item8',
+      buffetCode: 'BUFFET_STANDARD_MONK',
+      chineseTableCode: 'CHINESE_TABLE',
+      vatRate: 7,
+    },
+    'full-plus': {
+      monkCode: 'MONK_PLUS',
+      transportCode: 'transport',
+      buffetCode: 'BUFFET_PRIME_MONK',
+      chineseTableCode: 'CHINESE_TABLE',
+      vatRate: 7,
+    },
+    prime: {
+      monkCode: 'MONK_PRIME',
+      transportCode: 'transport',
+      buffetCode: 'BUFFET_PRIME_MONK',
+      chineseTableCode: 'CHINESE_TABLE',
+      vatRate: 7,
+    },
   },
-  'full-plus': {
-    monkCode: () => 'MONK_PLUS',
-    transportCode: 'transport',
-    buffetCode: 'BUFFET_PRIME_MONK',
-    chineseTableCode: 'CHINESE_TABLE',
-    vatRate: 7,
-  },
-  prime: {
-    monkCode: () => 'MONK_PRIME',
-    transportCode: 'transport',
-    buffetCode: 'BUFFET_PRIME_MONK',
-    chineseTableCode: 'CHINESE_TABLE',
-    vatRate: 7,
-  },
+  addons: { stage: 'STAGE', tent: 'TENT512', drape: 'DRAPE' },
 };
 
-/** Add-on id → catalog product code (price is still sent from BOOKING_ADDONS). */
-export const FA_ADDON_CODES: Record<string, string> = {
-  stage: 'STAGE',
-  tent: 'TENT512',
-  drape: 'DRAPE',
-};
+/** Merge a saved (possibly partial / older) config over the defaults and normalise codes. */
+export function mergeFaRecipes(saved: Partial<FaRecipeConfig> | null | undefined): FaRecipeConfig {
+  const code = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().toUpperCase() : null);
+  // A field that is absent from the saved config falls back to the default; an explicitly
+  // empty string means "no product — send that line as plain text" and is kept as null.
+  const optionalCode = (v: unknown, fallback: string | null | undefined) => (v === undefined ? fallback ?? null : code(v));
+  const packages: Record<string, FaRecipe> = {};
+  for (const id of Object.keys(DEFAULT_FA_RECIPES.packages)) {
+    const d = DEFAULT_FA_RECIPES.packages[id];
+    const s = (saved?.packages?.[id] || {}) as Partial<FaRecipe>;
+    const above = s.largeGuestsAbove === undefined ? d.largeGuestsAbove : Number(s.largeGuestsAbove);
+    packages[id] = {
+      monkCode: code(s.monkCode) || d.monkCode,
+      largeGuestsAbove: Number.isFinite(above as number) && (above as number) > 0 ? (above as number) : null,
+      monkCodeLarge: optionalCode(s.monkCodeLarge, d.monkCodeLarge),
+      transportCode: (typeof s.transportCode === 'string' && s.transportCode.trim()) || d.transportCode,
+      buffetCode: optionalCode(s.buffetCode, d.buffetCode),
+      chineseTableCode: optionalCode(s.chineseTableCode, d.chineseTableCode),
+      vatRate: s.vatRate === 0 || s.vatRate === 7 ? s.vatRate : d.vatRate,
+    };
+  }
+  const addons: Record<string, string> = {};
+  for (const a of BOOKING_ADDONS) {
+    addons[a.id] = optionalCode(saved?.addons?.[a.id], DEFAULT_FA_RECIPES.addons[a.id]) || '';
+  }
+  return { packages, addons };
+}
 
 export interface FaItem {
   productCode?: string;
@@ -116,27 +157,34 @@ export interface FaItem {
 }
 
 /** Build the quotation lines for a booking. Returns null when the package has no recipe. */
-export function buildFaItems(input: {
-  packageId: string;
-  foodMode: string;
-  guests: number;
-  tables: number;
-  monks: number;
-  selfTransport: boolean;
-  addons: string[];
-}): { items: FaItem[]; vatRate: 0 | 7; pkg: BookingPackage } | null {
+export function buildFaItems(
+  input: {
+    packageId: string;
+    foodMode: string;
+    guests: number;
+    tables: number;
+    monks: number;
+    selfTransport: boolean;
+    addons: string[];
+  },
+  config: FaRecipeConfig = DEFAULT_FA_RECIPES,
+): { items: FaItem[]; vatRate: 0 | 7; pkg: BookingPackage } | null {
   const pkg = BOOKING_PACKAGES.find((p) => p.id === input.packageId);
-  const recipe = FA_RECIPES[input.packageId];
+  const recipe = config.packages[input.packageId];
   if (!pkg || !recipe) return null;
 
   const items: FaItem[] = [];
   const exclude = input.selfTransport ? [recipe.transportCode] : [];
+  const monkCode =
+    recipe.monkCodeLarge && recipe.largeGuestsAbove && input.guests > recipe.largeGuestsAbove
+      ? recipe.monkCodeLarge
+      : recipe.monkCode;
 
   if (pkg.kind === 'ceremony') {
     // flat price; the 5-monk discount is applied here, self-transport becomes a line discount in flowaccount-app
     const price = pkg.base! - (input.monks === 5 ? FIVE_MONKS_DISCOUNT : 0);
     items.push({
-      productCode: recipe.monkCode(0),
+      productCode: monkCode,
       quantity: 1,
       variables: { monks: input.monks },
       exclude,
@@ -153,7 +201,7 @@ export function buildFaItems(input: {
     const monkPrice = Math.max(0, tierTotal - foodTotal);
 
     items.push({
-      productCode: recipe.monkCode(input.guests),
+      productCode: monkCode,
       quantity: 1,
       variables: { monks: input.monks },
       exclude,
@@ -161,25 +209,23 @@ export function buildFaItems(input: {
     });
 
     if (isTable) {
-      items.push({
-        productCode: recipe.chineseTableCode,
-        quantity: count,
-        unit: 'โต๊ะ',
-        unitPrice: cfg.extra,
-      });
+      items.push(
+        recipe.chineseTableCode
+          ? { productCode: recipe.chineseTableCode, quantity: count, unit: 'โต๊ะ', unitPrice: cfg.extra }
+          : { description: 'โต๊ะจีน', quantity: count, unit: 'โต๊ะ', unitPrice: cfg.extra },
+      );
     } else {
-      items.push({
-        productCode: recipe.buffetCode,
-        quantity: 1,
-        variables: { guests: count },
-        unitPrice: foodTotal,
-      });
+      items.push(
+        recipe.buffetCode
+          ? { productCode: recipe.buffetCode, quantity: 1, variables: { guests: count }, unitPrice: foodTotal }
+          : { description: `อาหารบุฟเฟต์ สำหรับแขก ${count} ท่าน`, quantity: 1, unit: 'ชุด', unitPrice: foodTotal },
+      );
     }
   }
 
   for (const a of BOOKING_ADDONS) {
     if (!input.addons.includes(a.id)) continue;
-    const code = FA_ADDON_CODES[a.id];
+    const code = config.addons[a.id];
     items.push(
       code
         ? { productCode: code, quantity: 1, unitPrice: a.price }

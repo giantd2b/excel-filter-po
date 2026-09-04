@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -32,6 +33,20 @@ export class BookingsController {
   @Get()
   async list(@Query('status') status?: string) {
     return this.bookingsService.list(status);
+  }
+
+  /** Package → flowaccount-app product mapping used when creating quotations. */
+  @UseGuards(FirebaseAuthGuard)
+  @Get('recipes')
+  async recipes() {
+    return this.bookingsService.recipeSettings();
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Put('recipes')
+  async saveRecipes(@Body() body: any) {
+    const config = await this.bookingsService.saveRecipeConfig(body || {});
+    return { config };
   }
 
   @UseGuards(FirebaseAuthGuard)

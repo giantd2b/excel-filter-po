@@ -547,6 +547,50 @@ export async function createBookingQuotation(id: string) {
   return api.post<BookingQuotationResult>(`/bookings/${id}/quotation`, {});
 }
 
+// ─── Package → flowaccount-app product mapping ───────────────────
+
+export interface FaRecipe {
+  monkCode: string;
+  largeGuestsAbove?: number | null;
+  monkCodeLarge?: string | null;
+  transportCode: string;
+  buffetCode?: string | null;
+  chineseTableCode?: string | null;
+  vatRate: 0 | 7;
+}
+
+export interface FaRecipeConfig {
+  packages: Record<string, FaRecipe>;
+  addons: Record<string, string>;
+}
+
+export interface FaCatalogProduct {
+  code: string | null;
+  name: string;
+  kind: "SIMPLE" | "PACKAGE";
+  unitPrice: number;
+  variables: string[];
+  components: { code: string; title: string; optional: boolean }[];
+}
+
+export interface BookingRecipeSettings {
+  config: FaRecipeConfig;
+  defaults: FaRecipeConfig;
+  packages: { id: string; name: string; kind: "ceremony" | "full" }[];
+  addons: { id: string; label: string; price: number }[];
+  products: FaCatalogProduct[];
+  catalogError: string | null;
+  appUrl: string;
+}
+
+export async function getBookingRecipes() {
+  return api.get<BookingRecipeSettings>("/bookings/recipes");
+}
+
+export async function saveBookingRecipes(config: FaRecipeConfig) {
+  return api.put<{ config: FaRecipeConfig }>("/bookings/recipes", config);
+}
+
 export async function getBookings(status?: string) {
   const qs = status && status !== "ALL" ? `?status=${status}` : "";
   return api.get<{ bookings: MeritBooking[]; statusCounts: Record<string, number>; total: number }>(

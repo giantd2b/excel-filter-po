@@ -1,7 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { BookingStatus } from '@prisma/client';
 import { PrismaService } from '../../common/providers/prisma.service';
-import { buildFaItems, calcEstimatedTotal } from './packages.config';
+import {
+  buildFaItems,
+  calcEstimatedTotal,
+  mergeFaRecipes,
+  DEFAULT_FA_RECIPES,
+  FA_RECIPES_SETTING_KEY,
+  BOOKING_PACKAGES,
+  BOOKING_ADDONS,
+  type FaRecipeConfig,
+} from './packages.config';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { FlowAccountClient } from '../quotations/flowaccount.client';
 
@@ -23,6 +32,60 @@ export class BookingsService {
     private readonly flowAccount: FlowAccountClient,
   ) {}
 
+  // ── Package → flowaccount-app product mapping (editable from the dashboard) ──
+
+  async getRecipeConfig(): Promise<FaRecipeConfig> {
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: FA_RECIPES_SETTING_KEY } });
+    let saved: Partial<FaRecipeConfig> | null = null;
+    if (row?.value) {
+      try {
+        saved = JSON.parse(row.value);
+      } catch {
+        saved = null;
+      }
+    }
+    return mergeFaRecipes(saved);
+  }
+
+  async saveRecipeConfig(input: Partial<FaRecipeConfig>): Promise<FaRecipeConfig> {
+    const merged = mergeFaRecipes(input);
+    await this.prisma.systemSetting.upsert({
+      where: { key: FA_RECIPES_SETTING_KEY },
+      update: { value: JSON.stringify(merged) },
+      create: { key: FA_RECIPES_SETTING_KEY, value: JSON.stringify(merged) },
+    });
+    return merged;
+  }
+
+  /** Everything the settings UI needs: current mapping, defaults, package/add-on lists and the FA catalog. */
+  async recipeSettings() {
+    const config = await this.getRecipeConfig();
+    let products: any[] = [];
+    let catalogError: string | null = null;
+    try {
+      products = this.flowAccount.isConfigured ? await this.flowAccount.listProducts() : [];
+      if (!this.flowAccount.isConfigured) catalogError = 'ยังไม่ได้ตั้งค่า FA_API_KEY';
+    } catch (e: any) {
+      catalogError = e?.message || 'โหลดรายการสินค้าจาก flowaccount-app ไม่สำเร็จ';
+    }
+    return {
+      config,
+      defaults: DEFAULT_FA_RECIPES,
+      packages: BOOKING_PACKAGES.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
+      addons: BOOKING_ADDONS,
+      products: products.map((p) => ({
+        code: p.code,
+        name: p.name,
+        kind: p.kind,
+        unitPrice: p.unitPrice,
+        variables: (p.variables || []).map((v: any) => v.key),
+        components: (p.components || []).map((c: any) => ({ code: c.code, title: c.title, optional: !!c.optional })),
+      })),
+      catalogError,
+      appUrl: this.flowAccount.appUrl,
+    };
+  }
+
   /**
    * Create (or fetch the already-created) quotation for a booking in flowaccount-app.
    * The booking code is used as externalRef, so calling twice never duplicates.
@@ -31,15 +94,19 @@ export class BookingsService {
     const b = await this.prisma.booking.findUnique({ where: { id } });
     if (!b) throw new NotFoundException('Booking not found');
 
-    const built = buildFaItems({
-      packageId: b.packageId,
-      foodMode: b.foodMode,
-      guests: b.guests,
-      tables: b.tables,
-      monks: b.monks,
-      selfTransport: b.selfTransport,
-      addons: b.addons,
-    });
+    const config = await this.getRecipeConfig();
+    const built = buildFaItems(
+      {
+        packageId: b.packageId,
+        foodMode: b.foodMode,
+        guests: b.guests,
+        tables: b.tables,
+        monks: b.monks,
+        selfTransport: b.selfTransport,
+        addons: b.addons,
+      },
+      config,
+    );
     if (!built) throw new BadRequestException(`ไม่มีสูตรใบเสนอราคาสำหรับแพ็กเกจ "${b.packageId}"`);
 
     const notes = [
