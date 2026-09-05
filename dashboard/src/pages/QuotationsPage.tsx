@@ -12,28 +12,15 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { faStatusLabel, faStatusStyle } from "@/lib/faStatus";
 import {
   getQuotationPipeline,
   getQuotationStats,
   syncQuotations,
 } from "@/lib/api-service";
 
-const STATUS_TABS = [
-  "ทั้งหมด",
-  "รออนุมัติ",
-  "อนุมัติ",
-  "ดำเนินการแล้ว",
-  "มัดจำแล้ว",
-  "ไม่อนุมัติ",
-];
-
-const STATUS_COLORS: Record<string, string> = {
-  รออนุมัติ: "bg-amber-50 text-amber-600 ring-1 ring-amber-200",
-  อนุมัติ: "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200",
-  ดำเนินการแล้ว: "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200",
-  มัดจำแล้ว: "bg-blue-50 text-blue-600 ring-1 ring-blue-200",
-  ไม่อนุมัติ: "bg-red-50 text-red-500 ring-1 ring-red-200",
-};
+// flowaccount-app status codes; labels via faStatusLabel
+const STATUS_TABS = ["ALL", "DRAFT", "PENDING", "APPROVED", "DEPOSITED", "REJECTED"];
 
 export default function QuotationsPage() {
   const navigate = useNavigate();
@@ -41,7 +28,7 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [stats, setStats] = useState<any>(null);
-  const [activeStatus, setActiveStatus] = useState("ทั้งหมด");
+  const [activeStatus, setActiveStatus] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [matchedFilter, setMatchedFilter] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -55,7 +42,7 @@ export default function QuotationsPage() {
     try {
       const [pipeline, statsData] = await Promise.all([
         getQuotationPipeline({
-          status: activeStatus !== "ทั้งหมด" ? activeStatus : undefined,
+          status: activeStatus !== "ALL" ? activeStatus : undefined,
           search: searchQuery || undefined,
           matched: matchedFilter || undefined,
           dateFrom: dateFrom || undefined,
@@ -194,7 +181,7 @@ export default function QuotationsPage() {
                   รออนุมัติ
                 </p>
                 <p className="text-xl font-bold text-amber-600 tabular-nums">
-                  {stats.statusCounts?.["รออนุมัติ"] || 0}
+                  {(stats.statusCounts?.PENDING || 0) + (stats.statusCounts?.["รออนุมัติ"] || 0)}
                 </p>
               </div>
             </div>
@@ -260,7 +247,7 @@ export default function QuotationsPage() {
                       : "bg-slate-50 text-slate-500 hover:bg-slate-100"
                   }`}
                 >
-                  {status}
+                  {status === "ALL" ? "ทั้งหมด" : faStatusLabel(status)}
                   {stats?.statusCounts?.[status] !== undefined && (
                     <span className="ml-1 opacity-70">
                       ({stats.statusCounts[status]})
@@ -440,11 +427,11 @@ export default function QuotationsPage() {
                     <td className="px-5 py-3.5 text-center">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                          STATUS_COLORS[q.status] ||
+                          faStatusStyle(q.status) + " ring-1 ring-current/20" ||
                           "bg-slate-50 text-slate-500"
                         }`}
                       >
-                        {q.status}
+                        {faStatusLabel(q.status)}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-center">

@@ -166,7 +166,7 @@ export class QuotationsService {
       statusCounts[q.status] = (statusCounts[q.status] || 0) + 1;
       const amount = parseFloat(q.grandTotal) || 0;
       totalValue += amount;
-      if (q.status === 'รออนุมัติ') {
+      if (q.status === 'PENDING' || q.status === 'รออนุมัติ') {
         pendingValue += amount;
       }
     });
@@ -398,7 +398,7 @@ export class QuotationsService {
         project: q.project,
         grandTotal: parseFloat(q.grandTotal) || 0,
         salesName: q.salesName || '',
-        status: q.status || 'รออนุมัติ',
+        status: q.status || 'PENDING',
         editUrl: q.editUrl || '',
         crmCustomerId: crmMatch?.id,
         crmDisplayName: crmMatch ? (crmMatch.nickname || crmMatch.displayName) : undefined,

@@ -17,6 +17,7 @@ import {
   type BookingLink,
 } from "@/lib/api-service";
 import BookingLinkModal from "./BookingLinkModal";
+import { faStatusLabel, faStatusStyle } from "@/lib/faStatus";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
 import {
@@ -754,16 +755,8 @@ export function CustomerInfoPanel({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-amber-600">{q.docNo}</span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                      q.status === 'อนุมัติ' || q.status === 'ดำเนินการแล้ว'
-                        ? 'bg-emerald-50 text-emerald-600'
-                        : q.status === 'ไม่อนุมัติ'
-                        ? 'bg-red-50 text-red-500'
-                        : q.status === 'มัดจำแล้ว'
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'bg-amber-50 text-amber-600'
-                    }`}>
-                      {q.status}
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${faStatusStyle(q.status)}`}>
+                      {faStatusLabel(q.status)}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{q.project || q.customer}</p>
