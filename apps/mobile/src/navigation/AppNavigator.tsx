@@ -16,6 +16,8 @@ import DashboardScreen from '../screens/DashboardScreen';
 import SlipReportScreen from '../screens/SlipReportScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import CustomerInfoScreen from '../screens/CustomerInfoScreen';
+import QuickRepliesScreen from '../screens/QuickRepliesScreen';
+import AdminsScreen from '../screens/AdminsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -196,6 +198,24 @@ export default function AppNavigator() {
               ...stackHeaderStyle,
               headerShown: true,
               headerTitle: 'ข้อมูลลูกค้า',
+            }}
+          />
+          <Stack.Screen
+            name="QuickReplies"
+            component={QuickRepliesScreen}
+            options={{
+              ...stackHeaderStyle,
+              headerShown: true,
+              headerTitle: 'ข้อความด่วน',
+            }}
+          />
+          <Stack.Screen
+            name="Admins"
+            component={AdminsScreen}
+            options={{
+              ...stackHeaderStyle,
+              headerShown: true,
+              headerTitle: 'ผู้ดูแลระบบ',
             }}
           />
         </>
