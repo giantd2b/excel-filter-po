@@ -39,6 +39,9 @@ export interface BookingAlertInput {
   phone?: string | null;
   note?: string | null;
   estimatedTotal?: number | null;
+  /** travel fee of the venue district, already included in estimatedTotal */
+  travelFee?: number | null;
+  travelArea?: string | null;
   source?: string | null;
   customerId?: string | null;
   channel?: string | null;
