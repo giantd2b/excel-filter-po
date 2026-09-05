@@ -135,13 +135,13 @@ function HomeTabs() {
         }}
       />
       <Tab.Screen
-        name="SlipReport"
-        component={SlipReportScreen}
+        name="Bookings"
+        component={BookingsScreen}
         options={{
           lazy: true,
-          title: 'สลิป',
+          title: 'จองงานบุญ',
           tabBarIcon: ({ color, size }) => (
-            <Text style={{ fontSize: size, color }}>🧾</Text>
+            <Text style={{ fontSize: size, color }}>🙏</Text>
           ),
         }}
       />
@@ -220,12 +220,13 @@ export default function AppNavigator() {
             }}
           />
           <Stack.Screen
-            name="Bookings"
-            component={BookingsScreen}
+            name="SlipReport"
+            component={SlipReportScreen}
+            initialParams={{ inStack: true }}
             options={{
               ...stackHeaderStyle,
               headerShown: true,
-              headerTitle: 'จองงานบุญ',
+              headerTitle: 'รายงานสลิป',
             }}
           />
         </>

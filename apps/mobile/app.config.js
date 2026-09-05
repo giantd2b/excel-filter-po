@@ -3,6 +3,9 @@ module.exports = {
     name: 'IRIS CRM',
     slug: 'iris-crm',
     version: '1.0.0',
+    // Deep links (iriscrm://bookings). Registered natively on the NEXT build;
+    // iOS already accepts com.iriscrm.app:// (Expo adds the bundle id as a scheme).
+    scheme: 'iriscrm',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',

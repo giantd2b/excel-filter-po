@@ -25,7 +25,9 @@ interface Slip {
   detected_at: any;
 }
 
-export default function SlipReportScreen() {
+export default function SlipReportScreen({ route }: any) {
+  // Rendered as a stack screen (Settings → รายงานสลิป) the navigator supplies the header.
+  const inStack = !!route?.params?.inStack;
   const insets = useSafeAreaInsets();
   const [slips, setSlips] = useState<Slip[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,10 +63,12 @@ export default function SlipReportScreen() {
   const totalAmount = slips.reduce((sum, s) => sum + (s.amount || 0), 0);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>รายงานสลิป</Text>
-      </View>
+    <View style={[styles.container, { paddingTop: inStack ? 0 : insets.top }]}>
+      {!inStack && (
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>รายงานสลิป</Text>
+        </View>
+      )}
 
       {/* Date picker */}
       <View style={styles.datePicker}>

@@ -203,7 +203,12 @@ export default function BookingsScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Tab screen: the tab navigator hides headers, so draw our own (same as the other tabs) */}
+      <View style={styles.screenHeader}>
+        <Text style={styles.screenTitle}>จองงานบุญ</Text>
+        <Text style={styles.screenCount}>{total} รายการ</Text>
+      </View>
       <FlatList
         data={bookings}
         keyExtractor={(item) => item.id}
@@ -240,6 +245,18 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
+  screenHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  screenTitle: { fontSize: 22, fontWeight: '800', color: '#1e293b' },
+  screenCount: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
   header: {
     backgroundColor: '#f8fafc',
     paddingHorizontal: 16,

@@ -121,9 +121,9 @@ export default function SettingsScreen() {
             <Text style={styles.menuChevron}>›</Text>
           </TouchableOpacity>
           <View style={styles.menuDivider} />
-          <TouchableOpacity style={styles.menuRow} onPress={() => navigation.navigate('Bookings')}>
-            <Text style={styles.menuIcon}>🙏</Text>
-            <Text style={styles.menuLabel}>จองงานบุญ</Text>
+          <TouchableOpacity style={styles.menuRow} onPress={() => navigation.navigate('SlipReport')}>
+            <Text style={styles.menuIcon}>🧾</Text>
+            <Text style={styles.menuLabel}>รายงานสลิป</Text>
             <Text style={styles.menuChevron}>›</Text>
           </TouchableOpacity>
         </View>
