@@ -185,7 +185,7 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
             boxShadow: 'var(--shadow-md)',
           }}
         >
-          จองแพ็กเกจนี้
+          ขอใบเสนอราคาแพ็กเกจนี้
         </div>
       </div>
     </div>

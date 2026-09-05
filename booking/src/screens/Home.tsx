@@ -108,7 +108,7 @@ export default function Home({ onStartBooking, onOpenPkg }: Props) {
               textWrap: 'pretty',
             }}
           >
-            เลือกแพ็กเกจ กรอกรายละเอียดงาน แล้วส่งให้ทีมงานทาง LINE ทีมงานจะยืนยันวันและรายละเอียดกลับภายในวันเดียวกัน
+            เลือกแพ็กเกจ กรอกรายละเอียดงาน รับใบเสนอราคาเบื้องต้นได้ทันที ทีมงานจะยืนยันคิววันงานและแจ้งขั้นตอนมัดจำกลับภายในวันเดียวกัน
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             <div
@@ -127,7 +127,7 @@ export default function Home({ onStartBooking, onOpenPkg }: Props) {
                 boxShadow: 'var(--shadow-md)',
               }}
             >
-              เริ่มจองแพ็กเกจ
+              ขอใบเสนอราคาเบื้องต้น
             </div>
             <div
               onClick={scrollPkgs}
