@@ -116,9 +116,16 @@ export function addDays(ymd: string | undefined, days: number) {
 
 // ─── Preset form data (mirrors dashboard BookingLinkModal) ────────────
 
+export const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+/** Days in a month, computed in UTC so no local-timezone surprises. */
+export function daysInMonth(y: number, mo: number) {
+  return new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+
 export const FALLBACK_PACKAGES: PricingPackage[] = [
-  { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ', kind: 'ceremony' },
-  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร', kind: 'ceremony' },
+  { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)', kind: 'ceremony' },
+  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony' },
   { id: 'full', name: 'ครบวงจร', kind: 'full' },
   { id: 'full-plus', name: 'ครบวงจร พลัส', kind: 'full' },
   { id: 'prime', name: 'PRIME ครบวงจร', kind: 'full' },
@@ -157,6 +164,8 @@ export const DEFAULT_PRESET: BookingPreset = {
   selfTransport: false,
   addons: [],
   note: '',
+  wantVat: null,
+  depositAmount: null,
 };
 
 /** Thai chat message that accompanies a booking link (same wording as the dashboard). */
@@ -166,10 +175,16 @@ export function buildLinkChatText(link: BookingLink, mode: 'preset' | 'free', ha
     const food = hasFood
       ? p.foodMode === 'table' ? `โต๊ะจีน ${p.tables} โต๊ะ` : `บุฟเฟต์ ${p.guests} ท่าน`
       : 'อาหารถวายพระ';
-    const price = link.estimatedTotal != null ? `ราคาประเมิน ${link.estimatedTotal.toLocaleString('th-TH')} บาท` : '';
+    const price =
+      link.estimatedTotal != null
+        ? p.wantVat
+          ? `ราคาประเมิน ${Math.round(link.estimatedTotal * 1.07).toLocaleString('th-TH')} บาท (รวม VAT 7%)`
+          : `ราคาประเมิน ${link.estimatedTotal.toLocaleString('th-TH')} บาท${p.wantVat === false ? ' (ไม่รวม VAT)' : ''}`
+        : '';
     return [
       `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${link.packageName} · พระ ${p.monks} รูป · ${food}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ''}${p.timeSlot ? ` (${p.timeSlot})` : ''}`,
       price,
+      link.depositAmount != null ? `มัดจำ ${link.depositAmount.toLocaleString('th-TH')} บาท เพื่อยืนยันคิว` : '',
       'กรอกชื่อ เบอร์ และสถานที่จัดงานที่ลิงก์นี้ ระบบจะออกใบเสนอราคาให้ทันทีค่ะ',
       link.url,
     ].filter(Boolean).join('\n');

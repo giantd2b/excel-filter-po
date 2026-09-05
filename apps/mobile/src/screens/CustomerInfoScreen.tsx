@@ -452,7 +452,10 @@ export default function CustomerInfoScreen({ route }: any) {
                   <Text style={styles.orderAmount}>฿{Number(b.estimatedTotal || 0).toLocaleString()}</Text>
                   {b.quotationPublicUrl ? (
                     <TouchableOpacity onPress={() => Linking.openURL(b.quotationPublicUrl!)}>
-                      <Text style={{ fontSize: 12, color: '#d97706', fontWeight: '600' }}>📄 {b.quotationDocNo || 'ใบเสนอราคา'}</Text>
+                      <Text style={{ fontSize: 12, color: '#d97706', fontWeight: '600' }}>
+                        📄 {b.quotationDocNo || 'ใบเสนอราคา'}
+                        {b.quotationSendStatus === 'sent' ? ' ✓ ส่งในแชตแล้ว' : b.quotationSendStatus === 'failed' ? ' · ส่งในแชตไม่สำเร็จ' : ''}
+                      </Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>

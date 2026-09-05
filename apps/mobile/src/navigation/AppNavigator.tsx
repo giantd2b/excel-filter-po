@@ -19,6 +19,7 @@ import CustomerInfoScreen from '../screens/CustomerInfoScreen';
 import QuickRepliesScreen from '../screens/QuickRepliesScreen';
 import AdminsScreen from '../screens/AdminsScreen';
 import BookingsScreen from '../screens/BookingsScreen';
+import BookingPricingScreen from '../screens/BookingPricingScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -227,6 +228,15 @@ export default function AppNavigator() {
               ...stackHeaderStyle,
               headerShown: true,
               headerTitle: 'รายงานสลิป',
+            }}
+          />
+          <Stack.Screen
+            name="BookingPricing"
+            component={BookingPricingScreen}
+            options={{
+              ...stackHeaderStyle,
+              headerShown: true,
+              headerTitle: 'ราคาแพ็กเกจ',
             }}
           />
         </>

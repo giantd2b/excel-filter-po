@@ -14,6 +14,9 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+
+const BOOKING_SITE = 'https://crm.iristermboon.com';
 import {
   listBookings,
   updateBookingStatus,
@@ -34,6 +37,7 @@ const SOURCES = [
 
 export default function BookingsScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const [bookings, setBookings] = useState<MeritBooking[]>([]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [total, setTotal] = useState(0);
@@ -171,7 +175,7 @@ export default function BookingsScreen() {
         style={styles.search}
         value={query}
         onChangeText={setQuery}
-        placeholder="ค้นหา รหัส / ชื่อ / เบอร์ / เลขใบเสนอราคา"
+        placeholder="ค้นหา รหัส / ชื่อ / เบอร์ / ชื่อในแชต / เลขใบเสนอราคา"
         placeholderTextColor="#94a3b8"
         clearButtonMode="while-editing"
         autoCorrect={false}
@@ -206,8 +210,15 @@ export default function BookingsScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Tab screen: the tab navigator hides headers, so draw our own (same as the other tabs) */}
       <View style={styles.screenHeader}>
-        <Text style={styles.screenTitle}>จองงานบุญ</Text>
-        <Text style={styles.screenCount}>{total} รายการ</Text>
+        <View>
+          <Text style={styles.screenTitle}>จองงานบุญ</Text>
+          <TouchableOpacity onPress={() => Linking.openURL(`${BOOKING_SITE}/booking/`).catch(() => {})}>
+            <Text style={styles.screenSub}>{total} รายการ · หน้าจองสาธารณะ /booking ↗</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.navigate('BookingPricing')}>
+          <Text style={styles.headerBtnText}>💰 ราคาแพ็กเกจ</Text>
+        </TouchableOpacity>
       </View>
       <FlatList
         data={bookings}
@@ -247,7 +258,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   screenHeader: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -256,7 +267,16 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f1f5f9',
   },
   screenTitle: { fontSize: 22, fontWeight: '800', color: '#1e293b' },
-  screenCount: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
+  screenSub: { fontSize: 12, color: '#6366f1', fontWeight: '600', marginTop: 2 },
+  headerBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  headerBtnText: { fontSize: 12, color: '#475569', fontWeight: '600' },
   header: {
     backgroundColor: '#f8fafc',
     paddingHorizontal: 16,

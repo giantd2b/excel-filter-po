@@ -34,9 +34,10 @@ import {
   FALLBACK_ADDONS,
   FALLBACK_PACKAGES,
   OCCASIONS,
+  THAI_MONTHS,
   TIME_SLOTS,
-  addDays,
   buildLinkChatText,
+  daysInMonth,
   fmtThaiDate,
 } from './bookingHelpers';
 
@@ -54,6 +55,7 @@ type Mode = 'preset' | 'free';
 /**
  * "ลิงก์จอง": a unique /booking/?ref=<token> link for one chat customer.
  * preset = sales fixes the whole package (+ live price); free = customer picks in the wizard.
+ * Mirrors dashboard/src/components/inbox/BookingLinkModal.tsx field-for-field.
  */
 export default function BookingLinkModal({ visible, customer, onClose, onSend, onSent }: Props) {
   const insets = useSafeAreaInsets();
@@ -70,6 +72,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [depositText, setDepositText] = useState('');
 
   const pkg = packages.find((p) => p.id === preset.packageId);
   const hasFood = pkg?.kind === 'full';
@@ -79,6 +82,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
     if (!visible) return;
     setMode('preset');
     setPreset(DEFAULT_PRESET);
+    setDepositText('');
     setFreePackageId('');
     setLink(null);
     setError(null);
@@ -128,6 +132,12 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
     setPreset((p) => ({ ...p, [k]: v }));
     setLink(null);
     setSent(false);
+  };
+
+  const setDeposit = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, '');
+    setDepositText(digits);
+    set('depositAmount', digits === '' ? null : Math.max(0, parseInt(digits, 10) || 0));
   };
 
   const switchMode = (m: Mode) => {
@@ -189,6 +199,8 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
   const numberValue = preset.foodMode === 'table' ? preset.tables : preset.guests;
   const numberStep = preset.foodMode === 'table' ? 1 : 5;
   const numberMin = preset.foodMode === 'table' ? 8 : 20;
+  const vatValue = preset.wantVat === true ? 'yes' : preset.wantVat === false ? 'no' : '';
+  const shownTotal = estimate ? (preset.wantVat ? estimate.grandTotal : estimate.total) : 0;
 
   return (
     <Modal
@@ -259,32 +271,15 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
               </Field>
 
               <Field label="วันที่จัดงาน (เว้นว่างให้ลูกค้าเลือก)">
-                <View style={styles.dateRow}>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => set('eventDate', addDays(preset.eventDate, -1))}>
-                    <Text style={styles.stepBtnText}>◀</Text>
-                  </TouchableOpacity>
-                  <View style={styles.dateValue}>
-                    <Text style={[styles.dateText, !preset.eventDate && { color: '#94a3b8' }]}>
-                      {preset.eventDate ? fmtThaiDate(preset.eventDate) : 'ให้ลูกค้าเลือก'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => set('eventDate', addDays(preset.eventDate, 1))}>
-                    <Text style={styles.stepBtnText}>▶</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={[styles.rowWrap, { marginTop: 6 }]}>
-                  <TouchableOpacity style={styles.miniBtn} onPress={() => set('eventDate', addDays(preset.eventDate, 7))}>
-                    <Text style={styles.miniBtnText}>+7 วัน</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.miniBtn} onPress={() => set('eventDate', addDays(preset.eventDate, 30))}>
-                    <Text style={styles.miniBtnText}>+30 วัน</Text>
-                  </TouchableOpacity>
-                  {preset.eventDate ? (
+                <ThaiDatePicker value={preset.eventDate || ''} onChange={(v) => set('eventDate', v)} />
+                {preset.eventDate ? (
+                  <View style={[styles.rowWrap, { alignItems: 'center', marginTop: 6 }]}>
+                    <Text style={styles.datePreview}>วันที่เลือก: {fmtThaiDate(preset.eventDate)}</Text>
                     <TouchableOpacity style={styles.miniBtn} onPress={() => set('eventDate', '')}>
-                      <Text style={[styles.miniBtnText, { color: '#dc2626' }]}>ล้าง</Text>
+                      <Text style={[styles.miniBtnText, { color: '#dc2626' }]}>ล้างวันที่ (ให้ลูกค้าเลือก)</Text>
                     </TouchableOpacity>
-                  ) : null}
-                </View>
+                  </View>
+                ) : null}
               </Field>
 
               <Field label="ช่วงเวลาพิธี">
@@ -312,8 +307,8 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                       onChange={(v) => set('foodMode', v as 'buffet' | 'table')}
                     />
                   </Field>
-                  <Field label={preset.foodMode === 'table' ? 'จำนวนโต๊ะ' : 'จำนวนแขก (ท่าน)'}>
-                    <View style={styles.dateRow}>
+                  <Field label={preset.foodMode === 'table' ? 'จำนวนโต๊ะ (อย่างน้อย 8)' : 'จำนวนแขก (ท่าน, อย่างน้อย 20)'}>
+                    <View style={styles.stepRow}>
                       <TouchableOpacity
                         style={styles.stepBtn}
                         onPress={() => set(numberField, Math.max(numberMin, numberValue - numberStep))}
@@ -370,6 +365,40 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                 </View>
               </Field>
 
+              <Field label="ใบกำกับภาษี (VAT 7%)">
+                <Chips
+                  options={[
+                    { value: '', label: 'ให้ลูกค้าเลือกเอง' },
+                    { value: 'yes', label: 'รับ VAT' },
+                    { value: 'no', label: 'ไม่รับ VAT' },
+                  ]}
+                  value={vatValue}
+                  onChange={(v) => set('wantVat', v === 'yes' ? true : v === 'no' ? false : null)}
+                />
+                <Text style={styles.fieldHint}>
+                  {vatValue === 'yes'
+                    ? 'ราคารวมภาษี 7% และออกใบกำกับภาษี'
+                    : vatValue === 'no'
+                      ? 'ราคาไม่รวมภาษี'
+                      : 'ลูกค้าเลือกเองบนหน้าจอง'}
+                </Text>
+              </Field>
+
+              <Field
+                label={`ยอดมัดจำ (บาท) — เว้นว่าง = ตามกติกาค่าอาหาร${
+                  estimate ? ` (${estimate.depositAmount.toLocaleString('th-TH')} บาท จากค่าอาหาร ${estimate.foodAmount.toLocaleString('th-TH')})` : ''
+                }`}
+              >
+                <TextInput
+                  style={styles.input}
+                  keyboardType="number-pad"
+                  value={depositText}
+                  onChangeText={setDeposit}
+                  placeholder="ระบุเองเมื่อต้องการยอดต่างจากกติกา"
+                  placeholderTextColor="#94a3b8"
+                />
+              </Field>
+
               <Field label="ข้อความถึงลูกค้า (แสดงบนหน้าจอง ไม่บังคับ)">
                 <TextInput
                   style={[styles.input, { minHeight: 64 }]}
@@ -392,19 +421,27 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                         <Text style={styles.estimateVal}>{r.v}</Text>
                       </View>
                     ))}
+                    <View style={styles.estimateRow}>
+                      <Text style={styles.estimateKey}>มัดจำเพื่อยืนยันคิว{estimate.depositManual ? ' (ระบุเอง)' : ''}</Text>
+                      <Text style={[styles.estimateVal, { color: '#b45309', fontWeight: '700' }]}>
+                        {estimate.depositAmount.toLocaleString('th-TH')} บาท
+                      </Text>
+                    </View>
                     <View style={styles.estimateTotalRow}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={styles.estimateTotalLabel}>ราคาประเมิน</Text>
                         {estimating ? <ActivityIndicator size="small" color="#6366f1" /> : null}
                       </View>
-                      <Text style={styles.estimateTotal}>฿{estimate.total.toLocaleString('th-TH')}</Text>
+                      <Text style={styles.estimateTotal}>
+                        ฿{shownTotal.toLocaleString('th-TH')}{preset.wantVat ? ' รวม VAT' : ''}
+                      </Text>
                     </View>
                   </>
                 ) : (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     {estimating ? <ActivityIndicator size="small" color="#94a3b8" /> : null}
                     <Text style={styles.estimateHint}>
-                      {estimating ? 'กำลังคำนวณราคาจาก FlowAccount…' : 'คำนวณราคาไม่สำเร็จ — ตรวจสอบการเชื่อมต่อแล้วแก้ค่าอีกครั้ง'}
+                      {estimating ? 'กำลังคำนวณราคาจาก IRIS Quotation…' : 'คำนวณราคาไม่สำเร็จ — ตรวจสอบการเชื่อมต่อแล้วแก้ค่าอีกครั้ง'}
                     </Text>
                   </View>
                 )}
@@ -442,6 +479,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                   link.packageName
                     ? `แพ็กเกจ: ${link.packageName}${link.estimatedTotal != null ? ` · ฿${link.estimatedTotal.toLocaleString('th-TH')}` : ''}`
                     : null,
+                  link.depositAmount != null ? `มัดจำ ฿${link.depositAmount.toLocaleString('th-TH')}` : null,
                   link.createdByName ? `สร้างโดย: ${link.createdByName}` : null,
                   `เปิดแล้ว ${link.openCount ?? 0} ครั้ง`,
                   `จองผ่านลิงก์นี้ ${link.bookingCount ?? 0} รายการ`,
@@ -494,21 +532,93 @@ function Chips({
   options,
   value,
   onChange,
+  compact,
 }: {
   options: { value: string; label: string }[];
   value: string;
   onChange: (v: string) => void;
+  compact?: boolean;
 }) {
   return (
     <View style={styles.rowWrap}>
       {options.map((o) => {
         const on = o.value === value;
         return (
-          <TouchableOpacity key={o.value || '__empty'} style={[styles.chip, on && styles.chipActive]} onPress={() => onChange(o.value)}>
+          <TouchableOpacity
+            key={o.value || '__empty'}
+            style={[styles.chip, compact && styles.chipCompact, on && styles.chipActive]}
+            onPress={() => onChange(o.value)}
+          >
             <Text style={[styles.chipText, on && styles.chipTextActive]}>{o.label}</Text>
           </TouchableOpacity>
         );
       })}
+    </View>
+  );
+}
+
+/**
+ * Day / month / year pickers that produce a plain "YYYY-MM-DD" string — the same
+ * approach as the dashboard's ThaiDateSelect (a native date picker once produced a value
+ * one day off from what sales tapped; explicit parts leave no room for timezone surprises).
+ */
+function ThaiDatePicker({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+  const y = m ? Number(m[1]) : 0;
+  const mo = m ? Number(m[2]) : 0;
+  const d = m ? Number(m[3]) : 0;
+  const thisYear = new Date().getFullYear();
+  const years = [thisYear, thisYear + 1, thisYear + 2];
+  const maxDay = y && mo ? daysInMonth(y, mo) : 31;
+
+  const emit = (ny: number, nmo: number, nd: number) => {
+    if (!ny || !nmo || !nd) {
+      onChange('');
+      return;
+    }
+    const dd = Math.min(nd, daysInMonth(ny, nmo));
+    onChange(`${ny}-${String(nmo).padStart(2, '0')}-${String(dd).padStart(2, '0')}`);
+  };
+
+  return (
+    <View style={{ gap: 8 }}>
+      <View style={styles.dateBlock}>
+        <Text style={styles.dateBlockLabel}>ปี</Text>
+        <Chips
+          compact
+          options={years.map((yy) => ({ value: String(yy), label: String(yy + 543) }))}
+          value={y ? String(y) : ''}
+          onChange={(v) => emit(Number(v), mo || new Date().getMonth() + 1, d || 1)}
+        />
+      </View>
+      <View style={styles.dateBlock}>
+        <Text style={styles.dateBlockLabel}>เดือน</Text>
+        <Chips
+          compact
+          options={THAI_MONTHS.map((name, i) => ({ value: String(i + 1), label: name }))}
+          value={mo ? String(mo) : ''}
+          onChange={(v) => emit(y || thisYear, Number(v), d || 1)}
+        />
+      </View>
+      <View style={styles.dateBlock}>
+        <Text style={styles.dateBlockLabel}>วัน</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {Array.from({ length: maxDay }, (_, i) => i + 1).map((n) => {
+              const on = n === d;
+              return (
+                <TouchableOpacity
+                  key={n}
+                  style={[styles.chip, styles.chipCompact, styles.dayChip, on && styles.chipActive]}
+                  onPress={() => emit(y || thisYear, mo || new Date().getMonth() + 1, n)}
+                >
+                  <Text style={[styles.chipText, on && styles.chipTextActive]}>{n}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -537,6 +647,7 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: '#1e293b' },
   field: { gap: 6 },
   fieldLabel: { fontSize: 12, fontWeight: '600', color: '#475569' },
+  fieldHint: { fontSize: 11, color: '#94a3b8' },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -557,10 +668,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
+  chipCompact: { paddingHorizontal: 10, paddingVertical: 5 },
+  dayChip: { minWidth: 36, alignItems: 'center' },
   chipActive: { backgroundColor: '#6366f1', borderColor: '#6366f1' },
   chipText: { fontSize: 12, color: '#475569', fontWeight: '500' },
   chipTextActive: { color: '#fff', fontWeight: '700' },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dateBlock: { gap: 4 },
+  dateBlockLabel: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
+  datePreview: { fontSize: 12, fontWeight: '700', color: '#6d28d9' },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   stepBtn: {
     width: 40,
     height: 40,
@@ -570,17 +686,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stepBtnText: { fontSize: 16, color: '#4f46e5', fontWeight: '700' },
-  dateValue: {
-    flex: 1,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dateText: { fontSize: 14, fontWeight: '600', color: '#4f46e5' },
   miniBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -597,8 +702,8 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     padding: 12,
   },
-  estimateRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
-  estimateKey: { fontSize: 12, color: '#64748b', flex: 1, marginRight: 8 },
+  estimateRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2, gap: 8 },
+  estimateKey: { fontSize: 12, color: '#64748b', flex: 1 },
   estimateVal: { fontSize: 12, color: '#475569', fontVariant: ['tabular-nums'] },
   estimateTotalRow: {
     flexDirection: 'row',

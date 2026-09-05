@@ -86,6 +86,26 @@ export default function BookingCard({
         <Text style={styles.pkg}>
           {b.packageName || b.packageId || '-'} · พระ {b.monks ?? '-'} รูป · {foodLine(b)}
         </Text>
+        {b.depositAmount != null ? (
+          <View style={styles.rowWrap}>
+            <View style={[styles.tag, styles.tagAmber]}>
+              <Text style={[styles.tagText, { color: '#b45309' }]}>
+                มัดจำ {Number(b.depositAmount).toLocaleString('th-TH')} บาท{b.depositManual ? ' · ระบุเอง' : ''}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+        {typeof b.wantVat === 'boolean' ? (
+          <View style={styles.rowWrap}>
+            <View style={[styles.tag, b.wantVat ? styles.tagBlue : styles.tagSlate]}>
+              <Text style={[styles.tagText, b.wantVat ? { color: '#1d4ed8', fontWeight: '700' } : { color: '#475569' }]}>
+                {b.wantVat
+                  ? `รับ VAT 7% · รวม ${Math.round(Number(b.estimatedTotal ?? 0) * 1.07).toLocaleString('th-TH')} บาท`
+                  : 'ไม่รับ VAT'}
+              </Text>
+            </View>
+          </View>
+        ) : null}
         {b.floor ? (
           <View style={styles.rowWrap}>
             <View style={[styles.tag, groundFloor ? styles.tagSlate : styles.tagAmber]}>
@@ -203,6 +223,7 @@ const styles = StyleSheet.create({
   tagViolet: { backgroundColor: '#f5f3ff' },
   tagSlate: { backgroundColor: '#f1f5f9' },
   tagAmber: { backgroundColor: '#fffbeb' },
+  tagBlue: { backgroundColor: '#eff6ff' },
   tagText: { fontSize: 11 },
   body: { marginTop: 10, gap: 5 },
   pkg: { fontSize: 13, fontWeight: '600', color: '#334155' },
