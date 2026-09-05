@@ -31,7 +31,7 @@ const IMG = (f: string) => `${import.meta.env.BASE_URL}img/${f}`;
 export const PKGS: Pkg[] = [
   {
     id: 'ceremony',
-    name: 'พิธีสงฆ์ แพ็กเกจงานบุญ',
+    name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)',
     short: 'มาตรฐาน',
     kind: 'ceremony',
     base: 14990,
@@ -55,7 +55,7 @@ export const PKGS: Pkg[] = [
   },
   {
     id: 'ceremony-prime',
-    name: 'PRIME พิธีสงฆ์ครบวงจร',
+    name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)',
     short: 'PRIME',
     kind: 'ceremony',
     base: 19990,

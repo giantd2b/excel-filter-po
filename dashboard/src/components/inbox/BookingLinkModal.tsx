@@ -13,8 +13,8 @@ import {
 
 /** Fallbacks when /bookings/pricing is unreachable (ids match booking/src/data/packages.ts). */
 const FALLBACK_PACKAGES = [
-  { id: "ceremony", name: "พิธีสงฆ์ แพ็กเกจงานบุญ", kind: "ceremony" },
-  { id: "ceremony-prime", name: "PRIME พิธีสงฆ์ครบวงจร", kind: "ceremony" },
+  { id: "ceremony", name: "พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)", kind: "ceremony" },
+  { id: "ceremony-prime", name: "PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)", kind: "ceremony" },
   { id: "full", name: "ครบวงจร", kind: "full" },
   { id: "full-plus", name: "ครบวงจร พลัส", kind: "full" },
   { id: "prime", name: "PRIME ครบวงจร", kind: "full" },

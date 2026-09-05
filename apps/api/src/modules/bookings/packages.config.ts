@@ -18,8 +18,8 @@ export interface BookingPackage {
 }
 
 export const BOOKING_PACKAGES: BookingPackage[] = [
-  { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ', kind: 'ceremony', base: 14990 },
-  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร', kind: 'ceremony', base: 19990 },
+  { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)', kind: 'ceremony', base: 14990 },
+  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony', base: 19990 },
   {
     id: 'full',
     name: 'ครบวงจร',
