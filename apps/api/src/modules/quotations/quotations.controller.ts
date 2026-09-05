@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { QuotationsService } from './quotations.service';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
 import { ChatCustomerDto } from './dto/chat-quotation.dto';
@@ -66,6 +66,21 @@ export class QuotationsController {
   @Get('sync')
   async syncQuotations() {
     return this.quotationsService.syncFromFlowAccount();
+  }
+
+  /** Close-rate summary per sales / channel / origin for the pipeline page. */
+  @UseGuards(FirebaseAuthGuard)
+  @Get('summary')
+  async summary(@Query('dateFrom') dateFrom?: string) {
+    return this.quotationsService.getSummary({ dateFrom: dateFrom || undefined });
+  }
+
+  /** Inbound webhook from IRIS Quotation (status / detail changes). Shared secret, no Firebase session. */
+  @Post('webhook/fa')
+  async faWebhook(@Headers('x-webhook-secret') secret: string | undefined, @Body() body: any) {
+    const expected = process.env.FA_WEBHOOK_SECRET || '';
+    if (!expected || secret !== expected) throw new ForbiddenException('invalid webhook secret');
+    return this.quotationsService.onFaWebhook(body || {});
   }
 
   @UseGuards(FirebaseAuthGuard)

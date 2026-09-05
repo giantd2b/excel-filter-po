@@ -190,6 +190,43 @@ export class QuotationsService {
     };
   }
 
+  /**
+   * Close-rate summary for the dashboard: per sales, per channel and per origin. A document counts
+   * as "closed" when it reached DEPOSITED. Uses the sales/channel stored on the document (attribution),
+   * falling back to the free-text salesName and the phone-matched channel for older documents.
+   */
+  async getSummary(opts: { dateFrom?: string } = {}) {
+    if (!this.cache || Date.now() - this.cache.updatedAt > this.CACHE_TTL) await this.syncFromFlowAccount();
+    let data = this.cache?.data || [];
+    if (opts.dateFrom) data = data.filter((q) => q.date && q.date >= opts.dateFrom!);
+    type Bucket = { key: string; count: number; total: number; byStatus: Record<string, number>; deposited: number; depositedTotal: number; rejected: number; open: number; rate: number };
+    const mk = (key: string): Bucket => ({ key, count: 0, total: 0, byStatus: {}, deposited: 0, depositedTotal: 0, rejected: 0, open: 0, rate: 0 });
+    const add = (m: Map<string, Bucket>, key: string, q: QuotationRecord) => {
+      const b = m.get(key) || mk(key); m.set(key, b);
+      const amount = Number(q.grandTotal) || 0;
+      b.count++; b.total += amount; b.byStatus[q.status] = (b.byStatus[q.status] || 0) + 1;
+      if (q.status === 'DEPOSITED') { b.deposited++; b.depositedTotal += amount; }
+      else if (q.status === 'REJECTED') b.rejected++;
+      else b.open++;
+    };
+    const bySales = new Map<string, Bucket>(), byChannel = new Map<string, Bucket>(), byOrigin = new Map<string, Bucket>();
+    for (const q of data) {
+      add(bySales, (q.crmSalesName || q.salesName || '').trim() || 'ไม่ระบุเซลล์', q);
+      add(byChannel, q.crmChannelLabel || (q.crmChannel ? channelLabel(q.crmChannel, q.crmChannelType === 'line' ? 'LINE' : 'FACEBOOK') : '') || 'ไม่ทราบช่องทาง', q);
+      add(byOrigin, q.origin, q);
+    }
+    const finish = (m: Map<string, Bucket>) => [...m.values()].map((b) => ({ ...b, rate: b.count ? Math.round((b.deposited / b.count) * 100) : 0 })).sort((a, b) => b.total - a.total);
+    const all = mk('ทั้งหมด'); for (const q of data) add(new Map([['x', all]]), 'x', q);
+    return { dateFrom: opts.dateFrom || null, total: { ...all, key: 'ทั้งหมด', rate: all.count ? Math.round((all.deposited / all.count) * 100) : 0 }, bySales: finish(bySales), byChannel: finish(byChannel), byOrigin: finish(byOrigin), updatedAt: this.cache?.updatedAt || 0 };
+  }
+
+  /** IRIS Quotation calls back here on status / detail changes: refresh that one document right away. */
+  async onFaWebhook(body: { event?: string; docNo?: string }) {
+    if (!body?.docNo) return { ok: false };
+    await this.refreshOne(body.docNo);
+    return { ok: true, docNo: body.docNo, event: body.event || null };
+  }
+
   async getStats() {
     if (!this.cache || Date.now() - this.cache.updatedAt > this.CACHE_TTL) {
       await this.syncFromFlowAccount();

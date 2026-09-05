@@ -502,6 +502,31 @@ export async function syncQuotations() {
   return api.get<any>("/quotations/sync");
 }
 
+export interface SummaryBucket {
+  key: string;
+  count: number;
+  total: number;
+  byStatus: Record<string, number>;
+  deposited: number;
+  depositedTotal: number;
+  rejected: number;
+  open: number;
+  /** % of documents that reached มัดจำแล้ว */
+  rate: number;
+}
+export interface QuotationSummary {
+  dateFrom: string | null;
+  total: SummaryBucket;
+  bySales: SummaryBucket[];
+  byChannel: SummaryBucket[];
+  byOrigin: SummaryBucket[];
+  updatedAt: number;
+}
+
+export async function getQuotationSummary(dateFrom?: string) {
+  return api.get<QuotationSummary>(`/quotations/summary${dateFrom ? `?dateFrom=${encodeURIComponent(dateFrom)}` : ""}`);
+}
+
 // ─── Quotations of a chat customer (IRIS Quotation is the source of truth) ─────
 
 /** chat = started from the chat panel (CQ-), booking = from a merit booking (TB-), attached = made by hand then attached, manual = made by hand */

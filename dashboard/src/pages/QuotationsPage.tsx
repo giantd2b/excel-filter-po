@@ -16,7 +16,10 @@ import { faStatusLabel, faStatusStyle } from "@/lib/faStatus";
 import {
   getQuotationPipeline,
   getQuotationStats,
+  getQuotationSummary,
   syncQuotations,
+  type QuotationSummary,
+  type SummaryBucket,
 } from "@/lib/api-service";
 
 // flowaccount-app status codes; labels via faStatusLabel
@@ -37,6 +40,8 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [stats, setStats] = useState<any>(null);
+  const [summary, setSummary] = useState<QuotationSummary | null>(null);
+  const [summaryTab, setSummaryTab] = useState<"bySales" | "byChannel" | "byOrigin">("bySales");
   const [activeStatus, setActiveStatus] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [matchedFilter, setMatchedFilter] = useState<string>("");
@@ -50,7 +55,7 @@ export default function QuotationsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [pipeline, statsData] = await Promise.all([
+      const [pipeline, statsData, summaryData] = await Promise.all([
         getQuotationPipeline({
           status: activeStatus !== "ALL" ? activeStatus : undefined,
           search: searchQuery || undefined,
@@ -61,6 +66,7 @@ export default function QuotationsPage() {
           limit: 30,
         }),
         getQuotationStats(),
+        getQuotationSummary(dateFrom || undefined),
       ]);
 
       setQuotations(pipeline.data || []);
@@ -68,6 +74,7 @@ export default function QuotationsPage() {
       setTotalPages(pipeline.totalPages || 1);
       setUpdatedAt(pipeline.updatedAt || 0);
       setStats(statsData);
+      setSummary(summaryData);
     } catch (err) {
       console.error("Failed to fetch quotations:", err);
     } finally {
@@ -227,6 +234,27 @@ export default function QuotationsPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Close-rate summary per sales / channel / origin (follows the ตั้งแต่ filter) */}
+      {summary && (
+        <div className="bg-white rounded-xl border border-slate-200/60 p-4 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">ปิดการขาย</p>
+              <p className="text-sm text-slate-700">
+                {summary.total.count} ใบ · มัดจำแล้ว <b className="text-emerald-600">{summary.total.deposited}</b> ({summary.total.rate}%) · ยอดที่มัดจำแล้ว <b>฿{formatCurrency(summary.total.depositedTotal)}</b>
+                {summary.dateFrom ? <span className="text-slate-400"> · ตั้งแต่ {formatDate(summary.dateFrom)}</span> : null}
+              </p>
+            </div>
+            <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+              {([["bySales", "ตามเซลล์"], ["byChannel", "ตามช่องทาง"], ["byOrigin", "ตามที่มา"]] as const).map(([k, label]) => (
+                <button key={k} onClick={() => setSummaryTab(k)} className={`px-2.5 py-1 rounded-md text-[11px] font-semibold ${summaryTab === k ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>{label}</button>
+              ))}
+            </div>
+          </div>
+          <SummaryTable rows={summary[summaryTab]} labelOf={summaryTab === "byOrigin" ? (k) => ORIGIN_LABEL[k] || k : (k) => k} />
         </div>
       )}
 
@@ -566,6 +594,54 @@ export default function QuotationsPage() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+const fmtBaht = (n: number) => (Number(n) || 0).toLocaleString("th-TH");
+
+/** One row per sales / channel / origin: volume, open, deposited, rejected and the deposit rate. */
+function SummaryTable({ rows, labelOf }: { rows: SummaryBucket[]; labelOf: (k: string) => string }) {
+  if (!rows.length) return <p className="text-xs text-slate-400">ยังไม่มีข้อมูลในช่วงที่เลือก</p>;
+  const max = Math.max(...rows.map((r) => r.count), 1);
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="text-[11px] text-slate-400 uppercase tracking-wider">
+            <th className="text-left py-1.5 pr-3 font-semibold">กลุ่ม</th>
+            <th className="text-right py-1.5 px-3 font-semibold">ใบ</th>
+            <th className="text-right py-1.5 px-3 font-semibold">ยอดรวม</th>
+            <th className="text-right py-1.5 px-3 font-semibold">กำลังตาม</th>
+            <th className="text-right py-1.5 px-3 font-semibold">มัดจำแล้ว</th>
+            <th className="text-right py-1.5 px-3 font-semibold">ยอดมัดจำแล้ว</th>
+            <th className="text-right py-1.5 px-3 font-semibold">ไม่อนุมัติ</th>
+            <th className="text-left py-1.5 pl-3 font-semibold w-40">อัตราปิด</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td className="py-1.5 pr-3 font-semibold text-slate-700">
+                {labelOf(r.key)}
+                <div className="h-1 mt-1 rounded bg-slate-100"><div className="h-1 rounded bg-brand-300" style={{ width: `${Math.round((r.count / max) * 100)}%` }} /></div>
+              </td>
+              <td className="py-1.5 px-3 text-right tabular-nums">{r.count}</td>
+              <td className="py-1.5 px-3 text-right tabular-nums">฿{fmtBaht(r.total)}</td>
+              <td className="py-1.5 px-3 text-right tabular-nums text-amber-600">{r.open}</td>
+              <td className="py-1.5 px-3 text-right tabular-nums text-emerald-600 font-semibold">{r.deposited}</td>
+              <td className="py-1.5 px-3 text-right tabular-nums text-emerald-700">฿{fmtBaht(r.depositedTotal)}</td>
+              <td className="py-1.5 px-3 text-right tabular-nums text-red-400">{r.rejected}</td>
+              <td className="py-1.5 pl-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-2 bg-emerald-400" style={{ width: `${r.rate}%` }} /></div>
+                  <span className="tabular-nums text-slate-600 w-9 text-right">{r.rate}%</span>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
