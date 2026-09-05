@@ -3,16 +3,30 @@ import { TH_AREAS } from '../data/th-areas';
 import type { BookingForm } from '../lib/calc';
 import { FieldLabel, inputStyle } from '../ui';
 
+export type AreaScope = 'event' | 'billing';
+
+/** Which form fields one address block reads/writes. */
+export const AREA_KEYS: Record<
+  AreaScope,
+  { line: keyof BookingForm; query: keyof BookingForm; tambon: keyof BookingForm; amphoe: keyof BookingForm; province: keyof BookingForm; zip: keyof BookingForm }
+> = {
+  event: { line: 'venue', query: 'areaQuery', tambon: 'tambon', amphoe: 'amphoe', province: 'province', zip: 'zip' },
+  billing: { line: 'billingLine', query: 'billingAreaQuery', tambon: 'billingTambon', amphoe: 'billingAmphoe', province: 'billingProvince', zip: 'billingZip' },
+};
+
 interface Props {
   form: BookingForm;
   setForm: (f: BookingForm) => void;
+  scope?: AreaScope;
   label?: string;
 }
 
 /** ตำบล/แขวง search over the service-area dataset + read-only อำเภอ/จังหวัด/รหัส chips. */
-export default function AreaSearch({ form: f, setForm, label = 'ตำบล / แขวง ที่จัดงาน' }: Props) {
+export default function AreaSearch({ form: f, setForm, scope = 'event', label = 'ตำบล / แขวง' }: Props) {
+  const k = AREA_KEYS[scope];
   const [open, setOpen] = useState(false);
-  const q = (f.areaQuery || '').trim();
+  const q = String(f[k.query] || '').trim();
+  const tambon = String(f[k.tambon] || '');
 
   const suggestions = useMemo(() => {
     if (q.length < 1) return [];
@@ -26,12 +40,12 @@ export default function AreaSearch({ form: f, setForm, label = 'ตำบล / �
         main: (bkk ? 'แขวง' : 'ต.') + t[0],
         sub: (bkk ? t[1] : 'อ.' + t[1]) + ' · จ.' + t[2] + ' · ' + t[3],
         pick: () => {
-          setForm({ ...f, areaQuery: t[0], tambon: t[0], amphoe: t[1], province: t[2], zip: t[3] });
+          setForm({ ...f, [k.query]: t[0], [k.tambon]: t[0], [k.amphoe]: t[1], [k.province]: t[2], [k.zip]: t[3] });
           setOpen(false);
         },
       };
     });
-  }, [q, f]);
+  }, [q, f, k]);
 
   return (
     <>
@@ -40,9 +54,9 @@ export default function AreaSearch({ form: f, setForm, label = 'ตำบล / �
         <input
           type="text"
           placeholder="พิมพ์ชื่อตำบล เช่น บ้านสวน"
-          value={f.areaQuery}
+          value={String(f[k.query] || '')}
           onChange={(e) => {
-            setForm({ ...f, areaQuery: e.target.value, tambon: '', amphoe: '', province: '', zip: '' });
+            setForm({ ...f, [k.query]: e.target.value, [k.tambon]: '', [k.amphoe]: '', [k.province]: '', [k.zip]: '' });
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
@@ -80,16 +94,16 @@ export default function AreaSearch({ form: f, setForm, label = 'ตำบล / �
         )}
         {open && q.length >= 2 && suggestions.length === 0 && (
           <div style={{ fontSize: 13, color: 'var(--color-neutral-600)', marginTop: 8, lineHeight: 1.6 }}>
-            ไม่พบตำบลนี้ในพื้นที่บริการ กรุณาพิมพ์ที่อยู่ในช่องด้านล่าง แล้วทีมงานจะตรวจสอบให้
+            ไม่พบตำบลนี้ในพื้นที่บริการ กรุณาพิมพ์ที่อยู่ในช่องด้านบน แล้วทีมงานจะตรวจสอบให้
           </div>
         )}
       </div>
-      {!!f.tambon && (
+      {!!tambon && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }}>
           {[
-            ['อำเภอ / เขต', f.amphoe],
-            ['จังหวัด', f.province],
-            ['รหัสไปรษณีย์', f.zip],
+            ['อำเภอ / เขต', String(f[k.amphoe] || '')],
+            ['จังหวัด', String(f[k.province] || '')],
+            ['รหัสไปรษณีย์', String(f[k.zip] || '')],
           ].map(([label, val]) => (
             <div
               key={label}

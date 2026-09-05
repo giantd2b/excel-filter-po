@@ -25,10 +25,24 @@ export interface BookingForm {
   selfTransport: boolean;
   addons: string[];
   budget: string;
+  /** contact person */
   name: string;
   phone: string;
-  /** billing address for the quotation (optional; defaults to the event address) */
-  customerAddress: string;
+  /** quotation issued to a person (billingName = name) or a company (billingName filled in) */
+  sameName: boolean;
+  billingName: string;
+  taxId: string;
+  /** billing address (full) */
+  billingLine: string;
+  billingAreaQuery: string;
+  billingTambon: string;
+  billingAmphoe: string;
+  billingProvince: string;
+  billingZip: string;
+  /** event address == billing address (no second entry) */
+  sameAddress: boolean;
+  /** floor of the venue, e.g. "ชั้น 1" */
+  floor: string;
   note: string;
 }
 
@@ -52,19 +66,65 @@ export const initialForm: BookingForm = {
   budget: '',
   name: '',
   phone: '',
-  customerAddress: '',
+  sameName: true,
+  billingName: '',
+  taxId: '',
+  billingLine: '',
+  billingAreaQuery: '',
+  billingTambon: '',
+  billingAmphoe: '',
+  billingProvince: '',
+  billingZip: '',
+  sameAddress: true,
+  floor: 'ชั้น 1',
   note: '',
 };
 
-export function addressLine(f: BookingForm): string {
-  const bkk = f.province === 'กรุงเทพฯ';
+function composeAddress(line: string, tambon: string, amphoe: string, province: string, zip: string): string {
+  const bkk = province === 'กรุงเทพฯ';
   const p: string[] = [];
-  if (f.venue) p.push(f.venue);
-  if (f.tambon) p.push((bkk ? 'แขวง' : 'ต.') + f.tambon);
-  if (f.amphoe) p.push(bkk ? f.amphoe : 'อ.' + f.amphoe);
-  if (f.province) p.push('จ.' + f.province);
-  if (f.zip) p.push(f.zip);
-  return p.join(' ') || 'ยังไม่ระบุ';
+  if (line) p.push(line);
+  if (tambon) p.push((bkk ? 'แขวง' : 'ต.') + tambon);
+  if (amphoe) p.push(bkk ? amphoe : 'อ.' + amphoe);
+  if (province) p.push('จ.' + province);
+  if (zip) p.push(zip);
+  return p.join(' ');
+}
+
+export function billingAddressLine(f: BookingForm): string {
+  return composeAddress(f.billingLine, f.billingTambon, f.billingAmphoe, f.billingProvince, f.billingZip) || 'ยังไม่ระบุ';
+}
+
+/**
+ * Apply the "same as" switches before submitting/summarising: copy the primary address
+ * (billing on the quick screen, event in the wizard) onto the other one, and the contact
+ * name onto the billing name when the quotation is issued to a person.
+ */
+export function finalizeForm(f: BookingForm, primary: 'billing' | 'event'): BookingForm {
+  const out = { ...f };
+  if (out.sameName || !out.billingName.trim()) out.billingName = out.name.trim();
+  if (out.sameAddress) {
+    if (primary === 'billing') {
+      out.venue = out.billingLine;
+      out.areaQuery = out.billingAreaQuery;
+      out.tambon = out.billingTambon;
+      out.amphoe = out.billingAmphoe;
+      out.province = out.billingProvince;
+      out.zip = out.billingZip;
+    } else {
+      out.billingLine = out.venue;
+      out.billingAreaQuery = out.areaQuery;
+      out.billingTambon = out.tambon;
+      out.billingAmphoe = out.amphoe;
+      out.billingProvince = out.province;
+      out.billingZip = out.zip;
+    }
+  }
+  return out;
+}
+
+export function addressLine(f: BookingForm): string {
+  return composeAddress(f.venue, f.tambon, f.amphoe, f.province, f.zip) || 'ยังไม่ระบุ';
 }
 
 export function tierPrice(pkg: Pkg, f: BookingForm): { base: number; label: string } {
@@ -128,7 +188,9 @@ export function summary(f: BookingForm): { k: string; v: string }[] {
   const rows = [
     { k: 'ประเภทงาน', v: f.occasion },
     { k: 'วันเวลา', v: (f.date || 'ยังไม่ระบุ') + ' · ' + f.time },
-    { k: 'สถานที่', v: addressLine(f) },
+    { k: 'สถานที่', v: `${addressLine(f)}${f.floor ? ` (${f.floor})` : ''}` },
+    ...(f.billingName && f.billingName !== f.name ? [{ k: 'ออกใบเสนอราคาในนาม', v: f.billingName }] : []),
+    { k: 'ที่อยู่ออกใบเสนอราคา', v: f.sameAddress ? 'ที่อยู่เดียวกับสถานที่จัดงาน' : billingAddressLine(f) },
     { k: 'แพ็กเกจ', v: c.pkg.name },
     { k: 'พระสงฆ์', v: f.monks + ' รูป' },
   ];

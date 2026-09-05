@@ -9,8 +9,8 @@ import {
   baht,
   pkgById,
 } from '../data/packages';
-import AreaSearch from '../components/AreaSearch';
-import { calc, summary, tentRecommendation, type BookingForm } from '../lib/calc';
+import { AddressFields, FloorField } from '../components/AddressFields';
+import { calc, finalizeForm, summary, tentRecommendation, type BookingForm } from '../lib/calc';
 import { submitBooking } from '../lib/api';
 import { BackLink, CheckIcon, FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
 import type { SavedBooking } from '../App';
@@ -50,19 +50,22 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
     if (step === 0 && !f.date) return setErr('กรุณาเลือกวันที่จัดงาน');
     if (step === 0 && !f.tambon && !f.venue.trim()) return setErr('กรุณาเลือกตำบล/แขวง ที่จัดงาน');
     if (step === 4) {
-      if (!f.name.trim()) return setErr('กรุณากรอกชื่อผู้จอง');
+      if (!f.name.trim()) return setErr('กรุณากรอกชื่อผู้ติดต่อ');
       if (!/[0-9]{9,}/.test(f.phone.replace(/[^0-9]/g, ''))) return setErr('กรุณากรอกเบอร์โทรให้ถูกต้อง');
+      if (!f.sameName && !f.billingName.trim()) return setErr('กรุณากรอกชื่อที่ต้องการให้ระบุในใบเสนอราคา');
+      if (!f.sameAddress && !f.billingLine.trim() && !f.billingTambon) return setErr('กรุณากรอกที่อยู่สำหรับออกใบเสนอราคา');
       if (submitting) return;
       setSubmitting(true);
       try {
-        const result = await submitBooking(f, linkRef);
+        const final = finalizeForm(f, 'event');
+        const result = await submitBooking(final, linkRef);
         onDone({
           code: result.code,
           total: result.estimatedTotal,
           quotationUrl: result.quotationUrl || null,
           quotationDocNo: result.quotationDocNo || null,
-          rows: summary(f),
-          f: { ...f },
+          rows: summary(final),
+          f: final,
         });
       } catch (e) {
         setErr(e instanceof Error ? e.message : 'ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
@@ -149,23 +152,17 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 ))}
               </div>
             </div>
-            <AreaSearch
+            <AddressFields
               form={f}
               setForm={(nf) => {
                 setForm(nf);
                 setErr('');
               }}
+              scope="event"
+              lineLabel="บ้านเลขที่ / หมู่ / ถนน หรือชื่อสถานที่จัดงาน"
+              linePlaceholder="เช่น 99/1 ม.5 ถ.สุขุมวิท หรือ ศาลาวัดใหญ่อินทาราม"
             />
-            <div>
-              <FieldLabel>บ้านเลขที่ / หมู่ / ถนน หรือชื่อสถานที่</FieldLabel>
-              <input
-                type="text"
-                placeholder="เช่น 99/1 ม.5 ถ.สุขุมวิท หรือ ศาลาวัดใหญ่อินทาราม"
-                value={f.venue}
-                onChange={(e) => setF('venue', e.target.value)}
-                style={inputStyle}
-              />
-            </div>
+            <FloorField value={f.floor} onChange={(v) => setF('floor', v)} />
           </div>
         )}
 
@@ -637,7 +634,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
         {step === 4 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div>
-              <FieldLabel>ชื่อผู้จอง</FieldLabel>
+              <FieldLabel>ชื่อผู้ติดต่อ</FieldLabel>
               <input
                 type="text"
                 placeholder="ชื่อ - นามสกุล"
@@ -656,16 +653,63 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 style={inputStyle}
               />
             </div>
-            <div>
-              <FieldLabel>ที่อยู่สำหรับออกใบเสนอราคา (ไม่บังคับ)</FieldLabel>
-              <textarea
-                placeholder="ชื่อบริษัท/บุคคล และที่อยู่ในใบเสนอราคา หากเว้นว่างจะใช้ที่อยู่สถานที่จัดงาน"
-                value={f.customerAddress}
-                onChange={(e) => setF('customerAddress', e.target.value)}
-                rows={2}
-                style={{ ...inputStyle, borderRadius: 22, padding: '14px 18px', resize: 'vertical' }}
-              ></textarea>
+            <div
+              onClick={() => setF('sameName', !f.sameName)}
+              style={cardStyle(f.sameName, { display: 'flex', alignItems: 'center', gap: 13, padding: '13px 16px' })}
+            >
+              <div style={checkStyle(f.sameName, 'var(--color-accent)')}>{f.sameName ? '✓' : ''}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>ออกใบเสนอราคาในนามบุคคล</div>
+                <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>ใช้ชื่อผู้ติดต่อเป็นชื่อในใบเสนอราคา</div>
+              </div>
             </div>
+            {!f.sameName && (
+              <>
+                <div>
+                  <FieldLabel>ชื่อบริษัท / ชื่อที่ต้องการให้ระบุในใบเสนอราคา</FieldLabel>
+                  <input
+                    type="text"
+                    placeholder="เช่น บริษัท ตัวอย่าง จำกัด"
+                    value={f.billingName}
+                    onChange={(e) => setF('billingName', e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>เลขประจำตัวผู้เสียภาษี (ไม่บังคับ)</FieldLabel>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="13 หลัก"
+                    value={f.taxId}
+                    onChange={(e) => setF('taxId', e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+              </>
+            )}
+            <div
+              onClick={() => setF('sameAddress', !f.sameAddress)}
+              style={cardStyle(f.sameAddress, { display: 'flex', alignItems: 'center', gap: 13, padding: '13px 16px' })}
+            >
+              <div style={checkStyle(f.sameAddress, 'var(--color-accent)')}>{f.sameAddress ? '✓' : ''}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>ที่อยู่ออกใบเสนอราคาเดียวกับสถานที่จัดงาน</div>
+                <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>ไม่ติ๊กถ้าต้องการระบุที่อยู่อื่นในใบเสนอราคา</div>
+              </div>
+            </div>
+            {!f.sameAddress && (
+              <AddressFields
+                form={f}
+                setForm={(nf) => {
+                  setForm(nf);
+                  setErr('');
+                }}
+                scope="billing"
+                lineLabel="ที่อยู่สำหรับออกใบเสนอราคา (บ้านเลขที่ / หมู่ / ถนน)"
+                linePlaceholder="เช่น 99/1 ม.5 ถ.สุขุมวิท"
+              />
+            )}
             <div>
               <FieldLabel>รายละเอียดเพิ่มเติม (ไม่บังคับ)</FieldLabel>
               <textarea

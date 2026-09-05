@@ -534,6 +534,9 @@ export interface MeritBooking {
   chatCustomerName?: string | null;
   salesName?: string | null;
   customerAddress?: string | null;
+  billingName?: string | null;
+  taxId?: string | null;
+  floor?: string | null;
   quotationDocNo?: string | null;
   quotationUrl?: string | null;
   quotationPublicUrl?: string | null;

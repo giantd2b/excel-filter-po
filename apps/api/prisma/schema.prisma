@@ -461,7 +461,15 @@ model Booking {
 
   customerName   String        @map("customer_name")
   phone          String
-  customerAddress String?      @map("customer_address") // billing address for the quotation (event address is venue/tambon/...)
+  customerAddress String?      @map("customer_address") // billing address for the quotation (composed from billing* below)
+  billingName     String?      @map("billing_name") // company/person the quotation is issued to (null = customerName)
+  taxId           String?      @map("tax_id")
+  billingLine     String?      @map("billing_line")
+  billingTambon   String?      @map("billing_tambon")
+  billingAmphoe   String?      @map("billing_amphoe")
+  billingProvince String?      @map("billing_province")
+  billingZip      String?      @map("billing_zip")
+  floor           String?      // floor of the venue (affects the price estimate)
   note           String?
   estimatedTotal Int           @map("estimated_total")
 

@@ -297,7 +297,10 @@ export default function BookingsPage() {
             <div key={b.id} className="bg-white rounded-xl ring-1 ring-slate-200 p-4 shadow-sm">
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
-                  <div className="font-semibold text-slate-800 truncate">{b.customerName}</div>
+                  <div className="font-semibold text-slate-800 truncate">{b.billingName || b.customerName}</div>
+                  {b.billingName && (
+                    <div className="text-xs text-slate-500">ผู้ติดต่อ: {b.customerName}{b.taxId ? ` · เลขผู้เสียภาษี ${b.taxId}` : ""}</div>
+                  )}
                   <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                     <span className="font-mono">{b.code}</span>
                     <span>·</span>
@@ -337,6 +340,13 @@ export default function BookingsPage() {
                 <div className="font-medium text-slate-700">
                   {b.packageName} · พระ {b.monks} รูป · {foodLine(b)}
                 </div>
+                {b.floor && (
+                  <div>
+                    <span className={`inline-flex text-[11px] px-2 py-0.5 rounded-full ${/ชั้น\s*1(\D|$)/.test(b.floor) ? "bg-slate-100 text-slate-600" : "bg-amber-50 text-amber-700 font-semibold"}`}>
+                      จัดงาน{b.floor}{/ชั้น\s*1(\D|$)/.test(b.floor) ? "" : " · ตรวจสอบราคา"}
+                    </span>
+                  </div>
+                )}
                 {b.customerAddress && (
                   <div className="text-xs text-slate-500">ที่อยู่ออกใบเสนอราคา: {b.customerAddress}</div>
                 )}

@@ -92,11 +92,48 @@ export class CreateBookingDto {
   @MaxLength(30)
   phone: string;
 
-  /** Billing address printed on the quotation (optional; defaults to the event address). */
+  /** Name the quotation is issued to (company or person); defaults to `name`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  billingName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  taxId?: string;
+
+  /** Billing address (full); defaults to the event address when absent. */
   @IsOptional()
   @IsString()
   @MaxLength(300)
-  customerAddress?: string;
+  billingLine?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  billingTambon?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  billingAmphoe?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  billingProvince?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  billingZip?: string;
+
+  /** Floor of the venue, e.g. "ชั้น 2" (affects the estimate). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  floor?: string;
 
   @IsOptional()
   @IsString()

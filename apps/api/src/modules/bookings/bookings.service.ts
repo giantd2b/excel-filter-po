@@ -217,7 +217,8 @@ export class BookingsService {
       b.note ? `หมายเหตุลูกค้า: ${b.note}` : '',
       b.budget ? `งบประมาณ: ${b.budget}` : '',
       `${b.source === 'chat_link' ? 'จองผ่านลิงก์จากแชต' : 'จองผ่านหน้าเว็บ'} ${b.code} · ราคาประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท`,
-      b.customerAddress ? `สถานที่จัดงาน: ${bookingAddress(b) || '-'}` : '',
+      `สถานที่จัดงาน: ${bookingAddress(b) || '-'}${b.floor ? ` · ${b.floor}` : ''}`,
+      b.billingName ? `ผู้ติดต่อ: ${b.customerName} ${b.phone}` : '',
       attributed
         ? `ช่องทาง: ${b.channel || '-'} · ลูกค้าแชต: ${b.chatCustomerName || '-'} (${b.customerId})${b.salesName ? ` · เซลล์: ${b.salesName}` : ''}`
         : '',
@@ -226,13 +227,19 @@ export class BookingsService {
     const res = await this.flowAccount.createQuotation({
       externalRef: b.code,
       customer: {
-        name: b.customerName,
+        name: b.billingName || b.customerName,
         phone: b.phone,
         address: b.customerAddress || bookingAddress(b),
-        contactPerson: b.chatCustomerName && b.chatCustomerName !== b.customerName ? b.chatCustomerName : undefined,
+        taxId: b.taxId && b.taxId.length === 13 ? b.taxId : undefined,
+        // company quotation → the booker is the contact; else the chat name when it differs
+        contactPerson: b.billingName
+          ? b.customerName
+          : b.chatCustomerName && b.chatCustomerName !== b.customerName
+            ? b.chatCustomerName
+            : undefined,
       },
       salesName: b.salesName || undefined,
-      project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}${b.customerAddress && b.venue ? ` · ${b.venue}` : ''}`,
+      project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}${b.venue ? ` · ${b.venue}` : ''}${b.floor ? ` (${b.floor})` : ''}`,
       vatRate: built.vatRate,
       // printed หมายเหตุ: the matched tier's remark template, else the package's (FA falls back to its default)
       remarkCode:
@@ -313,7 +320,22 @@ export class BookingsService {
         budget: dto.budget || null,
         customerName: dto.name.trim(),
         phone: phoneDigits,
-        customerAddress: dto.customerAddress?.trim() || null,
+        billingName: dto.billingName?.trim() && dto.billingName.trim() !== dto.name.trim() ? dto.billingName.trim() : null,
+        taxId: dto.taxId?.replace(/[^0-9]/g, '') || null,
+        billingLine: dto.billingLine?.trim() || null,
+        billingTambon: dto.billingTambon || null,
+        billingAmphoe: dto.billingAmphoe || null,
+        billingProvince: dto.billingProvince || null,
+        billingZip: dto.billingZip || null,
+        customerAddress:
+          bookingAddress({
+            venue: dto.billingLine?.trim() || null,
+            tambon: dto.billingTambon || null,
+            amphoe: dto.billingAmphoe || null,
+            province: dto.billingProvince || null,
+            zip: dto.billingZip || null,
+          }) || null,
+        floor: dto.floor?.trim() || null,
         note: dto.note || null,
         estimatedTotal: calc.total,
       },

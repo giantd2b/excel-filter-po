@@ -660,6 +660,7 @@ export function CustomerInfoPanel({
                 </div>
                 <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
                   {b.packageName} · {b.eventDate}
+                  {b.floor ? ` · ${b.floor}` : ""}
                   {b.source === "chat_link" ? " · ผ่านลิงก์จอง" : ""}
                   {b.salesName ? ` · ${b.salesName}` : ""}
                 </p>
