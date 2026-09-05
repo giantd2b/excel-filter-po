@@ -82,7 +82,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
       const result = await submitBooking(final, linkRef);
       onDone({
         code: result.code,
-        total: result.estimatedTotal,
+        total: result.grandTotal ?? result.estimatedTotal,
         quotationUrl: result.quotationUrl || null,
         quotationDocNo: result.quotationDocNo || null,
         rows: summary(final),
@@ -160,11 +160,26 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
               <span>{r.v}</span>
             </div>
           ))}
+          {f.wantVat && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', fontSize: 13.5, color: 'var(--color-neutral-700)' }}>
+                <span>ราคาก่อนภาษี</span>
+                <span>{baht(c.total)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', fontSize: 13.5, color: 'var(--color-neutral-700)' }}>
+                <span>ภาษีมูลค่าเพิ่ม 7%</span>
+                <span>+{baht(c.vat)}</span>
+              </div>
+            </>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8, paddingTop: 10, borderTop: '1.5px solid var(--color-neutral-300)' }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>ราคาประเมิน</span>
-            <span style={{ ...charm, fontSize: 26, color: 'var(--color-accent-700)' }}>{baht(c.total)}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{f.wantVat ? 'รวมทั้งสิ้น (รวม VAT)' : 'ราคาประเมิน'}</span>
+            <span style={{ ...charm, fontSize: 26, color: 'var(--color-accent-700)' }}>{baht(f.wantVat ? c.grandTotal : c.total)}</span>
           </div>
-          <div style={{ fontSize: 11.5, color: 'var(--color-neutral-600)', marginTop: 4 }}>ราคาก่อนภาษีมูลค่าเพิ่ม ใบเสนอราคาจริงจะแสดงรายละเอียดทุกบรรทัด</div>
+          <div style={{ fontSize: 11.5, color: 'var(--color-neutral-600)', marginTop: 4 }}>
+            {f.wantVat ? 'รวมภาษีมูลค่าเพิ่ม 7% แล้ว ' : 'ราคาไม่รวมภาษีมูลค่าเพิ่ม (เลือกได้ในส่วนข้อมูลสำหรับออกใบเสนอราคา) '}
+            ใบเสนอราคาจริงจะแสดงรายละเอียดทุกบรรทัด
+          </div>
         </div>
       </div>
 
@@ -183,7 +198,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
         <SectionHead>ข้อมูลสำหรับออกใบเสนอราคา</SectionHead>
         <ToggleCard
           on={f.sameName}
-          onClick={() => setF('sameName', !f.sameName)}
+          onClick={() => setForm({ ...f, sameName: !f.sameName, wantVat: f.sameName ? true : f.wantVat })}
           title="ออกใบเสนอราคาในนามบุคคล"
           sub="ใช้ชื่อผู้ติดต่อเป็นชื่อในใบเสนอราคา · ไม่ติ๊กถ้าออกในนามบริษัท"
         />
@@ -199,6 +214,12 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
             </div>
           </>
         )}
+        <ToggleCard
+          on={f.wantVat}
+          onClick={() => setF('wantVat', !f.wantVat)}
+          title="ต้องการใบกำกับภาษี (คิด VAT 7%)"
+          sub={f.wantVat ? 'ราคาจะบวกภาษีมูลค่าเพิ่ม 7% และใบเสนอราคาแสดง VAT' : 'ไม่ติ๊ก = ราคาไม่รวม VAT ไม่ออกใบกำกับภาษี'}
+        />
         <AddressFields
           form={f}
           setForm={setAll}

@@ -61,7 +61,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
         const result = await submitBooking(final, linkRef);
         onDone({
           code: result.code,
-          total: result.estimatedTotal,
+          total: result.grandTotal ?? result.estimatedTotal,
           quotationUrl: result.quotationUrl || null,
           quotationDocNo: result.quotationDocNo || null,
           rows: summary(final),
@@ -654,7 +654,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
               />
             </div>
             <div
-              onClick={() => setF('sameName', !f.sameName)}
+              onClick={() => setForm({ ...f, sameName: !f.sameName, wantVat: f.sameName ? true : f.wantVat })}
               style={cardStyle(f.sameName, { display: 'flex', alignItems: 'center', gap: 13, padding: '13px 16px' })}
             >
               <div style={checkStyle(f.sameName, 'var(--color-accent)')}>{f.sameName ? '✓' : ''}</div>
@@ -688,6 +688,18 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 </div>
               </>
             )}
+            <div
+              onClick={() => setF('wantVat', !f.wantVat)}
+              style={cardStyle(f.wantVat, { display: 'flex', alignItems: 'center', gap: 13, padding: '13px 16px' })}
+            >
+              <div style={checkStyle(f.wantVat, 'var(--color-accent)')}>{f.wantVat ? '✓' : ''}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>ต้องการใบกำกับภาษี (คิด VAT 7%)</div>
+                <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>
+                  {f.wantVat ? 'ราคาจะบวกภาษีมูลค่าเพิ่ม 7% และใบเสนอราคาแสดง VAT' : 'ไม่ติ๊ก = ราคาไม่รวม VAT ไม่ออกใบกำกับภาษี'}
+                </div>
+              </div>
+            </div>
             <div
               onClick={() => setF('sameAddress', !f.sameAddress)}
               style={cardStyle(f.sameAddress, { display: 'flex', alignItems: 'center', gap: 13, padding: '13px 16px' })}
@@ -767,15 +779,20 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                   borderTop: '2px solid var(--color-accent-300)',
                 }}
               >
-                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>ราคาประเมิน</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{f.wantVat ? 'รวมทั้งสิ้น (รวม VAT)' : 'ราคาประเมิน'}</div>
                 <div style={{ ...charm, fontSize: 30, color: 'var(--color-accent-700)', lineHeight: 1.25 }}>
-                  {baht(c.total)} บาท
+                  {baht(f.wantVat ? c.grandTotal : c.total)} บาท
                 </div>
               </div>
+              {f.wantVat && (
+                <div style={{ fontSize: 13, color: 'var(--color-neutral-700)', marginTop: 6 }}>
+                  ราคาก่อนภาษี {baht(c.total)} + ภาษีมูลค่าเพิ่ม 7% {baht(c.vat)} บาท
+                </div>
+              )}
               <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', marginTop: 8, lineHeight: 1.6 }}>
-                {c.pkg.kind === 'full'
-                  ? 'ราคาประเมินยังไม่รวมภาษีมูลค่าเพิ่ม 7% ทีมงานจะยืนยันราคาสุทธิอีกครั้งทาง LINE'
-                  : 'ราคาประเมินจากตัวเลือกที่ท่านระบุ ทีมงานจะยืนยันอีกครั้งทาง LINE'}
+                {f.wantVat
+                  ? 'ราคารวมภาษีมูลค่าเพิ่ม 7% แล้ว ทีมงานจะยืนยันราคาสุทธิอีกครั้ง'
+                  : 'ราคาประเมินไม่รวมภาษีมูลค่าเพิ่ม (ติ๊ก "ต้องการใบกำกับภาษี" ด้านบนหากต้องการ) ทีมงานจะยืนยันราคาสุทธิอีกครั้ง'}
               </div>
             </div>
 

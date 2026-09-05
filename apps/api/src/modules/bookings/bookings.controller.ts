@@ -24,9 +24,12 @@ export class BookingsController {
   @Post()
   async create(@Body() dto: CreateBookingDto) {
     const booking = await this.bookingsService.create(dto);
+    const vatAmount = booking.wantVat ? Math.round(booking.estimatedTotal * 0.07) : 0;
     return {
       code: booking.code,
       estimatedTotal: booking.estimatedTotal,
+      vatAmount,
+      grandTotal: booking.estimatedTotal + vatAmount,
       packageName: booking.packageName,
       // public read-only quotation link (null when flowaccount-app was unreachable)
       quotationUrl: booking.quotationPublicUrl || null,

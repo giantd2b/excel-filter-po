@@ -32,6 +32,8 @@ export interface BookingForm {
   sameName: boolean;
   billingName: string;
   taxId: string;
+  /** customer wants a tax invoice → 7% VAT added on top of the estimate */
+  wantVat: boolean;
   /** billing address (full) */
   billingLine: string;
   billingAreaQuery: string;
@@ -69,6 +71,7 @@ export const initialForm: BookingForm = {
   sameName: true,
   billingName: '',
   taxId: '',
+  wantVat: false,
   billingLine: '',
   billingAreaQuery: '',
   billingTambon: '',
@@ -156,9 +159,15 @@ export function tentRecommendation(f: BookingForm): string | null {
 
 export interface CalcResult {
   pkg: Pkg;
+  /** estimate before VAT */
   total: number;
+  /** 7% of total when the customer wants a tax invoice, else 0 */
+  vat: number;
+  grandTotal: number;
   rows: { k: string; v: string }[];
 }
+
+export const VAT_RATE = 0.07;
 
 export function calc(f: BookingForm): CalcResult {
   const pkg = pkgById(f.pkg);
@@ -180,7 +189,8 @@ export function calc(f: BookingForm): CalcResult {
     total -= DISCOUNTS.fiveMonks;
     rows.push({ k: 'พระ 5 รูป', v: '−' + baht(DISCOUNTS.fiveMonks) });
   }
-  return { pkg, total, rows };
+  const vat = f.wantVat ? Math.round(total * VAT_RATE) : 0;
+  return { pkg, total, vat, grandTotal: total + vat, rows };
 }
 
 export function summary(f: BookingForm): { k: string; v: string }[] {
@@ -191,6 +201,7 @@ export function summary(f: BookingForm): { k: string; v: string }[] {
     { k: 'สถานที่', v: `${addressLine(f)}${f.floor ? ` (${f.floor})` : ''}` },
     ...(f.billingName && f.billingName !== f.name ? [{ k: 'ออกใบเสนอราคาในนาม', v: f.billingName }] : []),
     { k: 'ที่อยู่ออกใบเสนอราคา', v: f.sameAddress ? 'ที่อยู่เดียวกับสถานที่จัดงาน' : billingAddressLine(f) },
+    { k: 'ใบกำกับภาษี', v: f.wantVat ? 'ต้องการ (คิด VAT 7%)' : 'ไม่ต้องการ (ไม่รวม VAT)' },
     { k: 'แพ็กเกจ', v: c.pkg.name },
     { k: 'พระสงฆ์', v: f.monks + ' รูป' },
   ];

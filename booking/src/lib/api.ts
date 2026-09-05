@@ -8,6 +8,9 @@ export interface BookingResult {
   /** public read-only quotation link from flowaccount-app (null when it could not be created) */
   quotationUrl?: string | null;
   quotationDocNo?: string | null;
+  /** VAT (7%) and total including VAT when the customer asked for a tax invoice */
+  vatAmount?: number;
+  grandTotal?: number;
 }
 
 /** Identity behind a /booking/?ref=<token> link created by sales in the CRM inbox. */
@@ -23,6 +26,8 @@ export interface BookingPreset {
   selfTransport: boolean;
   addons: string[];
   note?: string | null;
+  /** true/false fixed by sales, null = customer decides */
+  wantVat?: boolean | null;
 }
 
 export interface BookingLinkInfo {
@@ -66,6 +71,7 @@ export async function submitBooking(f: BookingForm, ref?: string | null): Promis
     budget: f.budget || undefined,
     name: f.name,
     phone: f.phone,
+    wantVat: f.wantVat,
     billingName: f.billingName.trim() || undefined,
     taxId: f.taxId.trim() || undefined,
     billingLine: f.billingLine.trim() || undefined,

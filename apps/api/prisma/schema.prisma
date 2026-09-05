@@ -470,6 +470,7 @@ model Booking {
   billingProvince String?      @map("billing_province")
   billingZip      String?      @map("billing_zip")
   floor           String?      // floor of the venue (affects the price estimate)
+  wantVat         Boolean?     @map("want_vat") // customer wants a tax invoice → quotation VAT 7%; null = not asked (recipe default)
   note           String?
   estimatedTotal Int           @map("estimated_total")
 

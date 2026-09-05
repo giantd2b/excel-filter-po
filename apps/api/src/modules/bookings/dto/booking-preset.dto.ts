@@ -61,6 +61,11 @@ export class BookingPresetDto {
   @IsString({ each: true })
   addons: string[];
 
+  /** VAT fixed by sales (true = 7%, false = none); omit to let the customer choose. */
+  @IsOptional()
+  @IsBoolean()
+  wantVat?: boolean;
+
   /** Message from sales shown to the customer above the summary. */
   @IsOptional()
   @IsString()

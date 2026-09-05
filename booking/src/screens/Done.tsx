@@ -108,7 +108,7 @@ export default function Done({ saved, onHome, chatChannel }: Props) {
             borderTop: '2px solid var(--color-accent-300)',
           }}
         >
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>ราคาประเมิน</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{saved.f.wantVat ? 'รวมทั้งสิ้น (รวม VAT 7%)' : 'ราคาประเมิน (ไม่รวม VAT)'}</div>
           <div style={{ ...charm, fontSize: 28, color: 'var(--color-accent-700)', lineHeight: 1.25 }}>
             {baht(saved.total)} บาท
           </div>

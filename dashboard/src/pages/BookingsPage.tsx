@@ -356,6 +356,13 @@ export default function BookingsPage() {
                 <div className="font-medium text-slate-700">
                   {b.packageName} · พระ {b.monks} รูป · {foodLine(b)}
                 </div>
+                {typeof b.wantVat === "boolean" && (
+                  <div>
+                    <span className={`inline-flex text-[11px] px-2 py-0.5 rounded-full ${b.wantVat ? "bg-blue-50 text-blue-700 font-semibold" : "bg-slate-100 text-slate-600"}`}>
+                      {b.wantVat ? `รับ VAT 7% · รวม ${Math.round(b.estimatedTotal * 1.07).toLocaleString("th-TH")} บาท` : "ไม่รับ VAT"}
+                    </span>
+                  </div>
+                )}
                 {b.floor && (
                   <div>
                     <span className={`inline-flex text-[11px] px-2 py-0.5 rounded-full ${/ชั้น\s*1(\D|$)/.test(b.floor) ? "bg-slate-100 text-slate-600" : "bg-amber-50 text-amber-700 font-semibold"}`}>

@@ -12,6 +12,7 @@ import {
   BOOKING_ADDONS,
   derivePricing,
   estimateBooking,
+  VAT_RATE,
   pickRemarkCode,
   DEFAULT_PRICING,
   type FaRecipeConfig,
@@ -230,6 +231,7 @@ export class BookingsService {
       b.budget ? `งบประมาณ: ${b.budget}` : '',
       `${b.source === 'chat_link' ? 'จองผ่านลิงก์จากแชต' : 'จองผ่านหน้าเว็บ'} ${b.code} · ราคาประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท`,
       `สถานที่จัดงาน: ${bookingAddress(b) || '-'}${b.floor ? ` · ${b.floor}` : ''}`,
+      typeof b.wantVat === 'boolean' ? (b.wantVat ? 'ลูกค้าต้องการใบกำกับภาษี (VAT 7%)' : 'ลูกค้าไม่รับ VAT') : '',
       b.billingName ? `ผู้ติดต่อ: ${b.customerName} ${b.phone}` : '',
       attributed
         ? `ช่องทาง: ${b.channel || '-'} · ลูกค้าแชต: ${b.chatCustomerName || '-'} (${b.customerId})${b.salesName ? ` · เซลล์: ${b.salesName}` : ''}`
@@ -252,7 +254,8 @@ export class BookingsService {
       },
       salesName: b.salesName || undefined,
       project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}${b.venue ? ` · ${b.venue}` : ''}${b.floor ? ` (${b.floor})` : ''}`,
-      vatRate: built.vatRate,
+      // the customer's tax-invoice choice wins over the recipe default
+      vatRate: typeof b.wantVat === 'boolean' ? (b.wantVat ? 7 : 0) : built.vatRate,
       // printed หมายเหตุ: the matched tier's remark template, else the package's (FA falls back to its default)
       remarkCode:
         (config.packages[b.packageId] &&
@@ -358,6 +361,7 @@ export class BookingsService {
             zip: dto.billingZip || null,
           }) || null,
         floor: dto.floor?.trim() || null,
+        wantVat: typeof dto.wantVat === 'boolean' ? dto.wantVat : null,
         note: dto.note || null,
         estimatedTotal: calc.total,
       },
@@ -581,7 +585,9 @@ export class BookingsService {
       `ใบเสนอราคา ${b.quotationDocNo} สำหรับ${b.occasion} วันที่ ${fmtThaiDate(b.eventDate)} พร้อมแล้วค่ะ`,
       'เปิดดูหรือบันทึกเป็น PDF ได้ที่ลิงก์นี้ (เก็บไว้ในแชตนี้ได้เลย)',
       b.quotationPublicUrl,
-      `ยอดประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท · การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ`,
+      b.wantVat
+        ? `ยอดประเมิน ${Math.round(b.estimatedTotal * (1 + VAT_RATE)).toLocaleString('th-TH')} บาท (รวม VAT 7%) · การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ`
+        : `ยอดประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท (ไม่รวม VAT) · การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ`,
     ].join('\n');
 
     const res = await this.messages.sendMessage({

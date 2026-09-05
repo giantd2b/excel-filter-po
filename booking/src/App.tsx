@@ -59,6 +59,7 @@ export default function App() {
               occasion: p.occasion || f.occasion,
               date: p.eventDate || f.date,
               time: p.timeSlot || f.time,
+              wantVat: p.wantVat ?? f.wantVat,
             }
           : {}),
       }));

@@ -537,6 +537,7 @@ export interface MeritBooking {
   billingName?: string | null;
   taxId?: string | null;
   floor?: string | null;
+  wantVat?: boolean | null;
   quotationDocNo?: string | null;
   quotationSentAt?: string | null;
   quotationSendStatus?: "sent" | "sending" | "failed" | null;
@@ -680,10 +681,14 @@ export interface BookingPreset {
   selfTransport: boolean;
   addons: string[];
   note?: string;
+  /** true/false fixed by sales; omitted = customer chooses */
+  wantVat?: boolean | null;
 }
 
 export interface BookingEstimate {
   total: number;
+  vatAmount: number;
+  grandTotal: number;
   packageName: string;
   rows: { k: string; v: string }[];
 }

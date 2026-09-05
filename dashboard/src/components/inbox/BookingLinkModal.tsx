@@ -53,6 +53,7 @@ const DEFAULT_PRESET: BookingPreset = {
   selfTransport: false,
   addons: [],
   note: "",
+  wantVat: null,
 };
 
 interface Props {
@@ -157,7 +158,12 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
     if (mode === "preset" && link.preset) {
       const p = link.preset;
       const food = hasFood ? (p.foodMode === "table" ? `โต๊ะจีน ${p.tables} โต๊ะ` : `บุฟเฟต์ ${p.guests} ท่าน`) : "อาหารถวายพระ";
-      const price = link.estimatedTotal != null ? `ราคาประเมิน ${link.estimatedTotal.toLocaleString("th-TH")} บาท` : "";
+      const price =
+        link.estimatedTotal != null
+          ? p.wantVat
+            ? `ราคาประเมิน ${Math.round(link.estimatedTotal * 1.07).toLocaleString("th-TH")} บาท (รวม VAT 7%)`
+            : `ราคาประเมิน ${link.estimatedTotal.toLocaleString("th-TH")} บาท${p.wantVat === false ? " (ไม่รวม VAT)" : ""}`
+          : "";
       return [
         `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${link.packageName} · พระ ${p.monks} รูป · ${food}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ""}${p.timeSlot ? ` (${p.timeSlot})` : ""}`,
         price,
@@ -316,6 +322,18 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
               </div>
             </div>
             <label className="block">
+              <span className={lbl}>ใบกำกับภาษี (VAT 7%)</span>
+              <select
+                value={preset.wantVat === true ? "yes" : preset.wantVat === false ? "no" : ""}
+                onChange={(e) => set("wantVat", e.target.value === "yes" ? true : e.target.value === "no" ? false : null)}
+                className={field}
+              >
+                <option value="">ให้ลูกค้าเลือกเอง</option>
+                <option value="yes">รับ VAT — ราคารวมภาษี 7% / ออกใบกำกับภาษี</option>
+                <option value="no">ไม่รับ VAT — ราคาไม่รวมภาษี</option>
+              </select>
+            </label>
+            <label className="block">
               <span className={lbl}>ข้อความถึงลูกค้า (แสดงบนหน้าจอง ไม่บังคับ)</span>
               <input value={preset.note || ""} onChange={(e) => set("note", e.target.value)} className={field} placeholder="เช่น ราคานี้รวมเต้นท์ใหญ่ 1 หลังแล้วค่ะ" />
             </label>
@@ -331,7 +349,7 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                   ))}
                   <div className="flex justify-between items-baseline mt-1 pt-1.5 border-t border-slate-200">
                     <span className="font-semibold text-slate-700">ราคาประเมิน {estimating && <Loader2 className="inline w-3 h-3 animate-spin ml-1" />}</span>
-                    <span className="font-bold text-slate-800 tabular-nums">฿{estimate.total.toLocaleString("th-TH")}</span>
+                    <span className="font-bold text-slate-800 tabular-nums">฿{(preset.wantVat ? estimate.grandTotal : estimate.total).toLocaleString("th-TH")}{preset.wantVat ? " รวม VAT" : ""}</span>
                   </div>
                 </>
               ) : (
@@ -418,5 +436,6 @@ function cleanPreset(p: BookingPreset): BookingPreset {
     eventDate: p.eventDate || undefined,
     timeSlot: p.timeSlot || undefined,
     note: p.note?.trim() || undefined,
+    wantVat: typeof p.wantVat === "boolean" ? p.wantVat : undefined,
   };
 }

@@ -674,10 +674,12 @@ export function calcEstimatedTotal(
 }
 
 /** Estimated total plus the price lines the booking page shows (mirrors booking/src/lib/calc.ts `calc`). */
+export const VAT_RATE = 0.07;
+
 export function estimateBooking(
-  input: Parameters<typeof calcEstimatedTotal>[0],
+  input: Parameters<typeof calcEstimatedTotal>[0] & { wantVat?: boolean | null },
   pricing: PricingConfig = DEFAULT_PRICING,
-): { total: number; packageName: string; rows: { k: string; v: string }[] } | null {
+): { total: number; vatAmount: number; grandTotal: number; packageName: string; rows: { k: string; v: string }[] } | null {
   const calc = calcEstimatedTotal(input, pricing);
   if (!calc) return null;
   const pp = pricing.packages[input.packageId];
@@ -696,5 +698,7 @@ export function estimateBooking(
   }
   if (input.selfTransport) rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: `−${fmt(pricing.selfTransportDiscount)}` });
   if (input.monks === 5) rows.push({ k: 'พระ 5 รูป', v: `−${fmt(pricing.fiveMonksDiscount)}` });
-  return { total: calc.total, packageName: calc.pkg.name, rows };
+  const vatAmount = input.wantVat ? Math.round(calc.total * VAT_RATE) : 0;
+  if (input.wantVat) rows.push({ k: 'ภาษีมูลค่าเพิ่ม 7%', v: `+${fmt(vatAmount)}` });
+  return { total: calc.total, vatAmount, grandTotal: calc.total + vatAmount, packageName: calc.pkg.name, rows };
 }

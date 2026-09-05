@@ -129,6 +129,11 @@ export class CreateBookingDto {
   @MaxLength(10)
   billingZip?: string;
 
+  /** Customer wants a tax invoice (VAT 7% on the quotation). */
+  @IsOptional()
+  @IsBoolean()
+  wantVat?: boolean;
+
   /** Floor of the venue, e.g. "ชั้น 2" (affects the estimate). */
   @IsOptional()
   @IsString()
