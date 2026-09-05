@@ -253,6 +253,8 @@ export class BookingsService {
             ? b.chatCustomerName
             : undefined,
       },
+      // company quotation → company bank account template on the document; else the personal one
+      customerType: b.billingName || (b.taxId && b.taxId.startsWith('0') && b.taxId.length === 13) ? 'COMPANY' : 'PERSON',
       salesName: b.salesName || undefined,
       project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}${b.venue ? ` · ${b.venue}` : ''}${b.floor ? ` (${b.floor})` : ''}`,
       // the customer's tax-invoice choice wins over the recipe default
