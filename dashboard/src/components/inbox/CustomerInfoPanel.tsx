@@ -76,7 +76,7 @@ export function CustomerInfoPanel({
   const [jobs, setJobs] = useState<any[]>([]);
   const [jobsLoading, setJobsLoading] = useState(false);
 
-  // Quotations (FlowAccount)
+  // Quotations (IRIS Quotation)
   const [bookings, setBookings] = useState<MeritBooking[]>([]);
   const [bookingLinks, setBookingLinks] = useState<BookingLink[]>([]);
   const [showBookingLink, setShowBookingLink] = useState(false);
@@ -727,7 +727,7 @@ export function CustomerInfoPanel({
         />
       )}
 
-      {/* Quotations (FlowAccount) */}
+      {/* Quotations (IRIS Quotation) */}
       {(quotations.length > 0 || quotationsLoading) && (
         <div className="px-4 py-3.5 border-b border-slate-100/80">
           <div className="flex items-center gap-1.5 mb-2.5">

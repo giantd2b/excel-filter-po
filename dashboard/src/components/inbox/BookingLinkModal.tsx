@@ -364,7 +364,7 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                 </>
               ) : (
                 <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> กำลังคำนวณราคาจาก FlowAccount…
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> กำลังคำนวณราคาจาก IRIS Quotation…
                 </div>
               )}
             </div>

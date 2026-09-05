@@ -210,7 +210,7 @@ export default function BookingsPage() {
             className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg ring-1 text-sm font-medium ${
               showSettings ? "bg-brand-600 text-white ring-brand-600" : "bg-white ring-slate-200 text-slate-600 hover:bg-slate-50"
             }`}
-            title="ผูกแพ็กเกจกับสินค้าใน FlowAccount app"
+            title="ผูกแพ็กเกจกับสินค้าใน IRIS Quotation"
           >
             <Settings2 className="w-4 h-4" />
             ตั้งค่าใบเสนอราคา
@@ -231,7 +231,7 @@ export default function BookingsPage() {
           <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
             {([
               ["pricing", "ราคาแพ็กเกจ"],
-              ["recipes", "ผูกสินค้า FlowAccount"],
+              ["recipes", "ผูกสินค้า IRIS Quotation"],
             ] as const).map(([key, label]) => (
               <button
                 key={key}
@@ -411,7 +411,7 @@ export default function BookingsPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
-                      title="เปิดใบเสนอราคาใน FlowAccount app"
+                      title="เปิดใบเสนอราคาใน IRIS Quotation"
                     >
                       <FileText className="w-3.5 h-3.5" />
                       {b.quotationDocNo}
@@ -474,7 +474,7 @@ export default function BookingsPage() {
                       onClick={() => createQuote(b)}
                       disabled={busyId === b.id}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full ring-1 ring-brand-200 text-brand-700 text-xs font-semibold hover:bg-brand-50 disabled:opacity-50"
-                      title="สร้างใบเสนอราคาใน FlowAccount app"
+                      title="สร้างใบเสนอราคาใน IRIS Quotation"
                     >
                       {busyId === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                       ใบเสนอราคา

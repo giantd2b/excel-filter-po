@@ -76,7 +76,7 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
     return (
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={selectCls}>
         <option value="">{allowEmpty ? emptyLabel || "(ไม่ใช้ — ส่งเป็นข้อความ)" : "เลือกสินค้า…"}</option>
-        {value && !known && <option value={value}>{value} (ไม่พบใน FlowAccount)</option>}
+        {value && !known && <option value={value}>{value} (ไม่พบใน IRIS Quotation)</option>}
         {options.map((p) => (
           <option key={p.code!} value={p.code!}>{p.code} · {p.name}</option>
         ))}
@@ -194,11 +194,11 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
       {/* header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="font-semibold text-slate-800">ผูกแพ็กเกจกับสินค้าใน FlowAccount app</h2>
+          <h2 className="font-semibold text-slate-800">ผูกแพ็กเกจกับสินค้าใน IRIS Quotation</h2>
           <p className="text-xs text-slate-500 mt-0.5">
             แต่ละแพ็กเกจของหน้า /booking จะกลายเป็นบรรทัดในใบเสนอราคาตามที่ผูกไว้ · ราคาและข้อความมาจากสินค้าใน{" "}
             <a href={`${data.appUrl}/products`} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline inline-flex items-center gap-0.5">
-              FlowAccount app <ExternalLink className="w-3 h-3" />
+              IRIS Quotation <ExternalLink className="w-3 h-3" />
             </a>
           </p>
         </div>

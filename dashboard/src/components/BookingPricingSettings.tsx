@@ -52,11 +52,11 @@ export default function BookingPricingSettings({ onClose }: { onClose?: () => vo
     <div className="bg-white rounded-xl ring-1 ring-slate-200 p-5 space-y-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="font-semibold text-slate-800">ราคาแพ็กเกจ (จาก FlowAccount app)</h2>
+          <h2 className="font-semibold text-slate-800">ราคาแพ็กเกจ (จาก IRIS Quotation)</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            ราคาทั้งหมดคำนวณจากสินค้าใน FlowAccount app ตามการผูกในแท็บ "ผูกสินค้า" · แก้ราคาได้ที่{" "}
+            ราคาทั้งหมดคำนวณจากสินค้าใน IRIS Quotation ตามการผูกในแท็บ "ผูกสินค้า" · แก้ราคาได้ที่{" "}
             <a href={productsUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline inline-flex items-center gap-0.5">
-              หน้าสินค้า FlowAccount <ExternalLink className="w-3 h-3" />
+              หน้าสินค้า IRIS Quotation <ExternalLink className="w-3 h-3" />
             </a>{" "}
             แล้วกดรีเฟรช · ราคาขั้น = พิธีสงฆ์ของขั้นนั้น + อาหาร (สูตรต่อหัว / โต๊ะจีน × โต๊ะ)
           </p>
@@ -72,7 +72,7 @@ export default function BookingPricingSettings({ onClose }: { onClose?: () => vo
             </button>
           )}
           <button onClick={refresh} disabled={refreshing} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50">
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> รีเฟรชจาก FlowAccount
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> รีเฟรชจาก IRIS Quotation
           </button>
         </div>
       </div>
@@ -80,14 +80,14 @@ export default function BookingPricingSettings({ onClose }: { onClose?: () => vo
       {(data.catalogError || error) && (
         <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 ring-1 ring-amber-200 rounded-lg px-3 py-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{error || `ดึงจาก FlowAccount ไม่ได้ (${data.catalogError}) — แสดงจากสำเนาล่าสุด`}</span>
+          <span>{error || `ดึงจาก IRIS Quotation ไม่ได้ (${data.catalogError}) — แสดงจากสำเนาล่าสุด`}</span>
         </div>
       )}
       {data.missingCodes.length > 0 && (
         <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 ring-1 ring-red-200 rounded-lg px-3 py-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>
-            ไม่พบสินค้าใน FlowAccount: <span className="font-mono">{data.missingCodes.join(", ")}</span> — ขั้นที่ใช้สินค้าเหล่านี้จะแสดงราคาสำรองจากโค้ด แก้ในแท็บ "ผูกสินค้า" หรือสร้างสินค้าให้ตรงรหัส
+            ไม่พบสินค้าใน IRIS Quotation: <span className="font-mono">{data.missingCodes.join(", ")}</span> — ขั้นที่ใช้สินค้าเหล่านี้จะแสดงราคาสำรองจากโค้ด แก้ในแท็บ "ผูกสินค้า" หรือสร้างสินค้าให้ตรงรหัส
           </span>
         </div>
       )}
