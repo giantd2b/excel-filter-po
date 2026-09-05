@@ -141,6 +141,9 @@ export default function BookingCard({
       <View style={styles.footer}>
         <View>
           <Text style={styles.total}>{formatBaht(b.estimatedTotal)}</Text>
+          {b.travelFee ? (
+            <Text style={styles.travel}>รวมค่าเดินทาง {b.travelArea || ''} {formatBaht(b.travelFee)}</Text>
+          ) : null}
           <Text style={styles.created}>จองเมื่อ {formatDateTime(b.createdAt)}</Text>
         </View>
       </View>
@@ -245,6 +248,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f1f5f9',
   },
   total: { fontSize: 16, fontWeight: '800', color: '#4f46e5' },
+  travel: { fontSize: 11, color: '#b45309', marginTop: 2 },
   created: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   pill: {

@@ -181,6 +181,23 @@ export default function BookingPricingScreen() {
       </View>
 
       <View style={styles.card}>
+        <Text style={styles.pkgName}>ค่าเดินทางตามอำเภอของสถานที่จัดงาน</Text>
+        {Object.keys(data.travelFees).length === 0 ? (
+          <Text style={[styles.muted, { fontStyle: 'italic' }]}>ยังไม่ได้ตั้งค่า</Text>
+        ) : (
+          Object.entries(data.travelFees)
+            .sort((a, b) => a[0].localeCompare(b[0], 'th'))
+            .map(([area, fee]) => (
+              <View key={area} style={styles.line}>
+                <Text style={styles.lineKey}>{area}</Text>
+                <Text style={styles.lineVal}>+{fmt(fee)}</Text>
+              </View>
+            ))
+        )}
+        <Text style={styles.hint}>บวกเข้าราคาประเมินและเป็นรายการในใบเสนอราคา · แก้ได้ที่ dashboard → ตั้งค่าใบเสนอราคา → ค่าเดินทาง</Text>
+      </View>
+
+      <View style={styles.card}>
         <Text style={styles.pkgName}>ส่วนลด (จากสินค้าพิธีสงฆ์)</Text>
         <View style={styles.line}>
           <Text style={styles.lineKey}>นิมนต์และรับ-ส่งพระเอง</Text>

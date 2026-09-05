@@ -43,6 +43,9 @@ export interface MeritBooking {
   wantVat?: boolean | null;
   depositAmount?: number | null;
   depositManual?: boolean;
+  /** travel fee of the venue district, already included in estimatedTotal */
+  travelFee?: number;
+  travelArea?: string | null;
   quotationDocNo?: string | null;
   quotationUrl?: string | null;
   quotationPublicUrl?: string | null;
@@ -68,6 +71,9 @@ export interface BookingPreset {
   wantVat?: boolean | null;
   /** admin's manual deposit (บาท); null/omitted = FA's stepped rule on the food cost */
   depositAmount?: number | null;
+  /** district / province of the event venue when known — only drives the travel fee in the estimate */
+  amphoe?: string;
+  province?: string;
 }
 
 export interface BookingEstimate {
@@ -123,6 +129,8 @@ export interface PricingAddon {
 export interface PricingResponse {
   packages: PricingPackage[];
   addons: PricingAddon[];
+  /** travel fee by อำเภอ/เขต of the event venue (from the travel-fee settings) */
+  travelFees: Record<string, number>;
 }
 
 // Full payload of GET /bookings/pricing (read-only price view, mirrors dashboard BookingPricingSettings)
@@ -149,6 +157,7 @@ export interface PricingSettings {
   catalogError?: string | null;
   missingCodes: string[];
   usedCodes: Record<string, { buffet?: Record<number, string>; table?: Record<number, string>; base?: string }>;
+  travelFees: Record<string, number>;
   appUrl?: string;
 }
 
@@ -183,6 +192,8 @@ export function cleanPreset(p: BookingPreset): BookingPreset {
     note: p.note?.trim() || undefined,
     wantVat: typeof p.wantVat === 'boolean' ? p.wantVat : undefined,
     depositAmount: typeof p.depositAmount === 'number' ? p.depositAmount : undefined,
+    amphoe: p.amphoe?.trim() || undefined,
+    province: p.province?.trim() || undefined,
   };
 }
 
@@ -249,9 +260,12 @@ export async function getCustomerBookings(customerId: string): Promise<CustomerB
   return { bookings: arr(data?.bookings), links: arr(data?.links) };
 }
 
+const feeMap = (v: unknown): Record<string, number> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, number>) : {};
+
 export async function getBookingPricing(): Promise<PricingResponse> {
   const { data } = await api.get('/bookings/pricing');
-  return { packages: arr(data?.packages), addons: arr(data?.addons) };
+  return { packages: arr(data?.packages), addons: arr(data?.addons), travelFees: feeMap(data?.travelFees) };
 }
 
 function shapePricingSettings(data: any): PricingSettings {
@@ -269,6 +283,7 @@ function shapePricingSettings(data: any): PricingSettings {
     catalogError: data?.catalogError ?? null,
     missingCodes: arr(data?.missingCodes),
     usedCodes: data?.usedCodes || {},
+    travelFees: feeMap(data?.travelFees),
     appUrl: data?.appUrl,
   };
 }

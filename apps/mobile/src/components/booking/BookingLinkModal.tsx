@@ -62,6 +62,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
   const [mode, setMode] = useState<Mode>('preset');
   const [packages, setPackages] = useState<PricingPackage[]>(FALLBACK_PACKAGES);
   const [addons, setAddons] = useState<PricingAddon[]>(FALLBACK_ADDONS);
+  const [travelFees, setTravelFees] = useState<Record<string, number>>({});
   const [preset, setPreset] = useState<BookingPreset>(DEFAULT_PRESET);
   const [estimate, setEstimate] = useState<BookingEstimate | null>(null);
   const [estimating, setEstimating] = useState(false);
@@ -96,6 +97,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
       .then((d) => {
         if (d.packages.length) setPackages(d.packages);
         if (d.addons.length) setAddons(d.addons);
+        if (d.travelFees) setTravelFees(d.travelFees);
       })
       .catch(() => {});
   }, [visible]);
@@ -363,6 +365,21 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                     );
                   })}
                 </View>
+              </Field>
+
+              <Field label="อำเภอ/เขตของสถานที่จัดงาน (คิดค่าเดินทาง)">
+                <Chips
+                  compact
+                  options={[
+                    { value: '', label: 'ไม่มีค่าเดินทาง / ยังไม่ทราบ' },
+                    ...Object.entries(travelFees)
+                      .sort((a, b) => a[0].localeCompare(b[0], 'th'))
+                      .map(([k, v]) => ({ value: k, label: `${k} · +${Number(v).toLocaleString('th-TH')}` })),
+                  ]}
+                  value={preset.amphoe || ''}
+                  onChange={(v) => set('amphoe', v || undefined)}
+                />
+                <Text style={styles.fieldHint}>ราคาจริงคิดจากอำเภอที่ลูกค้าเลือกในฟอร์มเสมอ</Text>
               </Field>
 
               <Field label="ใบกำกับภาษี (VAT 7%)">
