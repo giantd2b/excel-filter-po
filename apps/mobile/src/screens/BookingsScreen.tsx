@@ -27,6 +27,7 @@ import {
   type MeritBooking,
 } from '../services/bookings';
 import BookingCard from '../components/booking/BookingCard';
+import EditBookingModal from '../components/booking/EditBookingModal';
 import { NEXT_STATUS, STATUSES, STATUS_LABELS } from '../components/booking/bookingHelpers';
 
 const SOURCES = [
@@ -49,6 +50,7 @@ export default function BookingsScreen() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<MeritBooking | null>(null);
   const requestSeq = useRef(0);
 
   useEffect(() => {
@@ -246,9 +248,25 @@ export default function BookingsScreen() {
               onCreateQuote={createQuote}
               onCopyPublicLink={copyPublicLink}
               onSendQuoteToChat={sendQuoteToChat}
+              onEdit={setEditing}
             />
           </View>
         )}
+      />
+
+      <EditBookingModal
+        visible={!!editing}
+        booking={editing}
+        onClose={() => setEditing(null)}
+        onSaved={(saved, warnings) => {
+          setEditing(null);
+          patch(saved.id, saved);
+          Alert.alert(
+            warnings.length ? 'บันทึกแล้ว (มีข้อควรตรวจสอบ)' : 'บันทึกการแก้ไขแล้ว',
+            warnings.length ? warnings.map((w) => `⚠️ ${w}`).join('\n') : `${saved.code || ''} อัปเดตแล้ว`,
+          );
+          fetchData(true);
+        }}
       />
     </View>
   );

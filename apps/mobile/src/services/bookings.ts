@@ -39,6 +39,11 @@ export interface MeritBooking {
   customerAddress?: string | null;
   billingName?: string | null;
   taxId?: string | null;
+  billingLine?: string | null;
+  billingTambon?: string | null;
+  billingAmphoe?: string | null;
+  billingProvince?: string | null;
+  billingZip?: string | null;
   floor?: string | null;
   wantVat?: boolean | null;
   depositAmount?: number | null;
@@ -210,6 +215,20 @@ export async function listBookings(opts: { status?: string; source?: string; q?:
     statusCounts: data?.statusCounts || {},
     total: Number(data?.total ?? 0),
   };
+}
+
+/** Fields sales may correct on a booking (package / guests are not editable — a different package is a new booking). */
+export interface UpdateBookingPatch {
+  customerName?: string; phone?: string; occasion?: string; eventDate?: string; timeSlot?: string;
+  venue?: string; tambon?: string; amphoe?: string; province?: string; zip?: string; floor?: string;
+  billingName?: string; taxId?: string; billingLine?: string; billingTambon?: string; billingAmphoe?: string; billingProvince?: string; billingZip?: string;
+  wantVat?: boolean; note?: string;
+}
+
+/** PATCH /bookings/:id — re-derives travel fee + estimate and syncs open quotations; returns warnings to show. */
+export async function updateBooking(id: string, patch: UpdateBookingPatch): Promise<{ booking: MeritBooking; warnings: string[] }> {
+  const { data } = await api.patch(`/bookings/${id}`, patch, { timeout: 45000 });
+  return { booking: data?.booking || {}, warnings: arr<string>(data?.warnings) };
 }
 
 export async function updateBookingStatus(id: string, status: string): Promise<MeritBooking> {

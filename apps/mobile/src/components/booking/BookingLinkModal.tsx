@@ -34,12 +34,11 @@ import {
   FALLBACK_ADDONS,
   FALLBACK_PACKAGES,
   OCCASIONS,
-  THAI_MONTHS,
   TIME_SLOTS,
   buildLinkChatText,
-  daysInMonth,
   fmtThaiDate,
 } from './bookingHelpers';
+import { Chips, Field, ThaiDatePicker } from './FormBits';
 
 interface Props {
   visible: boolean;
@@ -531,112 +530,6 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
         </View>
       </KeyboardAvoidingView>
     </Modal>
-  );
-}
-
-// ─── Small building blocks ─────────────────────────────────────────────
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-function Chips({
-  options,
-  value,
-  onChange,
-  compact,
-}: {
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (v: string) => void;
-  compact?: boolean;
-}) {
-  return (
-    <View style={styles.rowWrap}>
-      {options.map((o) => {
-        const on = o.value === value;
-        return (
-          <TouchableOpacity
-            key={o.value || '__empty'}
-            style={[styles.chip, compact && styles.chipCompact, on && styles.chipActive]}
-            onPress={() => onChange(o.value)}
-          >
-            <Text style={[styles.chipText, on && styles.chipTextActive]}>{o.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-/**
- * Day / month / year pickers that produce a plain "YYYY-MM-DD" string — the same
- * approach as the dashboard's ThaiDateSelect (a native date picker once produced a value
- * one day off from what sales tapped; explicit parts leave no room for timezone surprises).
- */
-function ThaiDatePicker({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
-  const y = m ? Number(m[1]) : 0;
-  const mo = m ? Number(m[2]) : 0;
-  const d = m ? Number(m[3]) : 0;
-  const thisYear = new Date().getFullYear();
-  const years = [thisYear, thisYear + 1, thisYear + 2];
-  const maxDay = y && mo ? daysInMonth(y, mo) : 31;
-
-  const emit = (ny: number, nmo: number, nd: number) => {
-    if (!ny || !nmo || !nd) {
-      onChange('');
-      return;
-    }
-    const dd = Math.min(nd, daysInMonth(ny, nmo));
-    onChange(`${ny}-${String(nmo).padStart(2, '0')}-${String(dd).padStart(2, '0')}`);
-  };
-
-  return (
-    <View style={{ gap: 8 }}>
-      <View style={styles.dateBlock}>
-        <Text style={styles.dateBlockLabel}>ปี</Text>
-        <Chips
-          compact
-          options={years.map((yy) => ({ value: String(yy), label: String(yy + 543) }))}
-          value={y ? String(y) : ''}
-          onChange={(v) => emit(Number(v), mo || new Date().getMonth() + 1, d || 1)}
-        />
-      </View>
-      <View style={styles.dateBlock}>
-        <Text style={styles.dateBlockLabel}>เดือน</Text>
-        <Chips
-          compact
-          options={THAI_MONTHS.map((name, i) => ({ value: String(i + 1), label: name }))}
-          value={mo ? String(mo) : ''}
-          onChange={(v) => emit(y || thisYear, Number(v), d || 1)}
-        />
-      </View>
-      <View style={styles.dateBlock}>
-        <Text style={styles.dateBlockLabel}>วัน</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {Array.from({ length: maxDay }, (_, i) => i + 1).map((n) => {
-              const on = n === d;
-              return (
-                <TouchableOpacity
-                  key={n}
-                  style={[styles.chip, styles.chipCompact, styles.dayChip, on && styles.chipActive]}
-                  onPress={() => emit(y || thisYear, mo || new Date().getMonth() + 1, n)}
-                >
-                  <Text style={[styles.chipText, on && styles.chipTextActive]}>{n}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
-      </View>
-    </View>
   );
 }
 

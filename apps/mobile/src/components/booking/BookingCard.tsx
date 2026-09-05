@@ -22,6 +22,7 @@ interface Props {
   onCreateQuote: (b: MeritBooking) => void;
   onCopyPublicLink: (b: MeritBooking) => void;
   onSendQuoteToChat?: (b: MeritBooking) => void;
+  onEdit?: (b: MeritBooking) => void;
 }
 
 export default function BookingCard({
@@ -33,6 +34,7 @@ export default function BookingCard({
   onCreateQuote,
   onCopyPublicLink,
   onSendQuoteToChat,
+  onEdit,
 }: Props) {
   const st = statusStyle(b.status);
   const tent = tentAdvice(b);
@@ -188,6 +190,11 @@ export default function BookingCard({
                     ? 'กำลังส่ง…'
                     : '📨 ส่งลิงก์ในแชต'}
             </Text>
+          </TouchableOpacity>
+        ) : null}
+        {onEdit ? (
+          <TouchableOpacity style={[styles.pill, styles.pillOutline]} onPress={() => onEdit(b)} disabled={busy}>
+            <Text style={[styles.pillText, { color: '#475569' }]}>✏️ แก้ไข</Text>
           </TouchableOpacity>
         ) : null}
         <TouchableOpacity style={[styles.pill, styles.pillPrimary]} onPress={() => onAdvance(b)} disabled={busy}>
