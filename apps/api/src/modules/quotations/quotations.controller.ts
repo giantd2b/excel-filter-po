@@ -2,12 +2,13 @@ import { Body, Controller, ForbiddenException, Get, Headers, Param, Post, Query,
 import { QuotationsService } from './quotations.service';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
 import { ChatCustomerDto } from './dto/chat-quotation.dto';
+import { QuotationAlertsService } from './quotation-alerts.service';
 
 const adminOf = (req: any) => ({ id: req.admin?.id || req.user?.uid, name: req.admin?.name || req.user?.name || req.user?.email });
 
 @Controller('quotations')
 export class QuotationsController {
-  constructor(private readonly quotationsService: QuotationsService) {}
+  constructor(private readonly quotationsService: QuotationsService, private readonly alerts: QuotationAlertsService) {}
 
   @UseGuards(FirebaseAuthGuard)
   @Get('pipeline')
@@ -73,6 +74,13 @@ export class QuotationsController {
   @Get('summary')
   async summary(@Query('dateFrom') dateFrom?: string) {
     return this.quotationsService.getSummary({ dateFrom: dateFrom || undefined });
+  }
+
+  /** Run the stale-quotations digest now (dryRun=1 returns the text without sending). */
+  @UseGuards(FirebaseAuthGuard)
+  @Post('alerts/stale')
+  async staleDigest(@Query('dryRun') dryRun?: string) {
+    return this.alerts.runStaleDigest({ dryRun: dryRun === '1' || dryRun === 'true' });
   }
 
   /** Inbound webhook from IRIS Quotation (status / detail changes). Shared secret, no Firebase session. */

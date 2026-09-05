@@ -41,6 +41,7 @@ export class SlipsService {
       sender_name: s.senderName,
       receiver_name: s.receiverName,
       reference_number: s.referenceNumber,
+      matched_doc_no: (s as any).matchedDocNo || null,
       detected_at: s.detectedAt,
     }));
 

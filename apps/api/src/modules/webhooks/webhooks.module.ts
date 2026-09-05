@@ -7,9 +7,10 @@ import { MergeHelper } from './merge-helper';
 import { InboxGatewayModule } from '../inbox-gateway/inbox-gateway.module';
 import { MessagesModule } from '../messages/messages.module';
 import { UsersModule } from '../users/users.module';
+import { QuotationsModule } from '../quotations/quotations.module';
 
 @Module({
-  imports: [InboxGatewayModule, MessagesModule, UsersModule],
+  imports: [InboxGatewayModule, MessagesModule, UsersModule, QuotationsModule],
   controllers: [LineWebhookController, FacebookWebhookController, IrisJobWebhookController],
   providers: [WebhookService, MergeHelper],
 })

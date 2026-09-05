@@ -9,6 +9,7 @@ import { PrismaService } from '../../common/providers/prisma.service';
 import { ReplyTokenCacheService } from '../../common/providers/reply-token-cache.service';
 import { InboxGateway } from '../inbox-gateway/inbox-gateway.gateway';
 import { InboxStatsService } from '../inbox-gateway/inbox-stats.service';
+import { QuotationsService } from '../quotations/quotations.service';
 import { findThaiPhones, formatThaiPhone } from '../../common/utils/phone.utils';
 import { pushGroupMessage } from '../../common/utils/line-notify.utils';
 import { SlipDetectionService } from '../slips/slip-detection.service';
@@ -23,6 +24,7 @@ export class WebhookService {
     private readonly replyTokenCache: ReplyTokenCacheService,
     private readonly inboxGateway: InboxGateway,
     private readonly inboxStats: InboxStatsService,
+    private readonly quotations: QuotationsService,
   ) {}
 
   async saveMarkAsReadToken(customerId: string, token: string) {
@@ -318,7 +320,7 @@ export class WebhookService {
               customerId,
               channel: lineBot,
               bankName: slipData.bank_name || null,
-              amount: slipData.amount ? parseFloat(String(slipData.amount)) : null,
+              amount: slipData.amount ? parseFloat(String(slipData.amount).replace(/[^0-9.]/g, '')) || null : null,
               dateTime: slipData.date_time || null,
               senderName: slipData.sender_name || null,
               receiverName: slipData.receiver_name || null,
@@ -326,6 +328,8 @@ export class WebhookService {
             },
           });
 
+          // deposit auto-confirm: match the slip against the customer's open quotations (never blocks)
+          void this.quotations.matchSlipToDeposit({ id: messageID, customerId, amount: slipData.amount ? parseFloat(String(slipData.amount).replace(/[^0-9.]/g, '')) : null, imageUrl }).catch(() => {});
           const lines = [`มีสลิปส่งมา ${imageUrl}`];
           if (slipData.bank_name) lines.push(`ธนาคาร: ${slipData.bank_name}`);
           if (slipData.amount) lines.push(`จำนวน: ${slipData.amount}`);
@@ -588,7 +592,7 @@ export class WebhookService {
               customerId,
               channel: fbbot,
               bankName: slipData.bank_name || null,
-              amount: slipData.amount ? parseFloat(String(slipData.amount)) : null,
+              amount: slipData.amount ? parseFloat(String(slipData.amount).replace(/[^0-9.]/g, '')) || null : null,
               dateTime: slipData.date_time || null,
               senderName: slipData.sender_name || null,
               receiverName: slipData.receiver_name || null,
@@ -596,6 +600,8 @@ export class WebhookService {
             },
           });
 
+          // deposit auto-confirm: match the slip against the customer's open quotations (never blocks)
+          void this.quotations.matchSlipToDeposit({ id: messageId, customerId, amount: slipData.amount ? parseFloat(String(slipData.amount).replace(/[^0-9.]/g, '')) : null, imageUrl }).catch(() => {});
           const lines = [`มีสลิปส่งมา ${imageUrl}`];
           if (slipData.bank_name) lines.push(`ธนาคาร: ${slipData.bank_name}`);
           if (slipData.amount) lines.push(`จำนวน: ${slipData.amount}`);

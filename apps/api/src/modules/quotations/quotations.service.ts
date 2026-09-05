@@ -6,6 +6,7 @@ import { FlowAccountClient } from './flowaccount.client';
 import { MessagesService } from '../messages/messages.service';
 import { channelLabel } from '../../common/utils/channel-label';
 import { composeQuotationChatMessage, quotationOrigin, type QuotationOrigin } from './quotation-chat';
+import { pushTeamText } from '../../common/utils/team-line';
 
 // Thai month name → month number (0-based)
 const THAI_MONTHS: Record<string, number> = {
@@ -91,6 +92,8 @@ interface QuotationRecord {
   crmSalesName?: string;
   shareToken?: string;
   publicUrl?: string;
+  depositAmount: number;
+  validUntil?: string;
   origin: QuotationOrigin;
   matchedBy?: 'crm' | 'phone';
 }
@@ -684,6 +687,8 @@ export class QuotationsService {
       crmSalesName: q.crmSalesName || undefined,
       shareToken: q.shareToken || undefined,
       publicUrl: this.flowAccount.publicUrlFor(q) || undefined,
+      depositAmount: Number(q.depositAmount) || 0,
+      validUntil: q.validUntil || undefined,
       origin: quotationOrigin(q),
     };
   }
@@ -832,6 +837,60 @@ export class QuotationsService {
       });
     }
     return { sent: true, messageId: res.messageId, sentAt, publicUrl };
+  }
+
+  /** Public wrapper so other modules (webhooks) can refresh one document. */
+  async refreshDoc(docNo: string) {
+    await this.refreshOne(docNo);
+  }
+
+  /**
+   * A bank-transfer slip arrived in this customer's chat. If exactly one of their open quotations
+   * has a deposit equal to the slip amount (or the slip covers the whole document), mark it มัดจำแล้ว,
+   * thank the customer in the chat and tell the team. Anything ambiguous only notifies the team.
+   */
+  async matchSlipToDeposit(slip: { id: string; customerId: string; amount: number | null; imageUrl?: string }) {
+    const amount = Math.round((Number(slip.amount) || 0) * 100) / 100;
+    if (!amount || !slip.customerId || !this.flowAccount.isConfigured) return { matched: false, reason: 'no-amount' };
+    const already = await this.prisma.slip.findUnique({ where: { id: slip.id }, select: { matchedDocNo: true } }).catch(() => null);
+    if (already?.matchedDocNo) return { matched: true, docNo: already.matchedDocNo, reason: 'already' };
+
+    const c = await this.prisma.customer.findUnique({ where: { id: slip.customerId } });
+    const custName = c?.nickname || c?.displayName || slip.customerId;
+    const list = await this.flowAccount.listQuotations({ crmCustomerId: slip.customerId, limit: 50 }).catch(() => ({ data: [] as any[] }));
+    const open = (list.data || []).filter((q: any) => ['PENDING', 'APPROVED'].includes(q.status));
+    const eq = (a: number, b: number) => Math.abs(a - b) < 0.5;
+    const grand = (q: any) => parseFloat(String(q.grandTotal).replace(/,/g, '')) || 0;
+    const hits = open.filter((q: any) => eq(Number(q.depositAmount) || 0, amount) || (grand(q) > 0 && eq(grand(q), amount)));
+    const fmt = (n: number) => n.toLocaleString('th-TH');
+
+    if (hits.length !== 1) {
+      const why = hits.length === 0 ? (open.length ? `ไม่ตรงกับมัดจำใบใด (เปิดอยู่: ${open.map((q: any) => `${q.docNo} มัดจำ ${fmt(Number(q.depositAmount) || 0)}`).join(', ')})` : 'ลูกค้าไม่มีใบเสนอราคาที่เปิดอยู่') : `ตรงกับหลายใบ: ${hits.map((q: any) => q.docNo).join(', ')}`;
+      void pushTeamText(`💰 สลิป ${fmt(amount)} บาท จาก ${custName}\n${why}\nกรุณาตรวจสอบและเปลี่ยนสถานะเอง${slip.imageUrl ? `\n${slip.imageUrl}` : ''}`);
+      return { matched: false, reason: hits.length ? 'ambiguous' : 'no-candidate', candidates: hits.map((q: any) => q.docNo) };
+    }
+
+    const q = hits[0];
+    const full = grand(q) > 0 && eq(grand(q), amount) && !eq(Number(q.depositAmount) || 0, amount);
+    const note = `${full ? 'ชำระเต็มจำนวน' : 'มัดจำ'}จากสลิปในแชต ${fmt(amount)} บาท (${slip.id})`;
+    if (q.status === 'PENDING') await this.flowAccount.changeStatus(q.docNo, 'APPROVED', 'IRIS CRM (สลิป)', 'ลูกค้าโอนเงินตามใบเสนอราคา');
+    await this.flowAccount.changeStatus(q.docNo, 'DEPOSITED', 'IRIS CRM (สลิป)', note);
+    await this.prisma.slip.update({ where: { id: slip.id }, data: { matchedDocNo: q.docNo, matchedAt: new Date() } }).catch(() => {});
+    if (typeof q.externalRef === 'string' && q.externalRef.startsWith('TB-')) {
+      await this.prisma.booking.updateMany({ where: { quotationDocNo: q.docNo, status: { in: ['NEW', 'CONTACTED'] } }, data: { status: 'CONFIRMED' } }).catch(() => {});
+    }
+    await this.refreshOne(q.docNo);
+
+    if (c) {
+      const text = [
+        `ได้รับ${full ? 'ยอดชำระ' : 'เงินมัดจำ'} ${fmt(amount)} บาท สำหรับใบเสนอราคา ${q.docNo} เรียบร้อยแล้วค่ะ ขอบคุณมากค่ะ 🙏`,
+        q.eventDate ? `ทีมงานยืนยันคิววันงาน ${q.eventDate}${q.eventTime ? ` ${q.eventTime}` : ''} และจะติดต่อแจ้งรายละเอียดก่อนวันงานค่ะ` : 'ทีมงานยืนยันคิวให้เรียบร้อย และจะติดต่อแจ้งรายละเอียดก่อนวันงานค่ะ',
+      ].join('\n');
+      await this.messages.sendMessage({ oduserId: c.platformUserId, docId: c.id, channel: c.channel, text, adminName: q.crmSalesName || 'IRIS เติมบุญ', tag: 'CONFIRMED_EVENT_UPDATE' }).catch((e: any) => this.logger.warn(`deposit reply failed: ${e?.message || e}`));
+    }
+    void pushTeamText(`✅ ${full ? 'ชำระเต็มจำนวน' : 'มัดจำเข้าแล้ว'} ${q.docNo} · ${custName} · ${fmt(amount)} บาท (จับคู่จากสลิปอัตโนมัติ)${q.crmSalesName ? ` · เซลล์ ${q.crmSalesName}` : ''}`);
+    void this.flowAccount.notify(`มัดจำเข้าแล้ว ${q.docNo}`, `${custName} · ${fmt(amount)} บาท (สลิปในแชต)`, { docNo: q.docNo, kind: 'status' });
+    return { matched: true, docNo: q.docNo, full };
   }
 
   /** Search IRIS Quotation directly (docNo / customer / project / phone) for the attach modal. */

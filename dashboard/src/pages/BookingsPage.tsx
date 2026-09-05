@@ -3,6 +3,7 @@ import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, 
 import BookingRecipeSettings from "@/components/BookingRecipeSettings";
 import BookingTravelFeeSettings from "@/components/BookingTravelFeeSettings";
 import BookingPricingSettings from "@/components/BookingPricingSettings";
+import EditBookingModal from "@/components/EditBookingModal";
 import {
   getBookings,
   updateBookingStatus,
@@ -109,6 +110,9 @@ export default function BookingsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const [editing, setEditing] = useState<MeritBooking | null>(null);
+  const [editMsg, setEditMsg] = useState<string | null>(null);
 
   const advance = async (b: MeritBooking) => {
     setBusyId(b.id);
@@ -486,6 +490,14 @@ export default function BookingsPage() {
                     </button>
                   ) : null}
                   <button
+                    onClick={() => setEditing(b)}
+                    disabled={busyId === b.id}
+                    className="px-3 py-1.5 rounded-full ring-1 ring-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50"
+                    title="แก้ไขวันงาน สถานที่ ที่อยู่ เบอร์"
+                  >
+                    แก้ไข
+                  </button>
+                  <button
                     onClick={() => advance(b)}
                     disabled={busyId === b.id}
                     className="px-3 py-1.5 rounded-full bg-brand-50 text-brand-700 text-xs font-semibold hover:bg-brand-100 disabled:opacity-50"
@@ -505,6 +517,23 @@ export default function BookingsPage() {
             </div>
           ))}
         </div>
+      )}
+      {editMsg && (
+        <div className="fixed bottom-4 right-4 z-40 max-w-md bg-white rounded-xl shadow-lg ring-1 ring-slate-200 p-3 text-xs text-slate-700 whitespace-pre-line">
+          {editMsg}
+          <button onClick={() => setEditMsg(null)} className="ml-2 text-slate-400 hover:text-slate-600">ปิด</button>
+        </div>
+      )}
+      {editing && (
+        <EditBookingModal
+          booking={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(_b, warnings) => {
+            setEditing(null);
+            setEditMsg(warnings.length ? `บันทึกแล้ว\n⚠️ ${warnings.join('\n⚠️ ')}` : 'บันทึกการแก้ไขแล้ว');
+            fetchData();
+          }}
+        />
       )}
     </div>
   );

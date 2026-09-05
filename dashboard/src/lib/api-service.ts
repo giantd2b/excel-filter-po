@@ -633,6 +633,11 @@ export interface MeritBooking {
   customerAddress?: string | null;
   billingName?: string | null;
   taxId?: string | null;
+  billingLine?: string | null;
+  billingTambon?: string | null;
+  billingAmphoe?: string | null;
+  billingProvince?: string | null;
+  billingZip?: string | null;
   floor?: string | null;
   wantVat?: boolean | null;
   depositAmount?: number | null;
@@ -849,6 +854,18 @@ export async function getCustomerBookings(customerId: string) {
   return api.get<{ bookings: MeritBooking[]; links: BookingLink[] }>(
     `/bookings/by-customer/${encodeURIComponent(customerId)}`
   );
+}
+
+/** Fields sales may correct on a booking (package / guests are not editable). */
+export interface UpdateBookingPatch {
+  customerName?: string; phone?: string; occasion?: string; eventDate?: string; timeSlot?: string;
+  venue?: string; tambon?: string; amphoe?: string; province?: string; zip?: string; floor?: string;
+  billingName?: string; taxId?: string; billingLine?: string; billingTambon?: string; billingAmphoe?: string; billingProvince?: string; billingZip?: string;
+  wantVat?: boolean; note?: string;
+}
+
+export async function updateBooking(id: string, patch: UpdateBookingPatch) {
+  return api.patch<{ booking: MeritBooking; warnings: string[] }>(`/bookings/${id}`, patch);
 }
 
 export async function updateBookingStatus(id: string, status: string) {

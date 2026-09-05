@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { UpdateBookingDto } from './dto/update-booking.dto';
 import { BookingPresetDto, CreateBookingLinkDto } from './dto/booking-preset.dto';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
 
@@ -117,6 +118,13 @@ export class BookingsController {
   async saveTravelFees(@Body() body: any) {
     const config = await this.bookingsService.saveTravelFees(body || {});
     return { config };
+  }
+
+  /** Sales corrects booking details (contact, date, venue, billing); syncs open quotations. */
+  @UseGuards(FirebaseAuthGuard)
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() dto: UpdateBookingDto) {
+    return this.bookingsService.update(id, dto);
   }
 
   @UseGuards(FirebaseAuthGuard)

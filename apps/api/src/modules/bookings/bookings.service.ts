@@ -34,6 +34,7 @@ const CATALOG_CACHE_KEY = 'fa_catalog_cache';
 const CATALOG_TTL_MS = 5 * 60 * 1000;
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingPresetDto } from './dto/booking-preset.dto';
+import { UpdateBookingDto } from './dto/update-booking.dto';
 import { FlowAccountClient } from '../quotations/flowaccount.client';
 import { MessagesService } from '../messages/messages.service';
 import { sendNewBookingAlert } from './booking-alert';
@@ -810,6 +811,76 @@ export class BookingsService {
     } catch {
       throw new NotFoundException('Booking not found');
     }
+  }
+
+  /**
+   * Sales corrects contact / date / venue / billing details. Re-derives the travel fee and the
+   * estimate, and pushes date / time / address / phone into the linked quotation while it is still
+   * open. Returns warnings the dashboard shows (e.g. quotation already approved, travel fee changed).
+   */
+  async update(id: string, dto: UpdateBookingDto) {
+    const b = await this.prisma.booking.findUnique({ where: { id } });
+    if (!b) throw new NotFoundException('Booking not found');
+    const warnings: string[] = [];
+    const str = (v: string | undefined) => (typeof v === 'string' ? v.trim() : undefined);
+
+    const next = {
+      customerName: str(dto.customerName) || b.customerName,
+      phone: str(dto.phone) || b.phone,
+      occasion: str(dto.occasion) || b.occasion,
+      eventDate: dto.eventDate || b.eventDate,
+      timeSlot: str(dto.timeSlot) || b.timeSlot,
+      venue: dto.venue !== undefined ? str(dto.venue) || null : b.venue,
+      tambon: dto.tambon !== undefined ? str(dto.tambon) || null : b.tambon,
+      amphoe: dto.amphoe !== undefined ? str(dto.amphoe) || null : b.amphoe,
+      province: dto.province !== undefined ? str(dto.province) || null : b.province,
+      zip: dto.zip !== undefined ? str(dto.zip) || null : b.zip,
+      floor: dto.floor !== undefined ? str(dto.floor) || null : b.floor,
+      billingName: dto.billingName !== undefined ? str(dto.billingName) || null : b.billingName,
+      taxId: dto.taxId !== undefined ? (dto.taxId.replace(/[^0-9]/g, '') || null) : b.taxId,
+      billingLine: dto.billingLine !== undefined ? str(dto.billingLine) || null : b.billingLine,
+      billingTambon: dto.billingTambon !== undefined ? str(dto.billingTambon) || null : b.billingTambon,
+      billingAmphoe: dto.billingAmphoe !== undefined ? str(dto.billingAmphoe) || null : b.billingAmphoe,
+      billingProvince: dto.billingProvince !== undefined ? str(dto.billingProvince) || null : b.billingProvince,
+      billingZip: dto.billingZip !== undefined ? str(dto.billingZip) || null : b.billingZip,
+      wantVat: dto.wantVat !== undefined ? dto.wantVat : b.wantVat,
+      note: dto.note !== undefined ? str(dto.note) || null : b.note,
+    };
+    if (next.billingName && next.billingName === next.customerName) next.billingName = null;
+    if (next.phone.replace(/[^0-9]/g, '').length < 9) throw new BadRequestException('เบอร์โทรไม่ถูกต้อง');
+    if (!isServiceProvince(next.province || next.billingProvince)) {
+      throw new BadRequestException(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT}`);
+    }
+
+    // travel fee + estimate follow the (possibly new) venue district
+    const travelFee = travelFeeFor(next.amphoe, await this.getTravelFees());
+    const travelArea = travelFee > 0 ? travelAreaLabel(next.amphoe, next.province) : null;
+    const calc = calcEstimatedTotal(
+      { packageId: b.packageId, foodMode: b.foodMode, guests: b.guests, tables: b.tables, monks: b.monks, selfTransport: b.selfTransport, addons: b.addons, travelFee, travelArea: travelArea || undefined },
+      await this.getPricing(),
+    );
+    const estimatedTotal = calc?.total ?? b.estimatedTotal;
+    if ((b.travelFee || 0) !== travelFee) warnings.push(`ค่าเดินทางเปลี่ยนจาก ${(b.travelFee || 0).toLocaleString('th-TH')} เป็น ${travelFee.toLocaleString('th-TH')} บาท — รายการในใบเสนอราคาไม่ได้แก้อัตโนมัติ กรุณาแก้บรรทัดค่าเดินทางใน IRIS Quotation`);
+
+    const customerAddress = bookingAddress({ venue: next.billingLine, tambon: next.billingTambon, amphoe: next.billingAmphoe, province: next.billingProvince, zip: next.billingZip }) || null;
+    const updated = await this.prisma.booking.update({ where: { id }, data: { ...next, customerAddress, travelFee, travelArea, estimatedTotal } });
+
+    // keep the open quotation in step (date / time / address / phone / project line)
+    if (updated.quotationDocNo && this.flowAccount.isConfigured) {
+      try {
+        await this.flowAccount.updateDetails(updated.quotationDocNo, {
+          eventDate: updated.eventDate,
+          eventTime: updated.timeSlot,
+          contactPhone: updated.phone,
+          contactAddress: updated.customerAddress || bookingAddress(updated),
+          project: `${updated.occasion} · ${updated.eventDate} · ${updated.timeSlot}${updated.venue ? ` · ${updated.venue}` : ''}${updated.floor ? ` (${updated.floor})` : ''}`,
+          internalNotesAppend: `แก้จาก CRM ${new Date().toISOString().slice(0, 10)}: สถานที่จัดงาน ${bookingAddress(updated) || '-'}${updated.floor ? ` · ${updated.floor}` : ''}`,
+        });
+      } catch (e: any) {
+        warnings.push(`ใบเสนอราคา ${updated.quotationDocNo} ไม่ได้อัปเดต: ${e?.message || e}`);
+      }
+    }
+    return { booking: (await this.withSendStatus([updated]))[0], warnings };
   }
 
   async remove(id: string) {

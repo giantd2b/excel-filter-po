@@ -220,6 +220,8 @@ model Slip {
   senderName      String?   @map("sender_name")
   receiverName    String?   @map("receiver_name")
   referenceNumber String?   @map("reference_number")
+  matchedDocNo    String?   @map("matched_doc_no") // quotation confirmed as มัดจำแล้ว from this slip
+  matchedAt       DateTime? @map("matched_at")
   detectedAt      DateTime  @default(now()) @map("detected_at")
   createdAt       DateTime  @default(now()) @map("created_at")
 

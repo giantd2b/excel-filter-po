@@ -157,6 +157,35 @@ export class FlowAccountClient {
     }
   }
 
+  /** Change status with the same transition rules as the apps (e.g. deposit confirmed from a slip). */
+  async changeStatus(docNo: string, status: string, changedBy: string, note?: string): Promise<any> {
+    try {
+      const res = await this.client().post(`/quotations/${encodeURIComponent(docNo)}/status`, { status, changedBy, note });
+      return res.data?.data;
+    } catch (err: any) {
+      this.fail('เปลี่ยนสถานะใบเสนอราคาไม่สำเร็จ', err);
+    }
+  }
+
+  /** Booking details changed (date / time / venue / phone) — open documents only. */
+  async updateDetails(docNo: string, body: Record<string, unknown>): Promise<any> {
+    try {
+      const res = await this.client().patch(`/quotations/${encodeURIComponent(docNo)}/details`, body);
+      return res.data?.data;
+    } catch (err: any) {
+      this.fail('อัปเดตรายละเอียดใบเสนอราคาไม่สำเร็จ', err);
+    }
+  }
+
+  /** Push a notification to every sales phone running the IRIS Quotation app. */
+  async notify(title: string, body: string, data?: Record<string, unknown>): Promise<void> {
+    try {
+      await this.client().post('/notify', { title, body, data });
+    } catch (err: any) {
+      this.logger.warn(`notify failed: ${err?.message || err}`);
+    }
+  }
+
   /** Create (or reuse) the public read-only link of any document. */
   async shareQuotation(docNo: string): Promise<{ docNo: string; token: string; publicUrl: string }> {
     try {
