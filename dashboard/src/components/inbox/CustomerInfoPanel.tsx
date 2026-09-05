@@ -827,7 +827,7 @@ export function CustomerInfoPanel({
         <div className="flex items-center justify-between mb-2.5 gap-2">
           <div className="flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.06em]">
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.06em] whitespace-nowrap">
               ใบเสนอราคา
             </span>
             {quotations.length > 0 && (

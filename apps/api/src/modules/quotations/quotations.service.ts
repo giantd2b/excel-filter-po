@@ -715,7 +715,8 @@ export class QuotationsService {
     return {
       docNo,
       status: res.data.status,
-      editUrl: `${this.flowAccount.appUrl}${res.data.url || `/quotations/${encodeURIComponent(docNo)}`}`,
+      // straight into the editor: the admin's next step is filling the lines
+      editUrl: `${this.flowAccount.appUrl}/quotations/${encodeURIComponent(docNo)}/edit`,
       publicUrl: res.data.publicUrl || null,
       reused: !!res.reused,
     };
