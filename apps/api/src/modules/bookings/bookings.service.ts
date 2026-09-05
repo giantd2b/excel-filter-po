@@ -267,6 +267,9 @@ export class BookingsService {
         : {}),
       ...(b.depositManual && b.depositAmount != null ? { depositAmount: b.depositAmount } : {}),
       project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}${b.venue ? ` · ${b.venue}` : ''}${b.floor ? ` (${b.floor})` : ''}`,
+      // printed prominently on the document
+      eventDate: b.eventDate,
+      eventTime: b.timeSlot,
       // the customer's tax-invoice choice wins over the recipe default
       vatRate: typeof b.wantVat === 'boolean' ? (b.wantVat ? 7 : 0) : built.vatRate,
       // printed หมายเหตุ: the matched tier's remark template, else the package's (FA falls back to its default)
