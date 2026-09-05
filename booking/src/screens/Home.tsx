@@ -152,8 +152,8 @@ export default function Home({ onStartBooking, onOpenPkg }: Props) {
       {/* stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, padding: '0 20px 26px' }}>
         {[
-          ['12 ปี', 'ประสบการณ์จัดงาน'],
-          ['1,200+', 'งานบุญที่ดูแลแล้ว'],
+          ['7 ปี', 'ประสบการณ์จัดงาน'],
+          ['10,000+', 'งานบุญที่ดูแลแล้ว'],
           ['ครบชุด', 'พระ · อาหาร · อุปกรณ์'],
         ].map(([big, small]) => (
           <div
