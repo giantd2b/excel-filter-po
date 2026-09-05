@@ -1,6 +1,9 @@
-import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { QuotationsService } from './quotations.service';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
+import { ChatCustomerDto } from './dto/chat-quotation.dto';
+
+const adminOf = (req: any) => ({ id: req.admin?.id || req.user?.uid, name: req.admin?.name || req.user?.name || req.user?.email });
 
 @Controller('quotations')
 export class QuotationsController {
@@ -12,13 +15,52 @@ export class QuotationsController {
     @Query('status') status?: string,
     @Query('search') search?: string,
     @Query('matched') matched?: string,
+    @Query('source') source?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('page') pageStr?: string,
     @Query('limit') limitStr?: string,
   ) {
     const page = pageStr ? parseInt(pageStr, 10) : 1;
     const limit = limitStr ? parseInt(limitStr, 10) : 50;
-    return this.quotationsService.getPipeline({ status, search, matched, dateFrom, page, limit });
+    return this.quotationsService.getPipeline({ status, search, matched, source, dateFrom, page, limit });
+  }
+
+  /** Empty DRAFT in IRIS Quotation attributed to a chat customer; the admin fills the lines there. */
+  @UseGuards(FirebaseAuthGuard)
+  @Post('from-chat')
+  async createFromChat(@Body() dto: ChatCustomerDto, @Req() req: any) {
+    return this.quotationsService.createFromChat(dto.customerId, adminOf(req));
+  }
+
+  /** Live search in IRIS Quotation for the attach modal. */
+  @UseGuards(FirebaseAuthGuard)
+  @Get('search')
+  async search(@Query('q') q?: string) {
+    return this.quotationsService.searchFa(q || '');
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post(':docNo/attach')
+  async attach(@Param('docNo') docNo: string, @Body() dto: ChatCustomerDto, @Req() req: any) {
+    return this.quotationsService.attachToCustomer(docNo, dto.customerId, adminOf(req));
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post(':docNo/detach')
+  async detach(@Param('docNo') docNo: string) {
+    return this.quotationsService.detachFromCustomer(docNo);
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post(':docNo/share-link')
+  async shareLink(@Param('docNo') docNo: string) {
+    return { publicUrl: await this.quotationsService.ensurePublicLink(docNo) };
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post(':docNo/send-to-chat')
+  async sendToChat(@Param('docNo') docNo: string, @Req() req: any) {
+    return this.quotationsService.sendToChat(docNo, adminOf(req));
   }
 
   @Get('sync')

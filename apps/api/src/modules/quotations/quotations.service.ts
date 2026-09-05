@@ -1,7 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../common/providers/prisma.service';
-import axios from 'axios';
+import { FlowAccountClient } from './flowaccount.client';
+import { MessagesService } from '../messages/messages.service';
+import { channelLabel } from '../../common/utils/channel-label';
+import { composeQuotationChatMessage, quotationOrigin, type QuotationOrigin } from './quotation-chat';
 
 // Thai month name → month number (0-based)
 const THAI_MONTHS: Record<string, number> = {
@@ -76,7 +80,27 @@ interface QuotationRecord {
   daysUntilJob?: number | null;
   internalNotes?: string;
   contactPhone?: string;
+  // provenance stored on the IRIS Quotation document itself
+  externalRef?: string;
+  createdVia?: string;
+  /** crmCustomerId as stored in IRIS Quotation (may differ from the phone-matched crmCustomerId above) */
+  faCrmCustomerId?: string;
+  crmChannelLabel?: string;
+  crmChatName?: string;
+  crmSalesId?: string;
+  crmSalesName?: string;
+  shareToken?: string;
+  publicUrl?: string;
+  origin: QuotationOrigin;
+  matchedBy?: 'crm' | 'phone';
 }
+
+type CrmCustomerLite = {
+  id: string; displayName: string | null; nickname: string | null; phoneNumber: string | null;
+  phoneClean: string | null; additionalPhones: string[]; channel: string; channelType: string | null;
+};
+
+type MatchContext = { phoneMap: Map<string, CrmCustomerLite>; byId: Map<string, CrmCustomerLite> };
 
 @Injectable()
 export class QuotationsService {
@@ -86,12 +110,17 @@ export class QuotationsService {
   private manuallyLinked = new Set<string>(); // docNos linked via match page
   private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly flowAccount: FlowAccountClient,
+    private readonly messages: MessagesService,
+  ) {}
 
   async getPipeline(opts: {
     status?: string;
     search?: string;
     matched?: string;
+    source?: string;
     dateFrom?: string;
     page: number;
     limit: number;
@@ -119,6 +148,13 @@ export class QuotationsService {
       data = data.filter((q) => !q.crmCustomerId);
     }
 
+    // Filter by origin: chat (CQ-), booking (TB-), manual (made by hand, attached or not)
+    if (opts.source === 'chat' || opts.source === 'booking') {
+      data = data.filter((q) => q.origin === opts.source);
+    } else if (opts.source === 'manual') {
+      data = data.filter((q) => q.origin === 'manual' || q.origin === 'attached');
+    }
+
     // Filter by date range
     if (opts.dateFrom) {
       data = data.filter((q) => q.date && q.date >= opts.dateFrom!);
@@ -133,7 +169,9 @@ export class QuotationsService {
           q.project?.toLowerCase().includes(query) ||
           q.docNo?.toLowerCase().includes(query) ||
           q.salesName?.toLowerCase().includes(query) ||
-          q.crmDisplayName?.toLowerCase().includes(query),
+          q.crmDisplayName?.toLowerCase().includes(query) ||
+          q.crmChatName?.toLowerCase().includes(query) ||
+          q.externalRef?.toLowerCase().includes(query),
       );
     }
 
@@ -290,34 +328,22 @@ export class QuotationsService {
     this.syncing = true;
 
     try {
-    // Same base URL / key as FlowAccountClient (flowaccount.client.ts); no hardcoded fallback key
-    const FA_URL = (process.env.FA_API_URL || 'https://honest-mindfulness-production.up.railway.app/api/v1').replace(/\/+$/, '');
-    const FA_KEY = process.env.FA_API_KEY;
-    if (!FA_KEY) {
-      this.logger.warn('FA_API_KEY is not set — skipping FlowAccount sync');
-      this.syncing = false;
+    if (!this.flowAccount.isConfigured) {
+      this.logger.warn('FA_API_KEY is not set — skipping IRIS Quotation sync');
       return null;
     }
-    const headers = { 'X-Api-Key': FA_KEY };
 
-    this.logger.log('Syncing all quotations from FlowAccount...');
+    this.logger.log('Syncing all quotations from IRIS Quotation...');
 
-    // Step 1: Fetch ALL quotations from FA API (paginated)
+    // Step 1: Fetch ALL quotations from the IRIS Quotation API (paginated)
     const allFaQuotes: any[] = [];
     let page = 1;
-    const limit = 100;
     let totalPages = 1;
 
     while (page <= totalPages) {
       try {
-        const res = await axios.get(
-          `${FA_URL}/quotations?page=${page}&limit=${limit}`,
-          { headers, timeout: 15000 },
-        );
-        const body = res.data;
-        if (body.data?.length > 0) {
-          allFaQuotes.push(...body.data);
-        }
+        const body = await this.flowAccount.listQuotations({ page, limit: 100 });
+        if (body.data?.length > 0) allFaQuotes.push(...body.data);
         totalPages = body.totalPages || 1;
         page++;
       } catch (err: any) {
@@ -328,90 +354,9 @@ export class QuotationsService {
 
     this.logger.log(`Fetched ${allFaQuotes.length} quotations from FA API`);
 
-    // Step 2: Build phone → CRM customer lookup map (primary + additional phones)
-    const customers = await this.prisma.customer.findMany({
-      where: {
-        OR: [
-          { phoneNumber: { not: null } },
-          { additionalPhones: { isEmpty: false } },
-        ],
-      },
-      select: {
-        id: true,
-        displayName: true,
-        nickname: true,
-        phoneNumber: true,
-        phoneClean: true,
-        additionalPhones: true,
-        channel: true,
-        channelType: true,
-      },
-    });
-
-    const phoneMap = new Map<string, typeof customers[0]>();
-    for (const c of customers) {
-      // Primary phone
-      const phone = (c.phoneClean || c.phoneNumber || '').replace(/[-\s]/g, '');
-      if (phone.length >= 9) {
-        phoneMap.set(phone, c);
-        if (phone.length === 10) phoneMap.set(phone.slice(1), c);
-      }
-      // Additional phones
-      for (const ap of c.additionalPhones || []) {
-        const clean = ap.replace(/[^0-9]/g, '');
-        if (clean.length >= 9) {
-          phoneMap.set(clean, c);
-          if (clean.length === 10) phoneMap.set(clean.slice(1), c);
-        }
-      }
-    }
-
-    // Step 3: Map FA quotes to QuotationRecords, try CRM match
-    const allQuotations: QuotationRecord[] = allFaQuotes.map((q) => {
-      const daysSince = q.date
-        ? Math.floor((Date.now() - new Date(q.date).getTime()) / (1000 * 60 * 60 * 24))
-        : 0;
-
-      // Try to match to CRM by contact phone
-      // Clean: strip "โทร.", "ต่อXXX", split on "/" for multi-phone
-      const rawPhone = (q.contactPhone || '')
-        .replace(/โทร\.?/g, '')
-        .replace(/ต่อ\s*\d+/g, '')
-        .trim();
-      const phoneList = rawPhone.split(/[/,]/).map((p: string) => p.replace(/[^0-9]/g, '')).filter((p: string) => p.length >= 9);
-      let crmMatch: typeof customers[0] | undefined;
-      for (const ph of phoneList) {
-        crmMatch = phoneMap.get(ph) || phoneMap.get(ph.slice(1));
-        if (crmMatch) break;
-      }
-      const qPhone = phoneList[0] || rawPhone.replace(/[^0-9]/g, '');
-
-      const jobDate = parseThaiJobDate(q.project || '');
-      const daysUntilJob = jobDate
-        ? Math.floor((new Date(jobDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-        : null;
-
-      return {
-        docNo: q.docNo,
-        date: q.date,
-        customer: q.customer,
-        project: q.project,
-        grandTotal: parseFloat(q.grandTotal) || 0,
-        salesName: q.salesName || '',
-        status: q.status || 'PENDING',
-        editUrl: q.editUrl || '',
-        crmCustomerId: crmMatch?.id,
-        crmDisplayName: crmMatch ? (crmMatch.nickname || crmMatch.displayName) : undefined,
-        crmChannel: crmMatch?.channel,
-        crmChannelType: crmMatch ? (crmMatch.channelType === 'LINE' ? 'line' : 'facebook') : undefined,
-        phone: qPhone || undefined,
-        daysSinceQuote: daysSince,
-        jobDate,
-        daysUntilJob,
-        internalNotes: q.internalNotes || '',
-        contactPhone: q.contactPhone || '',
-      };
-    });
+    // Step 2+3: match every document to a CRM customer (exact crmCustomerId first, then phone)
+    const ctx = await this.buildMatchContext(allFaQuotes);
+    const allQuotations: QuotationRecord[] = allFaQuotes.map((q) => this.toRecord(q, ctx));
 
     // Sort by date descending
     allQuotations.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -609,6 +554,270 @@ export class QuotationsService {
   }
 
   // Auto-sync every 30 minutes
+  // ── Matching helpers ──────────────────────────────────────
+
+  /** Phone map of every CRM customer with a phone + id map of the customers referenced by the FA documents. */
+  private async buildMatchContext(faQuotes: any[]): Promise<MatchContext> {
+    const select = {
+      id: true, displayName: true, nickname: true, phoneNumber: true,
+      phoneClean: true, additionalPhones: true, channel: true, channelType: true,
+    } as const;
+    const referenced = Array.from(new Set(faQuotes.map((q) => q.crmCustomerId).filter((x): x is string => !!x)));
+    const [customers, byIdRows] = await Promise.all([
+      this.prisma.customer.findMany({
+        where: { OR: [{ phoneNumber: { not: null } }, { additionalPhones: { isEmpty: false } }] },
+        select,
+      }),
+      referenced.length ? this.prisma.customer.findMany({ where: { id: { in: referenced } }, select }) : Promise.resolve([]),
+    ]);
+
+    const phoneMap = new Map<string, CrmCustomerLite>();
+    for (const c of customers) {
+      const phone = (c.phoneClean || c.phoneNumber || '').replace(/[-\s]/g, '');
+      if (phone.length >= 9) {
+        phoneMap.set(phone, c);
+        if (phone.length === 10) phoneMap.set(phone.slice(1), c);
+      }
+      for (const ap of c.additionalPhones || []) {
+        const clean = ap.replace(/[^0-9]/g, '');
+        if (clean.length >= 9) {
+          phoneMap.set(clean, c);
+          if (clean.length === 10) phoneMap.set(clean.slice(1), c);
+        }
+      }
+    }
+    const byId = new Map<string, CrmCustomerLite>(byIdRows.map((c) => [c.id, c]));
+    return { phoneMap, byId };
+  }
+
+  /** One IRIS Quotation row → pipeline record. */
+  private toRecord(q: any, ctx: MatchContext): QuotationRecord {
+    const daysSince = q.date
+      ? Math.floor((Date.now() - new Date(q.date).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    // phone fallback: strip "โทร.", "ต่อXXX", split on "/" for multi-phone
+    const rawPhone = (q.contactPhone || '')
+      .replace(/โทร\.?/g, '')
+      .replace(/ต่อ\s*\d+/g, '')
+      .trim();
+    const phoneList = rawPhone.split(/[/,]/).map((p: string) => p.replace(/[^0-9]/g, '')).filter((p: string) => p.length >= 9);
+    let phoneMatch: CrmCustomerLite | undefined;
+    for (const ph of phoneList) {
+      phoneMatch = ctx.phoneMap.get(ph) || ctx.phoneMap.get(ph.slice(1));
+      if (phoneMatch) break;
+    }
+    const qPhone = phoneList[0] || rawPhone.replace(/[^0-9]/g, '');
+
+    const exact = q.crmCustomerId ? ctx.byId.get(q.crmCustomerId) : undefined;
+    const crmMatch = exact || phoneMatch;
+
+    const jobDate = parseThaiJobDate(q.project || '');
+    const daysUntilJob = jobDate
+      ? Math.floor((new Date(jobDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : null;
+
+    return {
+      docNo: q.docNo,
+      date: q.date,
+      customer: q.customer,
+      project: q.project,
+      grandTotal: parseFloat(q.grandTotal) || 0,
+      salesName: q.salesName || '',
+      status: q.status || 'PENDING',
+      // native documents carry no editUrl — point at the staff page in IRIS Quotation
+      editUrl: q.editUrl || this.flowAccount.editUrlFor(q.docNo),
+      crmCustomerId: crmMatch?.id,
+      crmDisplayName: crmMatch ? (crmMatch.nickname || crmMatch.displayName || undefined) : undefined,
+      crmChannel: crmMatch?.channel,
+      crmChannelType: crmMatch ? (crmMatch.channelType === 'LINE' ? 'line' : 'facebook') : undefined,
+      matchedBy: exact ? 'crm' : phoneMatch ? 'phone' : undefined,
+      phone: qPhone || undefined,
+      daysSinceQuote: daysSince,
+      jobDate,
+      daysUntilJob,
+      internalNotes: q.internalNotes || '',
+      contactPhone: q.contactPhone || '',
+      externalRef: q.externalRef || undefined,
+      createdVia: q.createdVia || undefined,
+      faCrmCustomerId: q.crmCustomerId || undefined,
+      crmChannelLabel: q.crmChannel || (crmMatch ? channelLabel(crmMatch.channel, crmMatch.channelType) : undefined),
+      crmChatName: q.crmChatName || undefined,
+      crmSalesId: q.crmSalesId || undefined,
+      crmSalesName: q.crmSalesName || undefined,
+      shareToken: q.shareToken || undefined,
+      publicUrl: this.flowAccount.publicUrlFor(q) || undefined,
+      origin: quotationOrigin(q),
+    };
+  }
+
+  /** Re-read one document from IRIS Quotation and replace it in the cache (no 30-minute wait). */
+  private async refreshOne(docNo: string) {
+    try {
+      const q = await this.flowAccount.getQuotation(docNo);
+      if (!q) return;
+      const rec = this.toRecord(q, await this.buildMatchContext([q]));
+      if (!this.cache) {
+        this.cache = { data: [rec], updatedAt: 0 }; // updatedAt 0 → next pipeline read triggers a full sync
+        return;
+      }
+      const i = this.cache.data.findIndex((r) => r.docNo === docNo);
+      if (i >= 0) this.cache.data[i] = rec;
+      else this.cache.data.unshift(rec);
+    } catch (e: any) {
+      this.logger.warn(`refreshOne ${docNo} failed: ${e?.message || e}`);
+    }
+  }
+
+  // ── Quotations started from / attached to a chat ──────────
+
+  private newChatRef(): string {
+    const d = new Date();
+    const yymmdd = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    return `CQ-${yymmdd}-${randomBytes(3).toString('hex').toUpperCase()}`;
+  }
+
+  /**
+   * "สร้างใบเสนอราคาทั่วไป" from the chat panel: an empty DRAFT in IRIS Quotation attributed to this
+   * chat customer / channel / the admin who clicked. The admin fills the lines in IRIS Quotation.
+   */
+  async createFromChat(customerId: string, admin: { id?: string; name?: string }) {
+    const c = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!c) throw new NotFoundException('ไม่พบลูกค้าในแชต');
+    const name = c.nickname || c.displayName || 'ลูกค้า';
+    const phone = c.phoneClean || c.phoneNumber || undefined;
+    const label = channelLabel(c.channel, c.channelType);
+    const salesName = admin.name || undefined;
+    const payload = (externalRef: string) => ({
+      externalRef,
+      status: 'DRAFT',
+      items: [],
+      customer: { name, phone },
+      salesName,
+      internalNotes: `สร้างจากแชต ${label} · ลูกค้าแชต: ${name} (${customerId})${salesName ? ` · เซลล์: ${salesName}` : ''}`,
+      crmCustomerId: customerId,
+      crmChannel: label,
+      crmChatName: name,
+      crmSalesId: admin.id,
+      crmSalesName: salesName,
+    });
+
+    let res: { data: any; reused: boolean };
+    try {
+      res = await this.flowAccount.createQuotation(payload(this.newChatRef()));
+    } catch (e: any) {
+      // the random suffix collided with an existing externalRef — one retry with a fresh one
+      if (!/externalRef/.test(e?.message || '')) throw e;
+      res = await this.flowAccount.createQuotation(payload(this.newChatRef()));
+    }
+    const docNo: string = res.data.docNo;
+    await this.refreshOne(docNo);
+    return {
+      docNo,
+      status: res.data.status,
+      editUrl: `${this.flowAccount.appUrl}${res.data.url || `/quotations/${encodeURIComponent(docNo)}`}`,
+      publicUrl: res.data.publicUrl || null,
+      reused: !!res.reused,
+    };
+  }
+
+  /** Attach an existing document (e.g. one made by hand) to a chat customer; stored in IRIS Quotation. */
+  async attachToCustomer(docNo: string, customerId: string, admin: { id?: string; name?: string }) {
+    const c = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!c) throw new NotFoundException('ไม่พบลูกค้าในแชต');
+    const data = await this.flowAccount.patchCrm(docNo, {
+      crmCustomerId: customerId,
+      crmChannel: channelLabel(c.channel, c.channelType),
+      crmChatName: c.nickname || c.displayName || 'ลูกค้า',
+      crmSalesId: admin.id,
+      crmSalesName: admin.name,
+    });
+    this.manuallyLinked.add(docNo);
+    await this.refreshOne(docNo);
+    return { docNo, attached: true, crmCustomerId: customerId, publicUrl: data?.publicUrl || null };
+  }
+
+  async detachFromCustomer(docNo: string) {
+    await this.flowAccount.patchCrm(docNo, { clear: true });
+    this.manuallyLinked.delete(docNo);
+    await this.refreshOne(docNo);
+    return { docNo, attached: false };
+  }
+
+  /** Public read-only URL of a document, creating the share token when needed. */
+  async ensurePublicLink(docNo: string): Promise<string> {
+    const q = await this.flowAccount.getQuotation(docNo);
+    if (!q) throw new NotFoundException(`ไม่พบใบเสนอราคา ${docNo}`);
+    const existing = this.flowAccount.publicUrlFor(q);
+    if (existing) return existing;
+    const s = await this.flowAccount.shareQuotation(docNo);
+    return s.publicUrl;
+  }
+
+  /**
+   * Push the public link of ANY attributed document into the customer's LINE / Facebook chat.
+   * Booking quotations also get their sent-at stamped on the booking row.
+   */
+  async sendToChat(docNo: string, admin: { id?: string; name?: string }) {
+    const q = await this.flowAccount.getQuotation(docNo);
+    if (!q) throw new NotFoundException(`ไม่พบใบเสนอราคา ${docNo}`);
+    if (!q.crmCustomerId) throw new BadRequestException('ใบเสนอราคานี้ยังไม่ได้ผูกกับลูกค้าในแชต');
+    if (!q.items?.length) throw new BadRequestException('ใบเสนอราคายังไม่มีรายการ กรุณาเติมรายการใน IRIS Quotation ก่อนส่ง');
+    const c = await this.prisma.customer.findUnique({ where: { id: q.crmCustomerId } });
+    if (!c) throw new NotFoundException('ไม่พบลูกค้าในแชต');
+
+    const publicUrl = this.flowAccount.publicUrlFor(q) || (await this.flowAccount.shareQuotation(docNo)).publicUrl;
+    const grand = parseFloat(String(q.grandTotal).replace(/,/g, '')) || 0;
+    const deposit = Number(q.depositAmount) || 0;
+    const text = composeQuotationChatMessage({
+      docNo,
+      publicUrl,
+      headline: q.project ? ` สำหรับ${q.project}` : '',
+      totalLine: `ยอดรวม ${grand.toLocaleString('th-TH')} บาท${q.isVat ? ' (รวม VAT 7%)' : ''}`,
+      depositLine: deposit > 0 ? `มัดจำ ${deposit.toLocaleString('th-TH')} บาท เพื่อยืนยันคิว ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ` : '',
+    });
+
+    const res = await this.messages.sendMessage({
+      oduserId: c.platformUserId,
+      docId: c.id,
+      channel: c.channel,
+      text,
+      adminId: admin.id || q.crmSalesId || undefined,
+      adminName: admin.name || q.crmSalesName || 'IRIS เติมบุญ',
+      tag: 'CONFIRMED_EVENT_UPDATE',
+    });
+    const sentAt = new Date();
+    if (typeof q.externalRef === 'string' && q.externalRef.startsWith('TB-')) {
+      await this.prisma.booking.updateMany({
+        where: { quotationDocNo: docNo },
+        data: { quotationSentAt: sentAt, quotationMessageId: res.messageId, quotationPublicUrl: publicUrl },
+      });
+    }
+    return { sent: true, messageId: res.messageId, sentAt, publicUrl };
+  }
+
+  /** Search IRIS Quotation directly (docNo / customer / project / phone) for the attach modal. */
+  async searchFa(query: string) {
+    const q = (query || '').trim();
+    if (!q) return { data: [] };
+    const body = await this.flowAccount.listQuotations({ search: q, limit: 10 });
+    return {
+      data: (body.data || []).map((x: any) => ({
+        docNo: x.docNo,
+        date: x.date,
+        customer: x.customer,
+        project: x.project,
+        grandTotal: parseFloat(x.grandTotal) || 0,
+        status: x.status,
+        salesName: x.salesName || '',
+        crmCustomerId: x.crmCustomerId || null,
+        crmChatName: x.crmChatName || null,
+        origin: quotationOrigin(x),
+        editUrl: this.flowAccount.editUrlFor(x.docNo),
+      })),
+    };
+  }
+
   @Cron('0 */30 * * * *')
   async handleCron() {
     try {

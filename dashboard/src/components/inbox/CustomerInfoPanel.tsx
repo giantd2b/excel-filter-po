@@ -13,10 +13,17 @@ import {
   setCustomerNickname,
   getCustomerJobs,
   getCustomerBookings,
+  getCustomerQuotations,
+  createQuotationFromChat,
+  attachQuotationToCustomer,
+  shareQuotationLink,
+  sendQuotationToChat,
   type MeritBooking,
   type BookingLink,
+  type CrmQuotation,
 } from "@/lib/api-service";
 import BookingLinkModal from "./BookingLinkModal";
+import AttachQuotationModal from "./AttachQuotationModal";
 import { faStatusLabel, faStatusStyle } from "@/lib/faStatus";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api-client";
@@ -47,6 +54,20 @@ import {
 interface CustomerInfoPanelProps {
   userId: string | null;
   onStatusChange?: () => void;
+}
+
+/** Colour + label of where an IRIS Quotation document came from. */
+const ORIGIN_STYLE: Record<string, string> = {
+  chat: "bg-emerald-100 text-emerald-700",
+  booking: "bg-violet-100 text-violet-700",
+  attached: "bg-blue-100 text-blue-700",
+  manual: "bg-slate-100 text-slate-500",
+};
+function originLabel(q: CrmQuotation) {
+  if (q.origin === "chat") return "จากแชต";
+  if (q.origin === "booking") return "จองงานบุญ";
+  if (q.origin === "attached") return "ผูกภายหลัง";
+  return q.matchedBy === "crm" ? "สร้างเอง" : "จับคู่จากเบอร์/ชื่อ";
 }
 
 export function CustomerInfoPanel({
@@ -80,8 +101,11 @@ export function CustomerInfoPanel({
   const [bookings, setBookings] = useState<MeritBooking[]>([]);
   const [bookingLinks, setBookingLinks] = useState<BookingLink[]>([]);
   const [showBookingLink, setShowBookingLink] = useState(false);
-  const [quotations, setQuotations] = useState<any[]>([]);
+  const [quotations, setQuotations] = useState<CrmQuotation[]>([]);
   const [quotationsLoading, setQuotationsLoading] = useState(false);
+  const [showAttachQuote, setShowAttachQuote] = useState(false);
+  const [quoteBusy, setQuoteBusy] = useState<string | null>(null); // "create" | docNo
+  const [quoteMsg, setQuoteMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Cache tags across conversation switches
   const tagsCacheRef = useRef<any[] | null>(null);
@@ -127,9 +151,10 @@ export function CustomerInfoPanel({
         getCustomerBookings(userId)
           .then((res) => { if (!cancelled) { setBookings(res.bookings || []); setBookingLinks(res.links || []); } })
           .catch(() => { if (!cancelled) { setBookings([]); setBookingLinks([]); } });
-        // Auto-fetch quotations from FlowAccount
+        // Every IRIS Quotation document attributed to this chat (+ phone/name matches)
         setQuotationsLoading(true);
-        api.get<{ data: any[]; total: number }>(`/users/${userId}/quotations`)
+        setQuoteMsg(null);
+        getCustomerQuotations(userId)
           .then((res) => { if (!cancelled) setQuotations(res.data || []); })
           .catch(() => { if (!cancelled) setQuotations([]); })
           .finally(() => { if (!cancelled) setQuotationsLoading(false); });
@@ -154,6 +179,76 @@ export function CustomerInfoPanel({
     ]);
     setDetails(d);
     setNotes(n);
+  };
+
+  const reloadQuotations = async () => {
+    if (!userId) return;
+    setQuotationsLoading(true);
+    try {
+      const res = await getCustomerQuotations(userId);
+      setQuotations(res.data || []);
+    } catch { /* keep what we have */ } finally {
+      setQuotationsLoading(false);
+    }
+  };
+
+  /** "สร้างใบเสนอราคาทั่วไป": empty draft in IRIS Quotation attributed to this chat + me; opens the editor. */
+  const createGeneralQuotation = async () => {
+    if (!userId) return;
+    const name = details?.nickname || details?.displayName || "ลูกค้า";
+    if (!window.confirm(`สร้างใบเสนอราคาร่างสำหรับ ${name}?\n\nระบบจะเปิด IRIS Quotation ให้เติมรายการ ใบนี้จะผูกกับแชตนี้และเซลล์ของคุณอัตโนมัติ`)) return;
+    setQuoteBusy("create");
+    setQuoteMsg(null);
+    try {
+      const res = await createQuotationFromChat(userId);
+      window.open(res.editUrl, "_blank", "noopener");
+      setQuoteMsg({ ok: true, text: `สร้าง ${res.docNo} แล้ว — เติมรายการใน IRIS Quotation แล้วกลับมากด "ส่งลิงก์เข้าแชต"` });
+      await reloadQuotations();
+    } catch (e: any) {
+      setQuoteMsg({ ok: false, text: e?.message || "สร้างใบเสนอราคาไม่สำเร็จ" });
+    } finally {
+      setQuoteBusy(null);
+    }
+  };
+
+  const sendQuoteToChat = async (docNo: string) => {
+    setQuoteBusy(docNo);
+    setQuoteMsg(null);
+    try {
+      await sendQuotationToChat(docNo);
+      setQuoteMsg({ ok: true, text: `ส่งลิงก์ ${docNo} เข้าแชตแล้ว` });
+      await reloadQuotations();
+    } catch (e: any) {
+      setQuoteMsg({ ok: false, text: e?.message || "ส่งไม่สำเร็จ" });
+    } finally {
+      setQuoteBusy(null);
+    }
+  };
+
+  const copyQuoteLink = async (q: CrmQuotation) => {
+    try {
+      const url = q.publicUrl || (await shareQuotationLink(q.docNo)).publicUrl;
+      await navigator.clipboard.writeText(url);
+      setQuoteMsg({ ok: true, text: `คัดลอกลิงก์ ${q.docNo} แล้ว` });
+      if (!q.publicUrl) await reloadQuotations();
+    } catch (e: any) {
+      setQuoteMsg({ ok: false, text: e?.message || "คัดลอกลิงก์ไม่สำเร็จ" });
+    }
+  };
+
+  const attachQuote = async (docNo: string) => {
+    if (!userId) return;
+    setQuoteBusy(docNo);
+    setQuoteMsg(null);
+    try {
+      await attachQuotationToCustomer(docNo, userId);
+      setQuoteMsg({ ok: true, text: `ผูก ${docNo} กับแชตนี้แล้ว` });
+      await reloadQuotations();
+    } catch (e: any) {
+      setQuoteMsg({ ok: false, text: e?.message || "ผูกไม่สำเร็จ" });
+    } finally {
+      setQuoteBusy(null);
+    }
   };
 
   const copyPhone = (phone: string) => {
@@ -727,53 +822,129 @@ export function CustomerInfoPanel({
         />
       )}
 
-      {/* Quotations (IRIS Quotation) */}
-      {(quotations.length > 0 || quotationsLoading) && (
-        <div className="px-4 py-3.5 border-b border-slate-100/80">
-          <div className="flex items-center gap-1.5 mb-2.5">
+      {/* Quotations (IRIS Quotation) — every document attributed to this chat, plus phone/name matches */}
+      <div className="px-4 py-3.5 border-b border-slate-100/80">
+        <div className="flex items-center justify-between mb-2.5 gap-2">
+          <div className="flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5 text-amber-500" />
             <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.06em]">
               ใบเสนอราคา
             </span>
-            <span className="text-[9px] text-amber-500 font-semibold ml-1">
-              {quotations.length}
-            </span>
+            {quotations.length > 0 && (
+              <span className="text-[9px] text-amber-500 font-semibold ml-1">{quotations.length}</span>
+            )}
           </div>
-          {quotationsLoading ? (
-            <div className="flex items-center justify-center py-3">
-              <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {quotations.map((q: any) => (
-                <a
-                  key={q.docNo}
-                  href={q.editUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block bg-amber-50/50 rounded-lg px-3 py-2.5 border border-amber-100/50 hover:bg-amber-50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-amber-600">{q.docNo}</span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${faStatusStyle(q.status)}`}>
-                      {faStatusLabel(q.status)}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{q.project || q.customer}</p>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-[10px] text-slate-400">{q.date}</span>
-                    <span className="text-[11px] font-semibold text-slate-700">
-                      ฿{Number(q.grandTotal || 0).toLocaleString()}
-                    </span>
-                  </div>
-                  {q.salesName && (
-                    <span className="text-[9px] text-slate-400 mt-0.5 block">👤 {q.salesName}</span>
-                  )}
-                </a>
-              ))}
-            </div>
-          )}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => setShowAttachQuote(true)}
+              className="text-[10px] font-medium text-slate-500 hover:text-slate-700"
+              title="ผูกใบที่สร้างเองใน IRIS Quotation กับแชตนี้"
+            >
+              ผูกใบที่มีอยู่
+            </button>
+            <button
+              onClick={createGeneralQuotation}
+              disabled={quoteBusy === "create"}
+              className="text-[10px] font-medium text-amber-600 hover:text-amber-800 disabled:opacity-50"
+              title="แพ็กเกจอื่นที่ไม่ใช่งานบุญ: สร้างใบร่างแล้วไปเติมรายการใน IRIS Quotation"
+            >
+              {quoteBusy === "create" ? "กำลังสร้าง…" : "+ สร้างใบเสนอราคาทั่วไป"}
+            </button>
+          </div>
         </div>
+        {quoteMsg && (
+          <p className={`text-[10px] mb-2 leading-relaxed ${quoteMsg.ok ? "text-emerald-600" : "text-red-500"}`}>{quoteMsg.text}</p>
+        )}
+        {quotationsLoading ? (
+          <div className="flex items-center justify-center py-3">
+            <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+          </div>
+        ) : quotations.length === 0 ? (
+          <p className="text-[11px] text-slate-400">
+            ยังไม่มีใบเสนอราคา — งานบุญใช้ลิงก์จองด้านบน แพ็กเกจอื่นกด "สร้างใบเสนอราคาทั่วไป"
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {quotations.map((q) => (
+              <div
+                key={q.docNo}
+                className="bg-amber-50/50 rounded-lg px-3 py-2.5 border border-amber-100/50"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <a
+                    href={q.editUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-semibold text-amber-600 hover:underline inline-flex items-center gap-1"
+                    title="เปิดใน IRIS Quotation"
+                  >
+                    {q.docNo}
+                    <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                  </a>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${faStatusStyle(q.status)}`}>
+                    {faStatusLabel(q.status)}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{q.project || q.customer}</p>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[10px] text-slate-400">{q.date}</span>
+                  <span className="text-[11px] font-semibold text-slate-700">
+                    ฿{Number(q.grandTotal || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${ORIGIN_STYLE[q.origin] || ORIGIN_STYLE.manual}`}>
+                    {originLabel(q)}
+                  </span>
+                  {(q.crmSalesName || q.salesName) && (
+                    <span className="text-[9px] text-slate-400">👤 {q.crmSalesName || q.salesName}</span>
+                  )}
+                  {q.itemCount === 0 && <span className="text-[9px] text-red-400">ยังไม่มีรายการ</span>}
+                </div>
+                <div className="flex items-center gap-3 mt-2">
+                  <button
+                    onClick={() => sendQuoteToChat(q.docNo)}
+                    disabled={quoteBusy === q.docNo || !q.attached}
+                    title={q.attached ? "ส่งลิงก์ใบเสนอราคาเข้าแชตนี้" : "ผูกกับแชตนี้ก่อนจึงส่งได้"}
+                    className="text-[10px] font-medium text-amber-600 hover:text-amber-800 disabled:opacity-40 inline-flex items-center gap-1"
+                  >
+                    <Send className="w-3 h-3" />
+                    {quoteBusy === q.docNo ? "กำลังส่ง…" : "ส่งลิงก์เข้าแชต"}
+                  </button>
+                  <button
+                    onClick={() => copyQuoteLink(q)}
+                    className="text-[10px] text-slate-500 hover:text-slate-700 inline-flex items-center gap-1"
+                    title={q.publicUrl || "สร้างลิงก์สาธารณะแล้วคัดลอก"}
+                  >
+                    <Copy className="w-3 h-3" />
+                    คัดลอกลิงก์
+                  </button>
+                  {!q.attached && (
+                    <button
+                      onClick={() => attachQuote(q.docNo)}
+                      disabled={quoteBusy === q.docNo}
+                      className="text-[10px] font-medium text-blue-600 hover:text-blue-800 ml-auto disabled:opacity-50"
+                      title="บันทึกใน IRIS Quotation ว่าใบนี้เป็นของลูกค้าแชตนี้"
+                    >
+                      ผูกกับแชตนี้
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {showAttachQuote && userId && (
+        <AttachQuotationModal
+          customer={{ id: userId, displayName: details?.nickname || details?.displayName || "ลูกค้า" }}
+          onClose={() => setShowAttachQuote(false)}
+          onAttached={(docNo) => {
+            setShowAttachQuote(false);
+            setQuoteMsg({ ok: true, text: `ผูก ${docNo} กับแชตนี้แล้ว` });
+            reloadQuotations();
+          }}
+        />
       )}
 
       {/* Recent slips */}

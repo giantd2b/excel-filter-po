@@ -4,6 +4,8 @@ import { PrismaService } from '../../common/providers/prisma.service';
 import { InboxGateway } from '../inbox-gateway/inbox-gateway.gateway';
 import { InboxStatsService } from '../inbox-gateway/inbox-stats.service';
 import { getLineAccessToken, getFacebookPageToken } from '../../common/utils/channel-tokens';
+import { FlowAccountClient } from '../quotations/flowaccount.client';
+import { quotationOrigin } from '../quotations/quotation-chat';
 
 @Injectable()
 export class UsersService {
@@ -13,6 +15,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly inboxGateway: InboxGateway,
     private readonly inboxStats: InboxStatsService,
+    private readonly flowAccount: FlowAccountClient,
   ) {}
 
   async findAll(limit = 50, startAfter?: string, channel?: string, search?: string) {
@@ -270,44 +273,65 @@ export class UsersService {
     });
   }
 
+  /**
+   * Every IRIS Quotation document of a chat customer: first the ones attributed to this customer
+   * (crmCustomerId — chat-created, booking or attached later), then phone / name matches as a fallback.
+   */
   async getCustomerQuotations(customerId: string) {
-    const FA_URL = 'https://honest-mindfulness-production.up.railway.app/api/v1';
-    const FA_KEY = process.env.FA_API_KEY || 'iris-fa-2026-secret';
-
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       select: { phoneNumber: true, phoneClean: true, displayName: true, nickname: true },
     });
     if (!customer) return { data: [], total: 0 };
+    if (!this.flowAccount.isConfigured) return { data: [], total: 0 };
 
-    const headers = { 'X-Api-Key': FA_KEY };
     const results: any[] = [];
+    const seen = new Set<string>();
+    const add = (rows: any[], matchedBy: 'crm' | 'phone' | 'name') => {
+      for (const q of rows || []) {
+        if (!q?.docNo || seen.has(q.docNo)) continue;
+        seen.add(q.docNo);
+        results.push({
+          docNo: q.docNo,
+          date: q.date,
+          customer: q.customer,
+          project: q.project,
+          grandTotal: parseFloat(String(q.grandTotal).replace(/,/g, '')) || 0,
+          status: q.status,
+          salesName: q.salesName || '',
+          itemCount: Array.isArray(q.items) ? q.items.length : undefined,
+          editUrl: q.editUrl || this.flowAccount.editUrlFor(q.docNo),
+          publicUrl: this.flowAccount.publicUrlFor(q),
+          externalRef: q.externalRef || null,
+          createdVia: q.createdVia || null,
+          crmCustomerId: q.crmCustomerId || null,
+          crmChannel: q.crmChannel || null,
+          crmChatName: q.crmChatName || null,
+          crmSalesName: q.crmSalesName || null,
+          origin: quotationOrigin(q),
+          attached: q.crmCustomerId === customerId,
+          matchedBy,
+        });
+      }
+    };
 
     try {
-      // Try phone match first
-      const phone = customer.phoneClean || customer.phoneNumber?.replace(/[-\s]/g, '');
-      if (phone) {
-        const res = await axios.get(`${FA_URL}/match/phone/${phone}`, { headers, timeout: 10000 });
-        if (res.data?.data?.length > 0) {
-          results.push(...res.data.data);
-        }
-      }
+      const attributed = await this.flowAccount.listQuotations({ crmCustomerId: customerId, limit: 100 });
+      add(attributed.data, 'crm');
+    } catch (err: any) {
+      this.logger.warn(`IRIS Quotation lookup by crmCustomerId failed: ${err.message}`);
+    }
 
-      // Also try name match if few results
+    try {
+      const phone = customer.phoneClean || customer.phoneNumber?.replace(/[-\s]/g, '');
+      if (phone) add(await this.flowAccount.matchPhone(phone), 'phone');
+
       if (results.length < 3) {
         const name = customer.nickname || customer.displayName;
-        if (name && name.length >= 3) {
-          const res = await axios.get(`${FA_URL}/match/name/${encodeURIComponent(name)}`, { headers, timeout: 10000 });
-          const nameResults = res.data?.data || [];
-          // Deduplicate by docNo
-          const existingDocs = new Set(results.map((r: any) => r.docNo));
-          nameResults.forEach((q: any) => {
-            if (!existingDocs.has(q.docNo)) results.push(q);
-          });
-        }
+        if (name && name.length >= 3) add(await this.flowAccount.matchName(name), 'name');
       }
     } catch (err: any) {
-      this.logger.warn(`FlowAccount lookup failed: ${err.message}`);
+      this.logger.warn(`IRIS Quotation lookup failed: ${err.message}`);
     }
 
     return {

@@ -29,13 +29,8 @@ import { BookingPresetDto } from './dto/booking-preset.dto';
 import { FlowAccountClient } from '../quotations/flowaccount.client';
 import { MessagesService } from '../messages/messages.service';
 import { sendNewBookingAlert } from './booking-alert';
-
-const CHANNEL_LABELS: Record<string, string> = { LINE: 'LINE', FACEBOOK: 'Facebook' };
-function channelLabel(channel: string, channelType?: string | null) {
-  const pretty = channel.replace(/^(Line|FB)_/i, '').replace(/_/g, ' ');
-  const type = CHANNEL_LABELS[String(channelType || '').toUpperCase()];
-  return type ? `${type} ${pretty}` : pretty;
-}
+import { channelLabel } from '../../common/utils/channel-label';
+import { composeQuotationChatMessage } from '../quotations/quotation-chat';
 
 /** "2026-09-30" → "พ. 30 ก.ย. 2569" without going through Date timezone maths. */
 function fmtThaiDate(iso: string): string {
@@ -260,6 +255,16 @@ export class BookingsService {
       // company quotation → company bank account template on the document; else the personal one
       customerType: b.billingName || (b.taxId && b.taxId.startsWith('0') && b.taxId.length === 13) ? 'COMPANY' : 'PERSON',
       salesName: b.salesName || undefined,
+      // structured attribution stored on the document (the CRM reads it back to track every quotation)
+      ...(attributed
+        ? {
+            crmCustomerId: b.customerId,
+            crmChannel: b.channel || undefined,
+            crmChatName: b.chatCustomerName || undefined,
+            crmSalesId: b.salesId || undefined,
+            crmSalesName: b.salesName || undefined,
+          }
+        : {}),
       ...(b.depositManual && b.depositAmount != null ? { depositAmount: b.depositAmount } : {}),
       project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}${b.venue ? ` · ${b.venue}` : ''}${b.floor ? ` (${b.floor})` : ''}`,
       // the customer's tax-invoice choice wins over the recipe default
@@ -277,6 +282,20 @@ export class BookingsService {
     });
 
     const docNo: string = res.data.docNo;
+    // documents created before attribution existed: backfill it when the booking is re-opened
+    if (res.reused && attributed && !res.data.crmCustomerId) {
+      try {
+        await this.flowAccount.patchCrm(docNo, {
+          crmCustomerId: b.customerId!,
+          crmChannel: b.channel || undefined,
+          crmChatName: b.chatCustomerName || undefined,
+          crmSalesId: b.salesId || undefined,
+          crmSalesName: b.salesName || undefined,
+        });
+      } catch (e: any) {
+        console.warn(`[Bookings] crm backfill failed for ${docNo}: ${e?.message || e}`);
+      }
+    }
     const quotationUrl = `${this.flowAccount.appUrl}${res.data.url || `/quotations/${encodeURIComponent(docNo)}`}`;
     const publicUrl: string | null = res.data.publicUrl || null;
     const updated = await this.prisma.booking.update({
@@ -621,17 +640,17 @@ export class BookingsService {
     const c = await this.prisma.customer.findUnique({ where: { id: b.customerId } });
     if (!c) throw new NotFoundException('ไม่พบลูกค้าในแชต');
 
-    const text = [
-      `ใบเสนอราคา ${b.quotationDocNo} สำหรับ${b.occasion} วันที่ ${fmtThaiDate(b.eventDate)} พร้อมแล้วค่ะ`,
-      'เปิดดูหรือบันทึกเป็น PDF ได้ที่ลิงก์นี้ (เก็บไว้ในแชตนี้ได้เลย)',
-      b.quotationPublicUrl,
-      b.wantVat
+    const text = composeQuotationChatMessage({
+      docNo: b.quotationDocNo || '',
+      publicUrl: b.quotationPublicUrl,
+      headline: ` สำหรับ${b.occasion} วันที่ ${fmtThaiDate(b.eventDate)}`,
+      totalLine: b.wantVat
         ? `ยอดประเมิน ${Math.round(b.estimatedTotal * (1 + VAT_RATE)).toLocaleString('th-TH')} บาท (รวม VAT 7%)`
         : `ยอดประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท (ไม่รวม VAT)`,
-      b.depositAmount != null
+      depositLine: b.depositAmount != null
         ? `มัดจำ ${b.depositAmount.toLocaleString('th-TH')} บาท เพื่อยืนยันคิว · การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ`
         : 'การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ',
-    ].join('\n');
+    });
 
     const res = await this.messages.sendMessage({
       oduserId: c.platformUserId,

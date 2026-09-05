@@ -478,6 +478,7 @@ export async function getQuotationPipeline(params: {
   status?: string;
   search?: string;
   matched?: string;
+  source?: string;
   dateFrom?: string;
   page?: number;
   limit?: number;
@@ -486,6 +487,7 @@ export async function getQuotationPipeline(params: {
   if (params.status) qs.set("status", params.status);
   if (params.search) qs.set("search", params.search);
   if (params.matched) qs.set("matched", params.matched);
+  if (params.source) qs.set("source", params.source);
   if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
   if (params.page) qs.set("page", String(params.page));
   if (params.limit) qs.set("limit", String(params.limit));
@@ -498,6 +500,73 @@ export async function getQuotationStats() {
 
 export async function syncQuotations() {
   return api.get<any>("/quotations/sync");
+}
+
+// ─── Quotations of a chat customer (IRIS Quotation is the source of truth) ─────
+
+/** chat = started from the chat panel (CQ-), booking = from a merit booking (TB-), attached = made by hand then attached, manual = made by hand */
+export type QuotationOrigin = "chat" | "booking" | "attached" | "manual";
+
+export interface CrmQuotation {
+  docNo: string;
+  date: string;
+  customer: string;
+  project: string;
+  grandTotal: number;
+  status: string;
+  salesName: string;
+  itemCount?: number;
+  editUrl: string;
+  publicUrl: string | null;
+  externalRef: string | null;
+  createdVia: string | null;
+  crmCustomerId: string | null;
+  crmChannel: string | null;
+  crmChatName: string | null;
+  crmSalesName: string | null;
+  origin: QuotationOrigin;
+  /** true when IRIS Quotation stores THIS customer's id on the document */
+  attached: boolean;
+  matchedBy: "crm" | "phone" | "name";
+}
+
+export interface FaSearchHit {
+  docNo: string;
+  date: string;
+  customer: string;
+  project: string;
+  grandTotal: number;
+  status: string;
+  salesName: string;
+  crmCustomerId: string | null;
+  crmChatName: string | null;
+  origin: QuotationOrigin;
+  editUrl: string;
+}
+
+export async function getCustomerQuotations(customerId: string) {
+  return api.get<{ data: CrmQuotation[]; total: number }>(`/users/${encodeURIComponent(customerId)}/quotations`);
+}
+
+/** Empty DRAFT in IRIS Quotation attributed to the chat customer + the logged-in admin; returns the edit link. */
+export async function createQuotationFromChat(customerId: string) {
+  return api.post<{ docNo: string; status: string; editUrl: string; publicUrl: string | null; reused: boolean }>("/quotations/from-chat", { customerId });
+}
+
+export async function searchFaQuotations(q: string) {
+  return api.get<{ data: FaSearchHit[] }>(`/quotations/search?q=${encodeURIComponent(q)}`);
+}
+
+export async function attachQuotationToCustomer(docNo: string, customerId: string) {
+  return api.post<{ docNo: string; attached: boolean; publicUrl: string | null }>(`/quotations/${encodeURIComponent(docNo)}/attach`, { customerId });
+}
+
+export async function shareQuotationLink(docNo: string) {
+  return api.post<{ publicUrl: string }>(`/quotations/${encodeURIComponent(docNo)}/share-link`, {});
+}
+
+export async function sendQuotationToChat(docNo: string) {
+  return api.post<{ sent: boolean; messageId: string | null; sentAt: string; publicUrl: string }>(`/quotations/${encodeURIComponent(docNo)}/send-to-chat`, {});
 }
 
 // ─── Merit Bookings (หน้าจองแพคเกจ /booking) ─────────────────────

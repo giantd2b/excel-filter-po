@@ -22,6 +22,15 @@ import {
 // flowaccount-app status codes; labels via faStatusLabel
 const STATUS_TABS = ["ALL", "DRAFT", "PENDING", "APPROVED", "DEPOSITED", "REJECTED"];
 
+// where the document came from (derived by the API from externalRef / crmCustomerId)
+const ORIGIN_LABEL: Record<string, string> = { chat: "จากแชต", booking: "จองงานบุญ", attached: "ผูกภายหลัง", manual: "สร้างเอง" };
+const ORIGIN_STYLE: Record<string, string> = {
+  chat: "bg-emerald-100 text-emerald-700",
+  booking: "bg-violet-100 text-violet-700",
+  attached: "bg-blue-100 text-blue-700",
+  manual: "bg-slate-100 text-slate-500",
+};
+
 export default function QuotationsPage() {
   const navigate = useNavigate();
   const [quotations, setQuotations] = useState<any[]>([]);
@@ -31,6 +40,7 @@ export default function QuotationsPage() {
   const [activeStatus, setActiveStatus] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [matchedFilter, setMatchedFilter] = useState<string>("");
+  const [sourceFilter, setSourceFilter] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -45,6 +55,7 @@ export default function QuotationsPage() {
           status: activeStatus !== "ALL" ? activeStatus : undefined,
           search: searchQuery || undefined,
           matched: matchedFilter || undefined,
+          source: sourceFilter || undefined,
           dateFrom: dateFrom || undefined,
           page,
           limit: 30,
@@ -62,7 +73,7 @@ export default function QuotationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeStatus, searchQuery, matchedFilter, dateFrom, page]);
+  }, [activeStatus, searchQuery, matchedFilter, sourceFilter, dateFrom, page]);
 
   useEffect(() => {
     fetchData();
@@ -284,6 +295,31 @@ export default function QuotationsPage() {
 
             <div className="w-px h-4 bg-slate-200" />
 
+            {/* Origin filter (from IRIS Quotation's externalRef / crmCustomerId) */}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-slate-400 font-medium">ที่มา:</span>
+              {[
+                { value: "", label: "ทั้งหมด" },
+                { value: "chat", label: "จากแชต" },
+                { value: "booking", label: "จองงานบุญ" },
+                { value: "manual", label: "สร้างเอง" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setSourceFilter(opt.value); setPage(1); }}
+                  className={`px-2 py-1 text-[11px] font-medium rounded-md transition-all ${
+                    sourceFilter === opt.value
+                      ? "bg-blue-500 text-white"
+                      : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="w-px h-4 bg-slate-200" />
+
             {/* Date filter */}
             <div className="flex items-center gap-1">
               <span className="text-[11px] text-slate-400 font-medium">ตั้งแต่:</span>
@@ -352,6 +388,9 @@ export default function QuotationsPage() {
                   </th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                     เซลล์
+                  </th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    ที่มา / ช่องทาง
                   </th>
                   <th className="text-center px-5 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                     สถานะ
@@ -423,6 +462,16 @@ export default function QuotationsPage() {
                       <span className="text-[12px] text-slate-500">
                         {q.salesName || "-"}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium ${ORIGIN_STYLE[q.origin] || ORIGIN_STYLE.manual}`}>
+                        {ORIGIN_LABEL[q.origin] || "สร้างเอง"}
+                      </span>
+                      {(q.crmChannelLabel || q.crmSalesName) && (
+                        <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[160px]">
+                          {q.crmChannelLabel || ""}{q.crmSalesName ? `${q.crmChannelLabel ? " · " : ""}เซลล์ ${q.crmSalesName}` : ""}
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-center">
                       <span
