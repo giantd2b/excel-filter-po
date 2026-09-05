@@ -14,8 +14,21 @@ import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
-import { getCustomerBookings, type BookingLink, type MeritBooking } from '../services/bookings';
+import { getCustomerBookings, apiErrorMessage, type BookingLink, type MeritBooking } from '../services/bookings';
+import {
+  getCustomerQuotations,
+  createQuotationFromChat,
+  sendQuotationToChat,
+  shareQuotationLink,
+  attachQuotationToCustomer,
+  faStatusLabel,
+  faStatusStyle,
+  originLabel,
+  ORIGIN_STYLE,
+  type CrmQuotation,
+} from '../services/quotations';
 import BookingLinkModal from '../components/booking/BookingLinkModal';
+import AttachQuotationModal from '../components/booking/AttachQuotationModal';
 import { statusLabel, statusStyle } from '../components/booking/bookingHelpers';
 
 export default function CustomerInfoScreen({ route }: any) {
@@ -35,9 +48,90 @@ export default function CustomerInfoScreen({ route }: any) {
   const [newTag, setNewTag] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
 
-  // Jobs & Quotations
+  // Jobs & Quotations (IRIS Quotation documents attributed to this chat + phone/name matches)
   const [jobs, setJobs] = useState<any[]>([]);
-  const [quotations, setQuotations] = useState<any[]>([]);
+  const [quotations, setQuotations] = useState<CrmQuotation[]>([]);
+  const [quotationsLoading, setQuotationsLoading] = useState(false);
+  const [showAttachQuote, setShowAttachQuote] = useState(false);
+  const [quoteBusy, setQuoteBusy] = useState<string | null>(null); // 'create' | docNo
+  const [quoteMsg, setQuoteMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const reloadQuotations = async () => {
+    setQuotationsLoading(true);
+    try {
+      setQuotations(await getCustomerQuotations(docId));
+    } catch { /* keep what we have */ } finally {
+      setQuotationsLoading(false);
+    }
+  };
+
+  /** "สร้างใบเสนอราคาทั่วไป": empty draft in IRIS Quotation attributed to this chat + me; opens the editor. */
+  const createGeneralQuotation = () => {
+    const name = details?.nickname || displayName || 'ลูกค้า';
+    Alert.alert(
+      'สร้างใบเสนอราคาร่าง',
+      `สร้างใบเสนอราคาร่างสำหรับ ${name}?\n\nระบบจะเปิด IRIS Quotation ให้เติมรายการ ใบนี้จะผูกกับแชตนี้และเซลล์ของคุณอัตโนมัติ`,
+      [
+        { text: 'ยกเลิก', style: 'cancel' },
+        {
+          text: 'สร้าง',
+          onPress: async () => {
+            setQuoteBusy('create');
+            setQuoteMsg(null);
+            try {
+              const res = await createQuotationFromChat(docId);
+              if (res.editUrl) Linking.openURL(res.editUrl).catch(() => {});
+              setQuoteMsg({ ok: true, text: `สร้าง ${res.docNo} แล้ว — เติมรายการใน IRIS Quotation แล้วกลับมากด "ส่งลิงก์เข้าแชต"` });
+              await reloadQuotations();
+            } catch (e: any) {
+              setQuoteMsg({ ok: false, text: apiErrorMessage(e, 'สร้างใบเสนอราคาไม่สำเร็จ') });
+            } finally {
+              setQuoteBusy(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const sendQuoteToChat = async (docNo: string) => {
+    setQuoteBusy(docNo);
+    setQuoteMsg(null);
+    try {
+      await sendQuotationToChat(docNo);
+      setQuoteMsg({ ok: true, text: `ส่งลิงก์ ${docNo} เข้าแชตแล้ว` });
+      await reloadQuotations();
+    } catch (e: any) {
+      setQuoteMsg({ ok: false, text: apiErrorMessage(e, 'ส่งไม่สำเร็จ') });
+    } finally {
+      setQuoteBusy(null);
+    }
+  };
+
+  const copyQuoteLink = async (q: CrmQuotation) => {
+    try {
+      const url = q.publicUrl || (await shareQuotationLink(q.docNo)).publicUrl;
+      await Clipboard.setStringAsync(url);
+      setQuoteMsg({ ok: true, text: `คัดลอกลิงก์ ${q.docNo} แล้ว` });
+      if (!q.publicUrl) await reloadQuotations();
+    } catch (e: any) {
+      setQuoteMsg({ ok: false, text: apiErrorMessage(e, 'คัดลอกลิงก์ไม่สำเร็จ') });
+    }
+  };
+
+  const attachQuote = async (docNo: string) => {
+    setQuoteBusy(docNo);
+    setQuoteMsg(null);
+    try {
+      await attachQuotationToCustomer(docNo, docId);
+      setQuoteMsg({ ok: true, text: `ผูก ${docNo} กับแชตนี้แล้ว` });
+      await reloadQuotations();
+    } catch (e: any) {
+      setQuoteMsg({ ok: false, text: apiErrorMessage(e, 'ผูกไม่สำเร็จ') });
+    } finally {
+      setQuoteBusy(null);
+    }
+  };
 
   // Merit bookings (/booking page) + booking links sent to this customer
   const [bookings, setBookings] = useState<MeritBooking[]>([]);
@@ -503,40 +597,95 @@ export default function CustomerInfoScreen({ route }: any) {
         onClose={() => { setShowBookingLink(false); refreshBookings(); }}
       />
 
-      {/* FlowAccount Quotations */}
-      {quotations.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ใบเสนอราคา ({quotations.length})</Text>
-          {quotations.map((q: any) => (
-            <TouchableOpacity
-              key={q.docNo}
-              style={styles.orderCard}
-              onPress={() => { if (q.editUrl) Linking.openURL(q.editUrl); }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: '#d97706' }}>{q.docNo}</Text>
-                <View style={{
-                  paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
-                  backgroundColor: q.status === 'อนุมัติ' || q.status === 'ดำเนินการแล้ว' ? '#dcfce7'
-                    : q.status === 'ไม่อนุมัติ' ? '#fef2f2' : '#fef3c7',
-                }}>
-                  <Text style={{
-                    fontSize: 9, fontWeight: '700',
-                    color: q.status === 'อนุมัติ' || q.status === 'ดำเนินการแล้ว' ? '#166534'
-                      : q.status === 'ไม่อนุมัติ' ? '#991b1b' : '#92400e',
-                  }}>{q.status}</Text>
-                </View>
-              </View>
-              <Text style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{q.project || q.customer}</Text>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                <Text style={{ fontSize: 11, color: '#94a3b8' }}>{q.date}</Text>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1e293b' }}>฿{Number(q.grandTotal || 0).toLocaleString()}</Text>
-              </View>
-              {q.salesName && <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>👤 {q.salesName}</Text>}
+      {/* Quotations (IRIS Quotation) — every document attributed to this chat, plus phone/name matches */}
+      <View style={styles.section}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>
+            ใบเสนอราคา{quotations.length > 0 ? ` (${quotations.length})` : ''}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity onPress={() => setShowAttachQuote(true)}>
+              <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600' }}>ผูกใบที่มีอยู่</Text>
             </TouchableOpacity>
-          ))}
+            <TouchableOpacity onPress={createGeneralQuotation} disabled={quoteBusy === 'create'}>
+              <Text style={{ fontSize: 12, color: '#d97706', fontWeight: '600', opacity: quoteBusy === 'create' ? 0.5 : 1 }}>
+                {quoteBusy === 'create' ? 'กำลังสร้าง…' : '+ สร้างใบเสนอราคาทั่วไป'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      )}
+        {quoteMsg ? (
+          <Text style={{ fontSize: 11, marginBottom: 8, lineHeight: 16, color: quoteMsg.ok ? '#059669' : '#ef4444' }}>{quoteMsg.text}</Text>
+        ) : null}
+        {quotationsLoading ? (
+          <ActivityIndicator color="#f59e0b" style={{ marginVertical: 8 }} />
+        ) : quotations.length === 0 ? (
+          <Text style={{ fontSize: 12, color: '#94a3b8' }}>
+            ยังไม่มีใบเสนอราคา — งานบุญใช้ลิงก์จองด้านบน แพ็กเกจอื่นกด "สร้างใบเสนอราคาทั่วไป"
+          </Text>
+        ) : (
+          quotations.map((q) => {
+            const st = faStatusStyle(q.status);
+            const origin = ORIGIN_STYLE[q.origin || ''] || ORIGIN_STYLE.manual;
+            const busy = quoteBusy === q.docNo;
+            return (
+              <View key={q.docNo} style={[styles.orderCard, { backgroundColor: '#fffbeb' }]}>
+                <View style={styles.orderHeader}>
+                  <TouchableOpacity onPress={() => { if (q.editUrl) Linking.openURL(q.editUrl).catch(() => {}); }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#d97706' }}>{q.docNo} ↗</Text>
+                  </TouchableOpacity>
+                  <View style={[styles.orderStatusBadge, { backgroundColor: st.bg }]}>
+                    <Text style={[styles.orderStatusText, { color: st.fg }]}>{faStatusLabel(q.status)}</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>{q.project || q.customer || '-'}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                  <Text style={{ fontSize: 11, color: '#94a3b8' }}>{q.date}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1e293b' }}>฿{Number(q.grandTotal || 0).toLocaleString('th-TH')}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                  <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: origin.bg }}>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: origin.fg }}>{originLabel(q)}</Text>
+                  </View>
+                  {q.crmSalesName || q.salesName ? (
+                    <Text style={{ fontSize: 10, color: '#94a3b8' }}>👤 {q.crmSalesName || q.salesName}</Text>
+                  ) : null}
+                  {q.itemCount === 0 ? <Text style={{ fontSize: 10, color: '#f87171' }}>ยังไม่มีรายการ</Text> : null}
+                </View>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, marginTop: 8 }}>
+                  <TouchableOpacity onPress={() => sendQuoteToChat(q.docNo)} disabled={busy || !q.attached}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#d97706', opacity: busy || !q.attached ? 0.4 : 1 }}>
+                      📨 {busy ? 'กำลังส่ง…' : 'ส่งลิงก์เข้าแชต'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => copyQuoteLink(q)}>
+                    <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600' }}>📋 คัดลอกลิงก์</Text>
+                  </TouchableOpacity>
+                  {!q.attached ? (
+                    <TouchableOpacity onPress={() => attachQuote(q.docNo)} disabled={busy} style={{ marginLeft: 'auto' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#2563eb', opacity: busy ? 0.5 : 1 }}>ผูกกับแชตนี้</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+                {!q.attached ? (
+                  <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>ผูกกับแชตนี้ก่อนจึงส่งลิงก์เข้าแชตได้</Text>
+                ) : null}
+              </View>
+            );
+          })
+        )}
+      </View>
+
+      <AttachQuotationModal
+        visible={showAttachQuote}
+        customer={{ id: docId, displayName: customer.nickname || displayName || 'ลูกค้า' }}
+        onClose={() => setShowAttachQuote(false)}
+        onAttached={(docNo) => {
+          setShowAttachQuote(false);
+          setQuoteMsg({ ok: true, text: `ผูก ${docNo} กับแชตนี้แล้ว` });
+          reloadQuotations();
+        }}
+      />
     </ScrollView>
   );
 }
