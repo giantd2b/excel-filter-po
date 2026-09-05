@@ -363,7 +363,16 @@ export class QuotationsService {
     };
   }
 
+  private syncPromise: Promise<any> | null = null;
+
+  /** Concurrent callers share one in-flight sync instead of getting an empty cache (cold start race). */
   async syncFromFlowAccount() {
+    if (this.syncPromise) return this.syncPromise;
+    this.syncPromise = this.doSync().finally(() => { this.syncPromise = null; });
+    return this.syncPromise;
+  }
+
+  private async doSync() {
     if (this.syncing) return this.cache ? { total: this.cache.data.length, matched: 0, updatedAt: this.cache.updatedAt } : null;
     this.syncing = true;
 
