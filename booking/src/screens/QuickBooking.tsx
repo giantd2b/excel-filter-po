@@ -63,8 +63,9 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
     if (!/[0-9]{9,}/.test(f.phone.replace(/[^0-9]/g, ''))) return setErr('กรุณากรอกเบอร์โทรให้ถูกต้อง');
     if (!f.sameName && !f.billingName.trim()) return setErr('กรุณากรอกชื่อที่ต้องการให้ระบุในใบเสนอราคา');
     if (!f.billingLine.trim()) return setErr('กรุณากรอกที่อยู่สำหรับออกใบเสนอราคา (บ้านเลขที่ / หมู่ / ถนน)');
-    if (!f.billingTambon && !f.billingProvince) return setErr('กรุณาเลือกตำบล/แขวง ของที่อยู่ออกใบเสนอราคา');
-    if (!f.sameAddress && !f.venue.trim() && !f.tambon) return setErr('กรุณาระบุสถานที่จัดงาน');
+    if (!f.billingTambon || !f.billingProvince) return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของที่อยู่ออกใบเสนอราคาจากรายการค้นหา (พิมพ์ชื่อตำบลแล้วแตะเลือก)');
+    if (!f.sameAddress && !f.venue.trim()) return setErr('กรุณาระบุสถานที่จัดงาน');
+    if (!f.sameAddress && (!f.tambon || !f.province)) return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของสถานที่จัดงานจากรายการค้นหา');
     if (!f.floor.trim()) return setErr('กรุณาระบุชั้นที่จัดงาน');
     if (!f.date) return setErr('กรุณาเลือกวันที่จัดงาน');
     if (submitting) return;

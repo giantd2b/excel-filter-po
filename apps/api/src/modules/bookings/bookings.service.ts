@@ -334,6 +334,11 @@ export class BookingsService {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dto.eventDate)) {
       throw new BadRequestException('กรุณาเลือกวันที่จัดงาน');
     }
+    // the address printed on the quotation must carry ตำบล/อำเภอ/จังหวัด — typing a house number
+    // without picking an area from the search list produced quotations with only "23 หมู่ 1"
+    if (!(dto.billingTambon || dto.tambon) || !(dto.billingProvince || dto.province)) {
+      throw new BadRequestException('กรุณาเลือกตำบล/อำเภอ/จังหวัดจากรายการค้นหา ที่อยู่ในใบเสนอราคาต้องมีตำบล อำเภอ และจังหวัด');
+    }
 
     const calc = calcEstimatedTotal(
       {

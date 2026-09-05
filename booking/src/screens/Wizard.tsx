@@ -49,12 +49,13 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
 
   const next = async () => {
     if (step === 0 && !f.date) return setErr('กรุณาเลือกวันที่จัดงาน');
-    if (step === 0 && !f.tambon && !f.venue.trim()) return setErr('กรุณาเลือกตำบล/แขวง ที่จัดงาน');
+    if (step === 0 && (!f.tambon || !f.province)) return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของสถานที่จัดงานจากรายการค้นหา (พิมพ์ชื่อตำบลแล้วแตะเลือก)');
     if (step === 4) {
       if (!f.name.trim()) return setErr('กรุณากรอกชื่อผู้ติดต่อ');
       if (!/[0-9]{9,}/.test(f.phone.replace(/[^0-9]/g, ''))) return setErr('กรุณากรอกเบอร์โทรให้ถูกต้อง');
       if (!f.sameName && !f.billingName.trim()) return setErr('กรุณากรอกชื่อที่ต้องการให้ระบุในใบเสนอราคา');
-      if (!f.sameAddress && !f.billingLine.trim() && !f.billingTambon) return setErr('กรุณากรอกที่อยู่สำหรับออกใบเสนอราคา');
+      if (!f.sameAddress && !f.billingLine.trim()) return setErr('กรุณากรอกที่อยู่สำหรับออกใบเสนอราคา (บ้านเลขที่ / หมู่ / ถนน)');
+      if (!f.sameAddress && (!f.billingTambon || !f.billingProvince)) return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของที่อยู่ออกใบเสนอราคาจากรายการค้นหา');
       if (submitting) return;
       setSubmitting(true);
       try {
