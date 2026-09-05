@@ -855,7 +855,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
             opacity: submitting ? 0.6 : 1,
           }}
         >
-          {step === 4 ? (submitting ? 'กำลังส่งข้อมูล…' : 'ยืนยันการจอง') : 'ถัดไป'}
+          {step === 4 ? (submitting ? 'กำลังส่งข้อมูล…' : 'ขอใบเสนอราคา') : 'ถัดไป'}
         </div>
       </div>
       {err && (

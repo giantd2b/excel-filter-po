@@ -100,9 +100,9 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
   return (
     <div>
       <div style={{ padding: '22px 20px 8px' }}>
-        <div style={{ ...charm, fontSize: 30, lineHeight: 1.2, color: 'var(--color-accent-900)' }}>ยืนยันการจองงานบุญ</div>
+        <div style={{ ...charm, fontSize: 30, lineHeight: 1.2, color: 'var(--color-accent-900)' }}>ขอใบเสนอราคางานบุญ</div>
         <div style={{ fontSize: 14, color: 'var(--color-neutral-600)', marginTop: 6, lineHeight: 1.6 }}>
-          ทีมงานจัดแพ็กเกจให้คุณ{linkInfo.customerName}แล้ว กรอกข้อมูลติดต่อ ที่อยู่ และสถานที่จัดงาน ระบบจะออกใบเสนอราคาให้ทันที
+          ทีมงานจัดแพ็กเกจให้คุณ{linkInfo.customerName}แล้ว กรอกข้อมูลติดต่อ ที่อยู่ และสถานที่จัดงาน ระบบจะออกใบเสนอราคาให้ทันที การจองจะสมบูรณ์เมื่อชำระมัดจำ
         </div>
       </div>
 
@@ -288,7 +288,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
             opacity: submitting ? 0.6 : 1,
           }}
         >
-          {submitting ? 'กำลังส่งข้อมูล…' : 'ยืนยันการจองและรับใบเสนอราคา'}
+          {submitting ? 'กำลังส่งข้อมูล…' : 'ส่งข้อมูลและรับใบเสนอราคา'}
         </div>
         {err && <div style={{ marginTop: 12, fontSize: 13.5, color: '#a3341f', textAlign: 'center' }}>{err}</div>}
       </div>

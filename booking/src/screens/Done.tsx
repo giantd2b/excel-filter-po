@@ -48,12 +48,15 @@ export default function Done({ saved, onHome }: Props) {
         </svg>
       </div>
       <h1 style={{ ...charm, fontSize: 32, lineHeight: 1.45, margin: '0 0 8px', color: 'var(--color-accent-900)' }}>
-        รับคำขอจองแล้ว
+        ได้รับข้อมูลแล้ว ขอบคุณค่ะ
       </h1>
       <p style={{ margin: '0 0 20px', fontSize: 15, lineHeight: 1.75, color: 'var(--color-neutral-700)', textWrap: 'pretty' }}>
         {saved.quotationUrl
           ? 'ใบเสนอราคาของท่านพร้อมแล้ว เปิดดูหรือบันทึกเป็น PDF ได้จากปุ่มด้านล่าง แล้วส่งรายละเอียดให้ทีมงานทาง LINE เพื่อตรวจสอบคิววันงาน'
           : 'ทีมงานจะจัดทำใบเสนอราคาและส่งให้ทาง LINE หลังตรวจสอบคิววันงาน กรุณากดปุ่มด้านล่างเพื่อส่งรายละเอียด'}
+      </p>
+      <p style={{ margin: '-8px 0 20px', fontSize: 13.5, lineHeight: 1.7, color: 'var(--color-accent-2-700)' }}>
+        ยังไม่ถือเป็นการจองคิว — การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะยืนยันคิววันงานและแจ้งขั้นตอนชำระมัดจำให้ทาง LINE
       </p>
       <div
         style={{
