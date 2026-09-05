@@ -297,7 +297,7 @@ export default function Home({ onStartBooking, onOpenPkg }: Props) {
           borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
         }}
       >
-        <SectionTitle style={{ margin: '0 0 18px' }}>จองง่าย 3 ขั้นตอน</SectionTitle>
+        <SectionTitle style={{ margin: '0 0 18px' }}>ขอใบเสนอราคาง่าย ๆ 3 ขั้นตอน</SectionTitle>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[
             ['เลือกแพ็กเกจและกรอกรายละเอียด', 'วันจัดงาน จำนวนแขก จำนวนพระ และสถานที่'],

@@ -12,12 +12,12 @@ export default function Done({ saved, onHome }: Props) {
   const [copied, setCopied] = useState(false);
 
   const copySummary = () => {
-    const txt = ['ขอจองงานบุญ ' + saved.code]
+    const txt = ['ขอใบเสนอราคางานบุญ ' + saved.code]
       .concat(saved.rows.map((x) => x.k + ': ' + x.v))
       .concat([
         'ราคาประเมิน: ' + baht(saved.total) + ' บาท',
         saved.quotationUrl ? 'ใบเสนอราคา: ' + saved.quotationUrl : '',
-        'ผู้จอง: ' + saved.f.name + ' ' + saved.f.phone,
+        'ผู้ติดต่อ: ' + saved.f.name + ' ' + saved.f.phone,
         saved.f.note ? 'หมายเหตุ: ' + saved.f.note : '',
       ])
       .filter(Boolean)
@@ -67,13 +67,13 @@ export default function Done({ saved, onHome }: Props) {
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>รหัสการจอง</div>
+          <div style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>เลขที่คำขอ</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-accent-700)', letterSpacing: '.04em' }}>
             {saved.code}
           </div>
         </div>
         {saved.rows
-          .concat([{ k: 'ผู้จอง', v: saved.f.name + ' · ' + saved.f.phone }])
+          .concat([{ k: 'ผู้ติดต่อ', v: saved.f.name + ' · ' + saved.f.phone }])
           .map((s) => (
             <div
               key={s.k}
@@ -160,7 +160,7 @@ export default function Done({ saved, onHome }: Props) {
             cursor: 'pointer',
           }}
         >
-          {copied ? 'คัดลอกแล้ว' : 'คัดลอกรายละเอียดการจอง'}
+          {copied ? 'คัดลอกแล้ว' : 'คัดลอกรายละเอียด'}
         </div>
         <a
           href={`tel:${PHONE}`}

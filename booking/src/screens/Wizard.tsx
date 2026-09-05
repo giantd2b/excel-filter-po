@@ -729,7 +729,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 boxShadow: 'var(--shadow-sm)',
               }}
             >
-              <div style={{ ...charm, fontSize: 23, color: 'var(--color-accent-900)', marginBottom: 10 }}>สรุปการจอง</div>
+              <div style={{ ...charm, fontSize: 23, color: 'var(--color-accent-900)', marginBottom: 10 }}>สรุปรายการ</div>
               {summary(f).map((s) => (
                 <div
                   key={s.k}
