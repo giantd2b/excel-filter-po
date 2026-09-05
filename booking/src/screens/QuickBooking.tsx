@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ADDONS, OCCASIONS, TIME_OPTS, baht, pkgById } from '../data/packages';
+import { ADDONS, OCCASIONS, TIME_OPTS, baht, pkgById, SERVICE_AREA_TEXT, isServiceProvince } from '../data/packages';
 import { calc, finalizeForm, summary, type BookingForm } from '../lib/calc';
 import { submitBooking, type BookingLinkInfo } from '../lib/api';
 import { FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
@@ -64,9 +64,17 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
     if (!/[0-9]{9,}/.test(f.phone.replace(/[^0-9]/g, ''))) return setErr('กรุณากรอกเบอร์โทรให้ถูกต้อง');
     if (!f.sameName && !f.billingName.trim()) return setErr('กรุณากรอกชื่อที่ต้องการให้ระบุในใบเสนอราคา');
     if (!f.billingLine.trim()) return setErr('กรุณากรอกที่อยู่สำหรับออกใบเสนอราคา (บ้านเลขที่ / หมู่ / ถนน)');
-    if (!f.billingTambon || !f.billingProvince) return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของที่อยู่ออกใบเสนอราคาจากรายการค้นหา (พิมพ์ชื่อตำบลแล้วแตะเลือก)');
+    if (!f.billingTambon || !f.billingProvince) {
+      if (f.sameAddress && f.billingAreaQuery.trim()) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`);
+      return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของที่อยู่ออกใบเสนอราคาจากรายการค้นหา (พิมพ์ชื่อตำบลแล้วแตะเลือก)');
+    }
+    if (f.sameAddress && !isServiceProvince(f.billingProvince)) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`);
     if (!f.sameAddress && !f.venue.trim()) return setErr('กรุณาระบุสถานที่จัดงาน');
-    if (!f.sameAddress && (!f.tambon || !f.province)) return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของสถานที่จัดงานจากรายการค้นหา');
+    if (!f.sameAddress && (!f.tambon || !f.province)) {
+      if (f.areaQuery.trim()) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`);
+      return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของสถานที่จัดงานจากรายการค้นหา');
+    }
+    if (!f.sameAddress && !isServiceProvince(f.province)) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`);
     if (!f.floor.trim()) return setErr('กรุณาระบุชั้นที่จัดงาน');
     if (!f.date) return setErr('กรุณาเลือกวันที่จัดงาน');
     if (submitting) return;

@@ -8,6 +8,8 @@ import {
   TIME_OPTS,
   baht,
   pkgById,
+  SERVICE_AREA_TEXT,
+  isServiceProvince,
 } from '../data/packages';
 import { AddressFields, FloorField } from '../components/AddressFields';
 import { calc, finalizeForm, summary, tentRecommendation, type BookingForm } from '../lib/calc';
@@ -49,7 +51,11 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
 
   const next = async () => {
     if (step === 0 && !f.date) return setErr('กรุณาเลือกวันที่จัดงาน');
-    if (step === 0 && (!f.tambon || !f.province)) return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของสถานที่จัดงานจากรายการค้นหา (พิมพ์ชื่อตำบลแล้วแตะเลือก)');
+    if (step === 0 && (!f.tambon || !f.province)) {
+      if (f.areaQuery.trim()) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`);
+      return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของสถานที่จัดงานจากรายการค้นหา (พิมพ์ชื่อตำบลแล้วแตะเลือก)');
+    }
+    if (step === 0 && !isServiceProvince(f.province)) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`);
     if (step === 4) {
       if (!f.name.trim()) return setErr('กรุณากรอกชื่อผู้ติดต่อ');
       if (!/[0-9]{9,}/.test(f.phone.replace(/[^0-9]/g, ''))) return setErr('กรุณากรอกเบอร์โทรให้ถูกต้อง');

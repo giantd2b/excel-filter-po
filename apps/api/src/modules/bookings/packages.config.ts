@@ -55,6 +55,14 @@ export const SELF_TRANSPORT_DISCOUNT = 1000;
 // Editable in the dashboard (จองงานบุญ → ตั้งค่า → ค่าเดินทาง), stored in SystemSetting
 // TRAVEL_FEES_SETTING_KEY, served to the /booking page in GET /bookings/pricing (travelFees)
 // and added as its own line on the quotation. Keys are district names without เขต/อ.
+/** Provinces we serve — the EVENT VENUE must be in one of these (mirror of booking/src/data/packages.ts). */
+export const SERVICE_PROVINCES = ['ชลบุรี', 'ระยอง', 'สมุทรปราการ', 'ฉะเชิงเทรา', 'กรุงเทพฯ'];
+export const SERVICE_AREA_TEXT = 'ชลบุรี ระยอง สมุทรปราการ ฉะเชิงเทรา และกรุงเทพมหานคร';
+export function isServiceProvince(p: string | null | undefined): boolean {
+  const v = String(p || '').trim().replace(/^จ\./, '').replace(/^กรุงเทพมหานคร$/, 'กรุงเทพฯ');
+  return SERVICE_PROVINCES.includes(v);
+}
+
 export const TRAVEL_FEES_SETTING_KEY = 'booking_travel_fees';
 export interface TravelFeeConfig { fees: Record<string, number> }
 export const DEFAULT_TRAVEL_FEES: TravelFeeConfig = {

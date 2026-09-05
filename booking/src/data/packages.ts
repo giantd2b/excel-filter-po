@@ -258,6 +258,14 @@ export const DEPOSIT_RULE: { tiers: { upTo: number; amount: number }[]; abovePer
   abovePercent: 20,
 };
 
+/** Provinces we serve — the event venue must be in one of these (mirror of apps/api packages.config.ts). */
+export const SERVICE_PROVINCES = ['ชลบุรี', 'ระยอง', 'สมุทรปราการ', 'ฉะเชิงเทรา', 'กรุงเทพฯ'];
+export const SERVICE_AREA_TEXT = 'ชลบุรี ระยอง สมุทรปราการ ฉะเชิงเทรา และกรุงเทพมหานคร';
+export function isServiceProvince(p: string | null | undefined): boolean {
+  const v = String(p || '').trim().replace(/^จ\./, '').replace(/^กรุงเทพมหานคร$/, 'กรุงเทพฯ');
+  return SERVICE_PROVINCES.includes(v);
+}
+
 /** Travel fee by อำเภอ/เขต of the EVENT VENUE (mirror of apps/api packages.config.ts DEFAULT_TRAVEL_FEES; overwritten by applyPricing). */
 export const TRAVEL_FEES: Record<string, number> = {
   วังจันทร์: 1000, เขาชะเมา: 2000, แกลง: 1000,

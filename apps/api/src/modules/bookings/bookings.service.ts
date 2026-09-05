@@ -21,6 +21,8 @@ import {
   mergeTravelFees,
   travelFeeFor,
   travelAreaLabel,
+  isServiceProvince,
+  SERVICE_AREA_TEXT,
   pickRemarkCode,
   DEFAULT_PRICING,
   type FaRecipeConfig,
@@ -374,6 +376,10 @@ export class BookingsService {
     // without picking an area from the search list produced quotations with only "23 หมู่ 1"
     if (!(dto.billingTambon || dto.tambon) || !(dto.billingProvince || dto.province)) {
       throw new BadRequestException('กรุณาเลือกตำบล/อำเภอ/จังหวัดจากรายการค้นหา ที่อยู่ในใบเสนอราคาต้องมีตำบล อำเภอ และจังหวัด');
+    }
+    // the EVENT VENUE must be inside the service area (dto.province = venue; quick form copies billing → venue)
+    if (!isServiceProvince(dto.province || dto.billingProvince)) {
+      throw new BadRequestException(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาติดต่อทีมงานทาง LINE`);
     }
 
     // travel fee follows the EVENT VENUE district (dto.amphoe); the quick form copies the billing

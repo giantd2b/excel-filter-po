@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { TH_AREAS } from '../data/th-areas';
-import { travelAreaLabel, travelFeeFor } from '../data/packages';
+import { SERVICE_AREA_TEXT, isServiceProvince, travelAreaLabel, travelFeeFor } from '../data/packages';
 import type { BookingForm } from '../lib/calc';
 import { FieldLabel, inputStyle } from '../ui';
 
@@ -100,9 +100,17 @@ export default function AreaSearch({ form: f, setForm, scope = 'event', label = 
             ))}
           </div>
         )}
-        {open && q.length >= 2 && suggestions.length === 0 && (
-          <div style={{ fontSize: 13, color: 'var(--color-neutral-600)', marginTop: 8, lineHeight: 1.6 }}>
-            ไม่พบตำบลนี้ในพื้นที่บริการ กรุณาพิมพ์ที่อยู่ในช่องด้านบน แล้วทีมงานจะตรวจสอบให้
+        {q.length >= 2 && suggestions.length === 0 && !tambon && (
+          <div style={{ background: '#fdecec', border: '1px solid #f0a5a5', borderRadius: 'var(--radius-md)', padding: '10px 13px', marginTop: 8, fontSize: 13, lineHeight: 1.6, color: '#8a1f1f' }}>
+            <b>⚠️ ไม่พบตำบล "{q}" ในพื้นที่บริการ</b>
+            <div style={{ marginTop: 2 }}>
+              {showTravelFee ? 'สถานที่จัดงาน' : 'ที่อยู่นี้'}อาจอยู่นอกพื้นที่บริการ — เรารับจัดงานใน{SERVICE_AREA_TEXT} ลองพิมพ์เฉพาะชื่อตำบล/แขวงอีกครั้ง หรือติดต่อทีมงานทาง LINE เพื่อสอบถามก่อนจอง
+            </div>
+          </div>
+        )}
+        {!!tambon && showTravelFee && !isServiceProvince(String(f[k.province] || '')) && (
+          <div style={{ background: '#fdecec', border: '1px solid #f0a5a5', borderRadius: 'var(--radius-md)', padding: '10px 13px', marginTop: 8, fontSize: 13, lineHeight: 1.6, color: '#8a1f1f' }}>
+            ⚠️ สถานที่จัดงานอยู่นอกพื้นที่บริการ (เรารับจัดงานใน{SERVICE_AREA_TEXT}) กรุณาติดต่อทีมงานก่อนจอง
           </div>
         )}
       </div>
