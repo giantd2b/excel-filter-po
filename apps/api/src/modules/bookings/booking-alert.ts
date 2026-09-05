@@ -196,9 +196,11 @@ export function buildNewBookingFlex(b: BookingAlertInput, opts: { crmUrl: string
 /** Fire-and-forget: push the new-booking card into the IRIS BOT group. Never throws. */
 export async function sendNewBookingAlert(b: BookingAlertInput): Promise<void> {
   try {
-    const token = process.env.IRIS_BOT_ACCESS_TOKEN;
+    // IRIS BOT is the same channel that posts slip alerts (LINE_GROUP_ACCESS_TOKEN);
+    // IRIS_BOT_ACCESS_TOKEN only overrides it. trim() guards against a pasted space.
+    const token = (process.env.IRIS_BOT_ACCESS_TOKEN || process.env.LINE_GROUP_ACCESS_TOKEN || '').trim();
     if (!token) {
-      console.warn(`[Bookings] IRIS_BOT_ACCESS_TOKEN not set — skip LINE group alert for ${b.code || 'booking'}`);
+      console.warn(`[Bookings] no LINE bot token (IRIS_BOT_ACCESS_TOKEN / LINE_GROUP_ACCESS_TOKEN) — skip group alert for ${b.code || 'booking'}`);
       return;
     }
     const groupId = process.env.BOOKING_ALERT_LINE_GROUP_ID || DEFAULT_GROUP_ID;
