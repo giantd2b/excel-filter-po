@@ -26,6 +26,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingPresetDto } from './dto/booking-preset.dto';
 import { FlowAccountClient } from '../quotations/flowaccount.client';
 import { MessagesService } from '../messages/messages.service';
+import { sendNewBookingAlert } from './booking-alert';
 
 const CHANNEL_LABELS: Record<string, string> = { LINE: 'LINE', FACEBOOK: 'Facebook' };
 function channelLabel(channel: string, channelType?: string | null) {
@@ -370,13 +371,16 @@ export class BookingsService {
     // Create the real quotation in flowaccount-app right away so the customer gets a
     // public link on the final step. A failure must never break the booking itself —
     // sales can still create it later from the dashboard.
+    let result: any = booking;
     try {
       const q = await this.createQuotation(booking.id);
-      return { ...q.booking, quotationPublicUrl: q.publicUrl || q.booking.quotationPublicUrl };
+      result = { ...q.booking, quotationPublicUrl: q.publicUrl || q.booking.quotationPublicUrl };
     } catch (e: any) {
       console.warn(`[Bookings] auto quotation failed for ${booking.code}: ${e?.message || e}`);
-      return booking;
     }
+    // Team alert into the IRIS BOT LINE group — detached, never fails the booking
+    sendNewBookingAlert(result).catch(() => {});
+    return result;
   }
 
   private async nextCode(): Promise<string> {
