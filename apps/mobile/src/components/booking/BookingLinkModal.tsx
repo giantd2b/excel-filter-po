@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
   },
-  linkUrl: { fontSize: 12, color: '#334155', fontFamily: 'monospace' as any },
+  linkUrl: { fontSize: 12, color: '#334155', fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }) },
   linkMeta: { fontSize: 11, color: '#64748b', lineHeight: 16 },
   errorBox: { backgroundColor: '#fef2f2', borderRadius: 10, padding: 10 },
   errorText: { fontSize: 12, color: '#dc2626' },

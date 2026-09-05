@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, ActivityIndicator, Platform } from 'react-native';
 import type { MeritBooking } from '../../services/bookings';
 import {
   NEXT_STATUS,
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
   sub: { fontSize: 11, color: '#64748b', marginTop: 2 },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
-  code: { fontSize: 12, color: '#64748b', fontFamily: 'monospace' as any },
+  code: { fontSize: 12, color: '#64748b', fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }) },
   phone: { fontSize: 12, color: '#4f46e5', fontWeight: '600' },
   statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   statusText: { fontSize: 11, fontWeight: '700' },
