@@ -148,7 +148,10 @@ export function buildNewBookingFlex(b: BookingAlertInput, opts: { crmUrl: string
       style: 'primary',
       color: '#B45309',
       height: 'sm',
-      action: { type: 'uri', label: 'เปิดใน CRM', uri: `${opts.crmUrl}/dashboard/bookings` },
+      // Bounce page: opens the IRIS CRM app when installed (iriscrm://bookings), else the web
+      // dashboard. openExternalBrowser=1 makes LINE use the system browser, which can hand
+      // off to the app; LINE's in-app browser cannot.
+      action: { type: 'uri', label: 'เปิดใน CRM', uri: `${opts.crmUrl}/open/bookings/?openExternalBrowser=1` },
     },
   ];
   if (b.quotationPublicUrl) {

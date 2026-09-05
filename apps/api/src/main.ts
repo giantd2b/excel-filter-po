@@ -32,6 +32,8 @@ async function bootstrap() {
   const staticPath = join(__dirname, '..', 'static');
   if (fs.existsSync(staticPath)) {
     app.use('/guide', express.static(join(staticPath, 'guide')));
+    // App deep-link bounce pages (e.g. /open/bookings/ → iriscrm://bookings, else web)
+    app.use('/open', express.static(join(staticPath, 'open')));
   }
 
   if (fs.existsSync(publicPath)) {
@@ -40,7 +42,7 @@ async function bootstrap() {
 
     // SPA fallback — serve index.html for all non-API routes
     app.use((req: any, res: any, next: any) => {
-      if (req.path.startsWith('/api') || req.path.startsWith('/inbox') || req.path.startsWith('/socket.io') || req.path.startsWith('/guide')) {
+      if (req.path.startsWith('/api') || req.path.startsWith('/inbox') || req.path.startsWith('/socket.io') || req.path.startsWith('/guide') || req.path.startsWith('/open')) {
         return next();
       }
       res.sendFile(join(publicPath, 'index.html'));

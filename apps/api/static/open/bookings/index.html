@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>เปิด IRIS CRM</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, "Segoe UI", Roboto, "Noto Sans Thai", sans-serif; background: #f8fafc; color: #1e293b; }
+    .card { text-align: center; padding: 32px 24px; max-width: 360px; }
+    .logo { font-size: 44px; margin-bottom: 8px; }
+    h1 { font-size: 18px; margin: 0 0 6px; }
+    p { font-size: 14px; color: #64748b; margin: 0 0 20px; line-height: 1.5; }
+    a.btn { display: block; padding: 13px 18px; border-radius: 12px; font-weight: 700; font-size: 15px;
+      text-decoration: none; margin-bottom: 10px; }
+    .primary { background: #6366f1; color: #fff; }
+    .secondary { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🙏</div>
+    <h1>กำลังเปิด IRIS CRM…</h1>
+    <p id="hint">ถ้าติดตั้งแอปไว้ จะเปิดแอปให้อัตโนมัติ ไม่เช่นนั้นจะเปิดในเบราว์เซอร์</p>
+    <a id="app" class="btn primary" href="#">เปิดในแอป</a>
+    <a id="web" class="btn secondary" href="/dashboard/bookings">เปิดในเบราว์เซอร์</a>
+  </div>
+  <script>
+    // Bounce page for LINE cards: LINE uri actions only allow http(s), so the card links
+    // here; we try the app's URL scheme and fall back to the web dashboard.
+    // iOS: Expo registers the bundle id as a scheme, so com.iriscrm.app:// works on every
+    // build; iriscrm:// is registered on builds that include `scheme` in app.config.js.
+    (function () {
+      var ua = navigator.userAgent || '';
+      var isIOS = /iPhone|iPad|iPod/i.test(ua);
+      var isAndroid = /Android/i.test(ua);
+      var path = 'bookings';
+      var appUrl = isIOS ? 'com.iriscrm.app://' + path : 'iriscrm://' + path;
+      var webUrl = '/dashboard/bookings';
+      document.getElementById('app').setAttribute('href', appUrl);
+
+      if (!isIOS && !isAndroid) { location.replace(webUrl); return; }
+
+      var left = false;
+      document.addEventListener('visibilitychange', function () { if (document.hidden) left = true; });
+      window.addEventListener('pagehide', function () { left = true; });
+
+      // Android Chrome: an intent:// URL falls back cleanly when the app is missing.
+      if (isAndroid && /Chrome/i.test(ua)) {
+        location.href = 'intent://' + path + '#Intent;scheme=iriscrm;package=com.iriscrm.app;S.browser_fallback_url='
+          + encodeURIComponent(location.origin + webUrl) + ';end';
+      } else {
+        location.href = appUrl;
+      }
+      setTimeout(function () { if (!left && !document.hidden) location.replace(webUrl); }, 1800);
+    })();
+  </script>
+</body>
+</html>
