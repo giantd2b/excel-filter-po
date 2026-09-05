@@ -11,11 +11,15 @@ import {
   Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
+import { getCustomerBookings, type BookingLink, type MeritBooking } from '../services/bookings';
+import BookingLinkModal from '../components/booking/BookingLinkModal';
+import { statusLabel, statusStyle } from '../components/booking/bookingHelpers';
 
 export default function CustomerInfoScreen({ route }: any) {
-  const { docId, displayName, pictureUrl, channel, channelType } = route.params;
+  const { docId, userId, displayName, pictureUrl, channel, channelType } = route.params;
   const insets = useSafeAreaInsets();
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +39,17 @@ export default function CustomerInfoScreen({ route }: any) {
   const [jobs, setJobs] = useState<any[]>([]);
   const [quotations, setQuotations] = useState<any[]>([]);
 
+  // Merit bookings (/booking page) + booking links sent to this customer
+  const [bookings, setBookings] = useState<MeritBooking[]>([]);
+  const [bookingLinks, setBookingLinks] = useState<BookingLink[]>([]);
+  const [showBookingLink, setShowBookingLink] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+
+  const refreshBookings = () =>
+    getCustomerBookings(docId)
+      .then((r) => { setBookings(r.bookings); setBookingLinks(r.links); })
+      .catch(() => {});
+
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -42,16 +57,26 @@ export default function CustomerInfoScreen({ route }: any) {
       api.get(`/users/${docId}/notes`).catch(() => ({ data: [] })),
       api.get(`/users/${docId}/jobs`).catch(() => ({ data: { jobs: [] } })),
       api.get(`/users/${docId}/quotations`).catch(() => ({ data: { data: [] } })),
-    ]).then(([detailsRes, notesRes, jobsRes, quotesRes]) => {
+      getCustomerBookings(docId).catch(() => ({ bookings: [], links: [] })),
+    ]).then(([detailsRes, notesRes, jobsRes, quotesRes, bookingsRes]) => {
       if (cancelled) return;
       setDetails(detailsRes.data);
       setNicknameValue(detailsRes.data?.nickname || '');
       setNotes(Array.isArray(notesRes.data) ? notesRes.data : []);
       setJobs(jobsRes.data?.jobs || []);
       setQuotations(quotesRes.data?.data || []);
+      setBookings(bookingsRes.bookings);
+      setBookingLinks(bookingsRes.links);
     }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [docId]);
+
+  const copyLink = async (l: BookingLink) => {
+    try { await Clipboard.setStringAsync(l.url); } catch { /* clipboard unavailable */ }
+    const key = l.token || l.url;
+    setCopiedToken(key);
+    setTimeout(() => setCopiedToken((c) => (c === key ? null : c)), 2000);
+  };
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
@@ -390,6 +415,90 @@ export default function CustomerInfoScreen({ route }: any) {
           ))}
         </View>
       )}
+
+      {/* Merit bookings (/booking page) */}
+      <View style={styles.section}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>การจองงานบุญ ({bookings.length})</Text>
+          <TouchableOpacity onPress={() => setShowBookingLink(true)}>
+            <Text style={{ fontSize: 12, color: '#6366f1', fontWeight: '600' }}>+ สร้างลิงก์จอง</Text>
+          </TouchableOpacity>
+        </View>
+        {bookings.length === 0 ? (
+          <Text style={{ fontSize: 12, color: '#94a3b8', marginBottom: bookingLinks.length ? 10 : 0 }}>
+            ยังไม่มีการจอง — ส่งลิงก์จองให้ลูกค้าเพื่อผูกการจองกับแชตนี้
+          </Text>
+        ) : (
+          bookings.map((b) => {
+            const st = statusStyle(b.status);
+            return (
+              <View key={b.id} style={styles.orderCard}>
+                <View style={styles.orderHeader}>
+                  <Text style={styles.orderRef}>{b.code}</Text>
+                  <View style={[styles.orderStatusBadge, { backgroundColor: st.bg }]}>
+                    <Text style={[styles.orderStatusText, { color: st.fg }]}>{statusLabel(b.status)}</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                  {[
+                    b.packageName,
+                    b.eventDate,
+                    b.floor,
+                    b.source === 'chat_link' ? 'ผ่านลิงก์จอง' : null,
+                    b.salesName ? `เซลล์ ${b.salesName}` : null,
+                  ].filter(Boolean).join(' · ')}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                  <Text style={styles.orderAmount}>฿{Number(b.estimatedTotal || 0).toLocaleString()}</Text>
+                  {b.quotationPublicUrl ? (
+                    <TouchableOpacity onPress={() => Linking.openURL(b.quotationPublicUrl!)}>
+                      <Text style={{ fontSize: 12, color: '#d97706', fontWeight: '600' }}>📄 {b.quotationDocNo || 'ใบเสนอราคา'}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })
+        )}
+
+        {bookingLinks.length > 0 && (
+          <View style={{ marginTop: 6 }}>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748b', marginBottom: 6 }}>ลิงก์ที่ส่งให้ลูกค้า</Text>
+            {bookingLinks.map((l) => {
+              const key = l.token || l.url;
+              return (
+                <View key={key} style={[styles.orderCard, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }} numberOfLines={1}>
+                      {l.packageName || 'ให้ลูกค้าเลือกแพ็กเกจเอง'}
+                      {l.estimatedTotal != null ? ` · ฿${Number(l.estimatedTotal).toLocaleString()}` : ''}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                      เปิด {l.openCount ?? 0} ครั้ง · จอง {l.bookingCount ?? 0} รายการ{l.createdByName ? ` · ${l.createdByName}` : ''}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => copyLink(l)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#eef2ff' }}>
+                    <Text style={{ fontSize: 12, color: copiedToken === key ? '#059669' : '#4f46e5', fontWeight: '600' }}>
+                      {copiedToken === key ? '✓ คัดลอกแล้ว' : 'คัดลอก'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+
+      <BookingLinkModal
+        visible={showBookingLink}
+        customer={{
+          id: docId,
+          oduserId: userId || customer.platformUserId || customer.oduserId || undefined,
+          channel: customer.channel || channel || '',
+          displayName: customer.nickname || displayName || '',
+        }}
+        onClose={() => { setShowBookingLink(false); refreshBookings(); }}
+      />
 
       {/* FlowAccount Quotations */}
       {quotations.length > 0 && (
