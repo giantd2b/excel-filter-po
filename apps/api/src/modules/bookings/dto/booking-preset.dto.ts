@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -65,6 +66,12 @@ export class BookingPresetDto {
   @IsOptional()
   @IsBoolean()
   wantVat?: boolean;
+
+  /** Deposit fixed by the admin (บาท); omit to use flowaccount-app's stepped rule on the food cost. */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  depositAmount?: number;
 
   /** Message from sales shown to the customer above the summary. */
   @IsOptional()

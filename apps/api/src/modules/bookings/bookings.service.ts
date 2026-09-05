@@ -13,6 +13,8 @@ import {
   derivePricing,
   estimateBooking,
   VAT_RATE,
+  DEFAULT_DEPOSIT_RULE,
+  type DepositRule,
   pickRemarkCode,
   DEFAULT_PRICING,
   type FaRecipeConfig,
@@ -127,6 +129,7 @@ export class BookingsService {
       missingCodes,
       usedCodes,
       appUrl: this.flowAccount.appUrl,
+      depositRule: await this.getDepositRule(force),
     };
   }
 
@@ -233,6 +236,7 @@ export class BookingsService {
       `${b.source === 'chat_link' ? 'จองผ่านลิงก์จากแชต' : 'จองผ่านหน้าเว็บ'} ${b.code} · ราคาประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท`,
       `สถานที่จัดงาน: ${bookingAddress(b) || '-'}${b.floor ? ` · ${b.floor}` : ''}`,
       typeof b.wantVat === 'boolean' ? (b.wantVat ? 'ลูกค้าต้องการใบกำกับภาษี (VAT 7%)' : 'ลูกค้าไม่รับ VAT') : '',
+      b.depositAmount != null ? `มัดจำ: ${b.depositAmount.toLocaleString('th-TH')} บาท (${b.depositManual ? 'แอดมินระบุเอง' : 'ตามกติกาค่าอาหาร'})` : '',
       b.billingName ? `ผู้ติดต่อ: ${b.customerName} ${b.phone}` : '',
       attributed
         ? `ช่องทาง: ${b.channel || '-'} · ลูกค้าแชต: ${b.chatCustomerName || '-'} (${b.customerId})${b.salesName ? ` · เซลล์: ${b.salesName}` : ''}`
@@ -256,6 +260,7 @@ export class BookingsService {
       // company quotation → company bank account template on the document; else the personal one
       customerType: b.billingName || (b.taxId && b.taxId.startsWith('0') && b.taxId.length === 13) ? 'COMPANY' : 'PERSON',
       salesName: b.salesName || undefined,
+      ...(b.depositManual && b.depositAmount != null ? { depositAmount: b.depositAmount } : {}),
       project: `${b.occasion} · ${b.eventDate} · ${b.timeSlot}${b.venue ? ` · ${b.venue}` : ''}${b.floor ? ` (${b.floor})` : ''}`,
       // the customer's tax-invoice choice wins over the recipe default
       vatRate: typeof b.wantVat === 'boolean' ? (b.wantVat ? 7 : 0) : built.vatRate,
@@ -324,6 +329,12 @@ export class BookingsService {
 
     const code = await this.nextCode();
     const attribution = await this.resolveAttribution(dto.ref, phoneDigits);
+    const preset = attribution.linkId ? ((await this.prisma.bookingLink.findUnique({ where: { id: attribution.linkId } }))?.preset as any) : null;
+    const est = estimateBooking(
+      { packageId: dto.packageId, foodMode: dto.foodMode, guests: dto.guests, tables: dto.tables, monks: dto.monks, selfTransport: dto.selfTransport, addons: dto.addons, depositAmount: typeof preset?.depositAmount === 'number' ? preset.depositAmount : undefined },
+      await this.getPricing(),
+      await this.getDepositRule(),
+    );
 
     const booking = await this.prisma.booking.create({
       data: {
@@ -365,6 +376,8 @@ export class BookingsService {
           }) || null,
         floor: dto.floor?.trim() || null,
         wantVat: typeof dto.wantVat === 'boolean' ? dto.wantVat : null,
+        depositAmount: est?.depositAmount ?? null,
+        depositManual: !!est?.depositManual,
         note: dto.note || null,
         estimatedTotal: calc.total,
       },
@@ -458,6 +471,7 @@ export class BookingsService {
       preset?: any;
       packageName?: string | null;
       estimatedTotal?: number | null;
+      depositAmount?: number | null;
     },
     bookingCount: number,
   ) {
@@ -470,6 +484,7 @@ export class BookingsService {
       preset: link.preset ?? null,
       packageName: link.packageName ?? null,
       estimatedTotal: link.estimatedTotal ?? null,
+      depositAmount: link.depositAmount ?? null,
       createdAt: link.createdAt,
       createdByName: link.createdByName,
       openCount: link.openCount,
@@ -478,9 +493,26 @@ export class BookingsService {
     };
   }
 
+  private depositRuleCache: { rule: DepositRule; at: number } | null = null;
+
+  /** flowaccount-app's deposit rule (5-minute cache; defaults when FA is unreachable). */
+  async getDepositRule(force = false): Promise<DepositRule> {
+    if (!force && this.depositRuleCache && Date.now() - this.depositRuleCache.at < CATALOG_TTL_MS) return this.depositRuleCache.rule;
+    try {
+      const rule = await this.flowAccount.getDepositRule();
+      if (rule?.tiers?.length) {
+        this.depositRuleCache = { rule, at: Date.now() };
+        return rule;
+      }
+    } catch (e: any) {
+      console.warn(`[Bookings] deposit rule unavailable: ${e?.message || e}`);
+    }
+    return this.depositRuleCache?.rule || DEFAULT_DEPOSIT_RULE;
+  }
+
   /** Live estimate for a preset (same numbers the booking page shows). */
   async estimate(preset: BookingPresetDto) {
-    const est = estimateBooking(preset, await this.getPricing());
+    const est = estimateBooking(preset, await this.getPricing(), await this.getDepositRule());
     if (!est) throw new BadRequestException(`ไม่พบแพ็กเกจ "${preset.packageId}"`);
     return est;
   }
@@ -516,6 +548,7 @@ export class BookingsService {
           preset: { ...preset } as any,
           packageName: est.packageName,
           estimatedTotal: est.total,
+          depositAmount: est.depositAmount,
           createdById: admin.id || null,
           createdByName: admin.name || null,
         },
@@ -568,6 +601,7 @@ export class BookingsService {
       preset: link.preset ?? null,
       packageName: link.packageName ?? null,
       estimatedTotal: link.estimatedTotal ?? null,
+      depositAmount: link.depositAmount ?? null,
     };
   }
 
@@ -592,8 +626,11 @@ export class BookingsService {
       'เปิดดูหรือบันทึกเป็น PDF ได้ที่ลิงก์นี้ (เก็บไว้ในแชตนี้ได้เลย)',
       b.quotationPublicUrl,
       b.wantVat
-        ? `ยอดประเมิน ${Math.round(b.estimatedTotal * (1 + VAT_RATE)).toLocaleString('th-TH')} บาท (รวม VAT 7%) · การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ`
-        : `ยอดประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท (ไม่รวม VAT) · การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ`,
+        ? `ยอดประเมิน ${Math.round(b.estimatedTotal * (1 + VAT_RATE)).toLocaleString('th-TH')} บาท (รวม VAT 7%)`
+        : `ยอดประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท (ไม่รวม VAT)`,
+      b.depositAmount != null
+        ? `มัดจำ ${b.depositAmount.toLocaleString('th-TH')} บาท เพื่อยืนยันคิว · การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ`
+        : 'การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ',
     ].join('\n');
 
     const res = await this.messages.sendMessage({

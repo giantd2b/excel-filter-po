@@ -30,6 +30,7 @@ export class BookingsController {
       estimatedTotal: booking.estimatedTotal,
       vatAmount,
       grandTotal: booking.estimatedTotal + vatAmount,
+      depositAmount: booking.depositAmount ?? null,
       packageName: booking.packageName,
       // public read-only quotation link (null when flowaccount-app was unreachable)
       quotationUrl: booking.quotationPublicUrl || null,

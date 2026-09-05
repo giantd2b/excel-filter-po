@@ -42,7 +42,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
   const [submitting, setSubmitting] = useState(false);
   const preset = linkInfo.preset;
   const pkg = pkgById(f.pkg);
-  const c = calc(f);
+  const c = calc(f, preset && typeof preset.depositAmount === 'number' ? preset.depositAmount : linkInfo.depositAmount ?? undefined);
   const hasFood = pkg.kind === 'full';
 
   const setF = <K extends keyof BookingForm>(k: K, v: BookingForm[K]) => {
@@ -171,6 +171,10 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
           <div style={{ fontSize: 11.5, color: 'var(--color-neutral-600)', marginTop: 4 }}>
             {f.wantVat ? 'รวมภาษีมูลค่าเพิ่ม 7% แล้ว ' : 'ราคาไม่รวมภาษีมูลค่าเพิ่ม (เลือกได้ในส่วนข้อมูลสำหรับออกใบเสนอราคา) '}
             ใบเสนอราคาจริงจะแสดงรายละเอียดทุกบรรทัด
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--color-accent-2-200)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-accent-2-800)' }}>มัดจำเพื่อยืนยันคิว</span>
+            <span style={{ ...charm, fontSize: 22, color: 'var(--color-accent-2-800)' }}>{baht(c.deposit)} บาท</span>
           </div>
         </div>
       </div>

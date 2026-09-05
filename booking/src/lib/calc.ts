@@ -1,5 +1,6 @@
 import {
   ADDONS,
+  DEPOSIT_RULE,
   DISCOUNTS,
   baht,
   pkgById,
@@ -164,14 +165,26 @@ export interface CalcResult {
   /** 7% of total when the customer wants a tax invoice, else 0 */
   vat: number;
   grandTotal: number;
+  /** food part of the package (per-guest/table price × count) */
+  foodAmount: number;
+  /** stepped deposit from foodAmount, or the manual amount passed in */
+  deposit: number;
   rows: { k: string; v: string }[];
 }
 
 export const VAT_RATE = 0.07;
 
-export function calc(f: BookingForm): CalcResult {
+export function computeDeposit(foodAmount: number): number {
+  const food = Math.max(0, foodAmount || 0);
+  for (const t of DEPOSIT_RULE.tiers) if (food <= t.upTo) return Math.round(t.amount);
+  return Math.round((food * DEPOSIT_RULE.abovePercent) / 100);
+}
+
+export function calc(f: BookingForm, manualDeposit?: number | null): CalcResult {
   const pkg = pkgById(f.pkg);
   const t = tierPrice(pkg, f);
+  const foodCfg = pkg.kind === 'full' ? (f.foodMode === 'table' ? pkg.table : pkg.buffet) : null;
+  const foodAmount = foodCfg ? Math.round(foodCfg.extra * (f.foodMode === 'table' ? f.tables : f.guests)) : 0;
   const rows: { k: string; v: string }[] = [{ k: t.label, v: baht(t.base) }];
   let total = t.base;
   for (const a of ADDONS) {
@@ -190,7 +203,8 @@ export function calc(f: BookingForm): CalcResult {
     rows.push({ k: 'พระ 5 รูป', v: '−' + baht(DISCOUNTS.fiveMonks) });
   }
   const vat = f.wantVat ? Math.round(total * VAT_RATE) : 0;
-  return { pkg, total, vat, grandTotal: total + vat, rows };
+  const deposit = typeof manualDeposit === 'number' ? manualDeposit : computeDeposit(foodAmount);
+  return { pkg, total, vat, grandTotal: total + vat, foodAmount, deposit, rows };
 }
 
 export function summary(f: BookingForm): { k: string; v: string }[] {
@@ -202,6 +216,7 @@ export function summary(f: BookingForm): { k: string; v: string }[] {
     ...(f.billingName && f.billingName !== f.name ? [{ k: 'ออกใบเสนอราคาในนาม', v: f.billingName }] : []),
     { k: 'ที่อยู่ออกใบเสนอราคา', v: f.sameAddress ? 'ที่อยู่เดียวกับสถานที่จัดงาน' : billingAddressLine(f) },
     { k: 'ใบกำกับภาษี', v: f.wantVat ? 'ต้องการ (คิด VAT 7%)' : 'ไม่ต้องการ (ไม่รวม VAT)' },
+    { k: 'มัดจำเพื่อยืนยันคิว', v: baht(c.deposit) + ' บาท' },
     { k: 'แพ็กเกจ', v: c.pkg.name },
     { k: 'พระสงฆ์', v: f.monks + ' รูป' },
   ];

@@ -356,6 +356,13 @@ export default function BookingsPage() {
                 <div className="font-medium text-slate-700">
                   {b.packageName} · พระ {b.monks} รูป · {foodLine(b)}
                 </div>
+                {b.depositAmount != null && (
+                  <div>
+                    <span className="inline-flex text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                      มัดจำ {b.depositAmount.toLocaleString("th-TH")} บาท{b.depositManual ? " · ระบุเอง" : ""}
+                    </span>
+                  </div>
+                )}
                 {typeof b.wantVat === "boolean" && (
                   <div>
                     <span className={`inline-flex text-[11px] px-2 py-0.5 rounded-full ${b.wantVat ? "bg-blue-50 text-blue-700 font-semibold" : "bg-slate-100 text-slate-600"}`}>

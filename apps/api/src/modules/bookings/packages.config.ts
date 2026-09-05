@@ -676,12 +676,36 @@ export function calcEstimatedTotal(
 /** Estimated total plus the price lines the booking page shows (mirrors booking/src/lib/calc.ts `calc`). */
 export const VAT_RATE = 0.07;
 
+// ── Deposit (เงินมัดจำ) — mirror of flowaccount-app backend/src/common/deposit.ts ──
+export interface DepositRule { tiers: { upTo: number; amount: number }[]; abovePercent: number }
+export const DEFAULT_DEPOSIT_RULE: DepositRule = { tiers: [{ upTo: 15000, amount: 3000 }, { upTo: 25000, amount: 5000 }], abovePercent: 20 };
+
+export function computeDeposit(foodAmount: number, rule: DepositRule = DEFAULT_DEPOSIT_RULE): number {
+  const food = Math.max(0, Number(foodAmount) || 0);
+  for (const t of rule.tiers || []) if (food <= t.upTo) return Math.round(t.amount);
+  return Math.round((food * (rule.abovePercent || 0)) / 100);
+}
+
+/** Food part of a booking: per-guest/table price (tier `extra`) × count; ceremony-only packages have none. */
+export function foodAmountFor(input: { packageId: string; foodMode: string; guests: number; tables: number }, pricing: PricingConfig): number {
+  const pkg = BOOKING_PACKAGES.find((p) => p.id === input.packageId);
+  const pp = pricing.packages[input.packageId];
+  if (!pkg || !pp || pkg.kind !== 'full') return 0;
+  const cfg = input.foodMode === 'table' ? pp.table : pp.buffet;
+  const count = input.foodMode === 'table' ? input.tables : input.guests;
+  return cfg ? Math.round(cfg.extra * count) : 0;
+}
+
 export function estimateBooking(
-  input: Parameters<typeof calcEstimatedTotal>[0] & { wantVat?: boolean | null },
+  input: Parameters<typeof calcEstimatedTotal>[0] & { wantVat?: boolean | null; depositAmount?: number | null },
   pricing: PricingConfig = DEFAULT_PRICING,
-): { total: number; vatAmount: number; grandTotal: number; packageName: string; rows: { k: string; v: string }[] } | null {
+  depositRule: DepositRule = DEFAULT_DEPOSIT_RULE,
+): { total: number; vatAmount: number; grandTotal: number; foodAmount: number; depositAmount: number; depositManual: boolean; packageName: string; rows: { k: string; v: string }[] } | null {
   const calc = calcEstimatedTotal(input, pricing);
   if (!calc) return null;
+  const foodAmount = foodAmountFor(input, pricing);
+  const depositManual = typeof input.depositAmount === 'number' && input.depositAmount >= 0;
+  const depositAmount = depositManual ? Math.round(input.depositAmount as number) : computeDeposit(foodAmount, depositRule);
   const pp = pricing.packages[input.packageId];
   const fmt = (n: number) => `${n.toLocaleString('th-TH')} บาท`;
   const rows: { k: string; v: string }[] = [];
@@ -700,5 +724,5 @@ export function estimateBooking(
   if (input.monks === 5) rows.push({ k: 'พระ 5 รูป', v: `−${fmt(pricing.fiveMonksDiscount)}` });
   const vatAmount = input.wantVat ? Math.round(calc.total * VAT_RATE) : 0;
   if (input.wantVat) rows.push({ k: 'ภาษีมูลค่าเพิ่ม 7%', v: `+${fmt(vatAmount)}` });
-  return { total: calc.total, vatAmount, grandTotal: calc.total + vatAmount, packageName: calc.pkg.name, rows };
+  return { total: calc.total, vatAmount, grandTotal: calc.total + vatAmount, foodAmount, depositAmount, depositManual, packageName: calc.pkg.name, rows };
 }

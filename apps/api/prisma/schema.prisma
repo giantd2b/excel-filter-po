@@ -471,6 +471,8 @@ model Booking {
   billingZip      String?      @map("billing_zip")
   floor           String?      // floor of the venue (affects the price estimate)
   wantVat         Boolean?     @map("want_vat") // customer wants a tax invoice → quotation VAT 7%; null = not asked (recipe default)
+  depositAmount   Int?         @map("deposit_amount") // เงินมัดจำ (FA deposit rule on the food cost, or admin's manual amount)
+  depositManual   Boolean      @default(false) @map("deposit_manual")
   note           String?
   estimatedTotal Int           @map("estimated_total")
 
@@ -519,6 +521,7 @@ model BookingLink {
   preset        Json?
   packageName   String?   @map("package_name")
   estimatedTotal Int?     @map("estimated_total")
+  depositAmount Int?      @map("deposit_amount") // shown to the customer on the quick screen; manual when preset.depositAmount is set
   createdById   String?   @map("created_by_id")
   createdByName String?   @map("created_by_name")
   openCount     Int       @default(0) @map("open_count")

@@ -252,6 +252,12 @@ export const PHONE_LABEL = '080-583-8383 ต่อ 2';
 // Discounts — defaults only; live values arrive from GET /api/bookings/pricing (see applyPricing)
 export const DISCOUNTS = { selfTransport: 1000, fiveMonks: 1500 };
 
+/** Deposit rule (mirror of flowaccount-app); overwritten by applyPricing. */
+export const DEPOSIT_RULE: { tiers: { upTo: number; amount: number }[]; abovePercent: number } = {
+  tiers: [{ upTo: 15000, amount: 3000 }, { upTo: 25000, amount: 5000 }],
+  abovePercent: 20,
+};
+
 export interface PricingPayload {
   pricing: {
     packages: Record<string, { base?: number | null; buffet?: TierConfig | null; table?: TierConfig | null }>;
@@ -259,6 +265,7 @@ export interface PricingPayload {
     selfTransportDiscount: number;
     fiveMonksDiscount: number;
   };
+  depositRule?: { tiers: { upTo: number; amount: number }[]; abovePercent: number };
 }
 
 /**
@@ -284,6 +291,11 @@ export function applyPricing(payload: PricingPayload) {
   }
   if (typeof p.selfTransportDiscount === 'number') DISCOUNTS.selfTransport = p.selfTransportDiscount;
   if (typeof p.fiveMonksDiscount === 'number') DISCOUNTS.fiveMonks = p.fiveMonksDiscount;
+  const r = payload.depositRule;
+  if (r?.tiers?.length) {
+    DEPOSIT_RULE.tiers = r.tiers.map((t) => ({ upTo: Number(t.upTo), amount: Number(t.amount) }));
+    DEPOSIT_RULE.abovePercent = Number(r.abovePercent) || 0;
+  }
 }
 
 export function pkgById(id: string): Pkg {

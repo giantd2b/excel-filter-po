@@ -538,6 +538,8 @@ export interface MeritBooking {
   taxId?: string | null;
   floor?: string | null;
   wantVat?: boolean | null;
+  depositAmount?: number | null;
+  depositManual?: boolean;
   quotationDocNo?: string | null;
   quotationSentAt?: string | null;
   quotationSendStatus?: "sent" | "sending" | "failed" | null;
@@ -683,12 +685,17 @@ export interface BookingPreset {
   note?: string;
   /** true/false fixed by sales; omitted = customer chooses */
   wantVat?: boolean | null;
+  /** admin's manual deposit (บาท); omitted = FA's stepped rule on the food cost */
+  depositAmount?: number | null;
 }
 
 export interface BookingEstimate {
   total: number;
   vatAmount: number;
   grandTotal: number;
+  foodAmount: number;
+  depositAmount: number;
+  depositManual: boolean;
   packageName: string;
   rows: { k: string; v: string }[];
 }
@@ -707,6 +714,7 @@ export interface BookingLink {
   preset: BookingPreset | null;
   packageName: string | null;
   estimatedTotal: number | null;
+  depositAmount: number | null;
   createdAt: string;
   createdByName: string | null;
   openCount: number;

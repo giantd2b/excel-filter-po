@@ -791,6 +791,10 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                   ราคาก่อนภาษี {baht(c.total)} + ภาษีมูลค่าเพิ่ม 7% {baht(c.vat)} บาท
                 </div>
               )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 14, color: 'var(--color-accent-2-800)', fontWeight: 600 }}>
+                <span>มัดจำเพื่อยืนยันคิว</span>
+                <span>{baht(c.deposit)} บาท</span>
+              </div>
               <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', marginTop: 8, lineHeight: 1.6 }}>
                 {f.wantVat
                   ? 'ราคารวมภาษีมูลค่าเพิ่ม 7% แล้ว ทีมงานจะยืนยันราคาสุทธิอีกครั้ง'

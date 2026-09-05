@@ -11,6 +11,7 @@ export interface BookingResult {
   /** VAT (7%) and total including VAT when the customer asked for a tax invoice */
   vatAmount?: number;
   grandTotal?: number;
+  depositAmount?: number | null;
 }
 
 /** Identity behind a /booking/?ref=<token> link created by sales in the CRM inbox. */
@@ -28,6 +29,8 @@ export interface BookingPreset {
   note?: string | null;
   /** true/false fixed by sales, null = customer decides */
   wantVat?: boolean | null;
+  /** deposit fixed by the admin (บาท) */
+  depositAmount?: number | null;
 }
 
 export interface BookingLinkInfo {
@@ -39,6 +42,8 @@ export interface BookingLinkInfo {
   preset: BookingPreset | null;
   packageName: string | null;
   estimatedTotal: number | null;
+  /** deposit fixed on the link (manual or computed when the link was made) */
+  depositAmount: number | null;
 }
 
 export async function getBookingLink(token: string): Promise<BookingLinkInfo | null> {

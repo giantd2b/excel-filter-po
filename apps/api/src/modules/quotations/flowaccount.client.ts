@@ -49,6 +49,12 @@ export class FlowAccountClient {
     return res.data?.data || [];
   }
 
+  /** Deposit rule (stepped by food cost) — { tiers: [{ upTo, amount }], abovePercent }. */
+  async getDepositRule(): Promise<any> {
+    const res = await this.client().get('/deposit-rule');
+    return res.data?.data || null;
+  }
+
   async listQuotations(page: number, limit: number): Promise<any> {
     const res = await this.client().get(`/quotations?page=${page}&limit=${limit}`);
     return res.data;

@@ -44,6 +44,7 @@ const DEFAULT_PRESET: BookingPreset = {
   addons: [],
   note: "",
   wantVat: null,
+  depositAmount: null,
 };
 
 interface Props {
@@ -157,6 +158,7 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
       return [
         `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${link.packageName} · พระ ${p.monks} รูป · ${food}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ""}${p.timeSlot ? ` (${p.timeSlot})` : ""}`,
         price,
+        link.depositAmount != null ? `มัดจำ ${link.depositAmount.toLocaleString("th-TH")} บาท เพื่อยืนยันคิว` : "",
         `กรอกชื่อ เบอร์ และสถานที่จัดงานที่ลิงก์นี้ ระบบจะออกใบเสนอราคาให้ทันทีค่ะ`,
         link.url,
       ].filter(Boolean).join("\n");
@@ -327,6 +329,17 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
               </select>
             </label>
             <label className="block">
+              <span className={lbl}>ยอดมัดจำ (บาท) — เว้นว่าง = ตามกติกาค่าอาหาร{estimate ? ` (${estimate.depositAmount.toLocaleString("th-TH")} บาท จากค่าอาหาร ${estimate.foodAmount.toLocaleString("th-TH")})` : ""}</span>
+              <input
+                type="number"
+                min={0}
+                value={preset.depositAmount ?? ""}
+                onChange={(e) => set("depositAmount", e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                className={field}
+                placeholder="ระบุเองเมื่อต้องการยอดต่างจากกติกา"
+              />
+            </label>
+            <label className="block">
               <span className={lbl}>ข้อความถึงลูกค้า (แสดงบนหน้าจอง ไม่บังคับ)</span>
               <input value={preset.note || ""} onChange={(e) => set("note", e.target.value)} className={field} placeholder="เช่น ราคานี้รวมเต้นท์ใหญ่ 1 หลังแล้วค่ะ" />
             </label>
@@ -340,6 +353,10 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                       <span className="tabular-nums">{r.v}</span>
                     </div>
                   ))}
+                  <div className="flex justify-between text-xs text-slate-600 py-0.5">
+                    <span>มัดจำเพื่อยืนยันคิว{estimate.depositManual ? " (ระบุเอง)" : ""}</span>
+                    <span className="tabular-nums font-semibold text-amber-700">{estimate.depositAmount.toLocaleString("th-TH")} บาท</span>
+                  </div>
                   <div className="flex justify-between items-baseline mt-1 pt-1.5 border-t border-slate-200">
                     <span className="font-semibold text-slate-700">ราคาประเมิน {estimating && <Loader2 className="inline w-3 h-3 animate-spin ml-1" />}</span>
                     <span className="font-bold text-slate-800 tabular-nums">฿{(preset.wantVat ? estimate.grandTotal : estimate.total).toLocaleString("th-TH")}{preset.wantVat ? " รวม VAT" : ""}</span>
@@ -430,5 +447,6 @@ function cleanPreset(p: BookingPreset): BookingPreset {
     timeSlot: p.timeSlot || undefined,
     note: p.note?.trim() || undefined,
     wantVat: typeof p.wantVat === "boolean" ? p.wantVat : undefined,
+    depositAmount: typeof p.depositAmount === "number" ? p.depositAmount : undefined,
   };
 }
