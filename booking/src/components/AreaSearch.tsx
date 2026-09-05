@@ -65,9 +65,9 @@ export default function AreaSearch({ form: f, setForm, scope = 'event', label = 
           onFocus={() => setOpen(true)}
           style={inputStyle}
         />
-        {q && !tambon && (
+        {q && !tambon && suggestions.length > 0 && (
           <div style={{ fontSize: 12, color: '#b45309', marginTop: 6, fontWeight: 600 }}>
-            {suggestions.length ? 'ยังไม่ได้เลือกพื้นที่ — แตะเลือกตำบลจากรายการ ระบบจะเติมอำเภอ/จังหวัด/รหัสไปรษณีย์ให้' : 'ไม่พบตำบลนี้ในพื้นที่ให้บริการ ลองพิมพ์เฉพาะชื่อตำบล/แขวง'}
+            ยังไม่ได้เลือกพื้นที่ — แตะเลือกตำบลจากรายการ ระบบจะเติมอำเภอ/จังหวัด/รหัสไปรษณีย์ให้
           </div>
         )}
         {open && suggestions.length > 0 && (
