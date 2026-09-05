@@ -5,15 +5,7 @@ import { submitBooking, type BookingLinkInfo } from '../lib/api';
 import { FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
 import { AddressFields, FloorField } from '../components/AddressFields';
 import type { SavedBooking } from '../App';
-
-function fmtThaiDate(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
-  if (!m) return iso;
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
-  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-  return `${days[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()]} ${d} ${months[mo - 1]} ${y + 543}`;
-}
+import { fmtThaiDate } from '../lib/date';
 
 interface Props {
   form: BookingForm;

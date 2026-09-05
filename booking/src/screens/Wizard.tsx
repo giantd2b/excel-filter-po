@@ -14,6 +14,7 @@ import { calc, finalizeForm, summary, tentRecommendation, type BookingForm } fro
 import { submitBooking } from '../lib/api';
 import { BackLink, CheckIcon, FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
 import type { SavedBooking } from '../App';
+import { fmtThaiDate } from '../lib/date';
 
 interface Props {
   form: BookingForm;
@@ -136,6 +137,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
             <div>
               <FieldLabel>วันที่จัดงาน</FieldLabel>
               <input type="date" value={f.date} onChange={(e) => setF('date', e.target.value)} style={inputStyle} />
+              {f.date && <div style={{ fontSize: 12.5, color: 'var(--color-accent-700)', marginTop: 6 }}>วันที่เลือก: {fmtThaiDate(f.date)}</div>}
             </div>
             <div>
               <FieldLabel>ช่วงเวลาพิธี</FieldLabel>

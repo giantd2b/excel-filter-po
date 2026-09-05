@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { X, Link2, Copy, Check, Send, Loader2, ExternalLink } from "lucide-react";
+import ThaiDateSelect, { fmtThaiDate } from "@/components/ThaiDateSelect";
 import {
   createBookingLink,
   estimateBooking,
@@ -29,17 +30,6 @@ const TIME_SLOTS = [
   { v: "เช้า 07.00-07.30 น.", label: "ทำบุญเช้า 07.00-07.30 น." },
   { v: "เพล 10.00-10.30 น.", label: "ถวายเพล 10.00-10.30 น." },
 ];
-
-/** "2026-09-30" → "พุธ 30 ก.ย. 2569" (parsed as plain y-m-d, never via the Date timezone path). */
-export function fmtThaiDate(iso?: string | null): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
-  if (!m) return iso || "";
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const days = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
-  const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-  const dow = days[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()];
-  return `${dow} ${d} ${months[mo - 1]} ${y + 543}`;
-}
 
 const DEFAULT_PRESET: BookingPreset = {
   occasion: "ทำบุญขึ้นบ้านใหม่",
@@ -249,7 +239,10 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
               </label>
               <label className="block">
                 <span className={lbl}>วันที่จัดงาน (เว้นว่างให้ลูกค้าเลือก)</span>
-                <input type="date" value={preset.eventDate || ""} onChange={(e) => set("eventDate", e.target.value)} className={field} />
+                <ThaiDateSelect value={preset.eventDate || ""} onChange={(v) => set("eventDate", v)} className="mt-1" />
+                {preset.eventDate && (
+                  <button type="button" onClick={() => set("eventDate", "")} className="mt-1 text-[11px] text-slate-400 hover:text-slate-600">ล้างวันที่ (ให้ลูกค้าเลือก)</button>
+                )}
                 {preset.eventDate && (
                   <span className="block mt-1 text-[11px] font-semibold text-violet-700">วันที่เลือก: {fmtThaiDate(preset.eventDate)}</span>
                 )}
