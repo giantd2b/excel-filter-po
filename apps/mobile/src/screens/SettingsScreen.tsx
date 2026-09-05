@@ -120,6 +120,12 @@ export default function SettingsScreen() {
             <Text style={styles.menuLabel}>ผู้ดูแลระบบ</Text>
             <Text style={styles.menuChevron}>›</Text>
           </TouchableOpacity>
+          <View style={styles.menuDivider} />
+          <TouchableOpacity style={styles.menuRow} onPress={() => navigation.navigate('Bookings')}>
+            <Text style={styles.menuIcon}>🙏</Text>
+            <Text style={styles.menuLabel}>จองงานบุญ</Text>
+            <Text style={styles.menuChevron}>›</Text>
+          </TouchableOpacity>
         </View>
 
         {/* App Version */}
