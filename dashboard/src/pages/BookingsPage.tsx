@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText, Settings2, Link2, Search, MessageCircle } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText, Settings2, Link2, Search, MessageCircle, Send, Check } from "lucide-react";
 import BookingRecipeSettings from "@/components/BookingRecipeSettings";
 import BookingPricingSettings from "@/components/BookingPricingSettings";
 import {
@@ -7,6 +7,7 @@ import {
   updateBookingStatus,
   deleteBooking,
   createBookingQuotation,
+  sendBookingQuotationToChat,
   type MeritBooking,
 } from "@/lib/api-service";
 
@@ -161,6 +162,21 @@ export default function BookingsPage() {
     } catch (err: any) {
       console.error("Failed to create quotation:", err);
       setQuoteError(`${b.code}: ${err?.message || "สร้างใบเสนอราคาไม่สำเร็จ"}`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const sendChat = async (b: MeritBooking) => {
+    setBusyId(b.id);
+    setQuoteError(null);
+    try {
+      await sendBookingQuotationToChat(b.id);
+      // delivery is asynchronous — refresh shortly so the status chip catches up
+      setTimeout(() => fetchData(), 2500);
+      await fetchData();
+    } catch (err: any) {
+      setQuoteError(`${b.code}: ${err?.message || "ส่งลิงก์ในแชตไม่สำเร็จ"}`);
     } finally {
       setBusyId(null);
     }
@@ -401,6 +417,42 @@ export default function BookingsPage() {
                     >
                       <Link2 className="w-3.5 h-3.5" />
                       {copiedId === b.id ? "คัดลอกแล้ว" : "ลิงก์ลูกค้า"}
+                    </button>
+                  ) : null}
+                  {b.quotationPublicUrl && b.customerId ? (
+                    <button
+                      type="button"
+                      onClick={() => sendChat(b)}
+                      disabled={busyId === b.id}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs ring-1 disabled:opacity-50 ${
+                        b.quotationSendStatus === "sent"
+                          ? "ring-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                          : b.quotationSendStatus === "failed"
+                            ? "ring-red-200 text-red-600 bg-red-50 hover:bg-red-100"
+                            : "ring-violet-200 text-violet-700 hover:bg-violet-50"
+                      }`}
+                      title={
+                        b.quotationSendStatus === "sent"
+                          ? `ส่งลิงก์เข้าแชต ${b.channel || ""} แล้ว${b.quotationSentAt ? ` เมื่อ ${new Date(b.quotationSentAt).toLocaleString("th-TH")}` : ""} · กดเพื่อส่งอีกครั้ง`
+                          : b.quotationSendStatus === "failed"
+                            ? "ส่งเข้าแชตไม่สำเร็จ (Facebook อาจเกินหน้าต่าง 24 ชม.) · กดเพื่อลองใหม่"
+                            : "ส่งลิงก์ใบเสนอราคาเข้าห้องแชตของลูกค้า"
+                      }
+                    >
+                      {busyId === b.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : b.quotationSendStatus === "sent" ? (
+                        <Check className="w-3.5 h-3.5" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      {b.quotationSendStatus === "sent"
+                        ? "ส่งในแชตแล้ว"
+                        : b.quotationSendStatus === "failed"
+                          ? "ส่งไม่สำเร็จ · ลองใหม่"
+                          : b.quotationSendStatus === "sending"
+                            ? "กำลังส่ง…"
+                            : "ส่งลิงก์ในแชต"}
                     </button>
                   ) : null}
                   {!b.quotationUrl ? (

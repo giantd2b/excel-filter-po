@@ -107,6 +107,13 @@ export class BookingsController {
     return this.bookingsService.updateStatus(id, status);
   }
 
+  /** Push (or re-push) the public quotation link into the customer's LINE/Facebook chat. */
+  @UseGuards(FirebaseAuthGuard)
+  @Post(':id/send-quotation')
+  async sendQuotation(@Param('id') id: string) {
+    return this.bookingsService.sendQuotationToChat(id, { force: true });
+  }
+
   /** Create (idempotently) the flowaccount-app quotation for a booking. */
   @UseGuards(FirebaseAuthGuard)
   @Post(':id/quotation')

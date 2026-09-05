@@ -6,9 +6,11 @@ import type { SavedBooking } from '../App';
 interface Props {
   saved: SavedBooking;
   onHome: () => void;
+  /** chat channel label when the form was opened from a booking link (the link is also pushed there) */
+  chatChannel?: string | null;
 }
 
-export default function Done({ saved, onHome }: Props) {
+export default function Done({ saved, onHome, chatChannel }: Props) {
   const [copied, setCopied] = useState(false);
 
   const copySummary = () => {
@@ -58,6 +60,11 @@ export default function Done({ saved, onHome }: Props) {
       <p style={{ margin: '-8px 0 20px', fontSize: 13.5, lineHeight: 1.7, color: 'var(--color-accent-2-700)' }}>
         ยังไม่ถือเป็นการจองคิว — การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะยืนยันคิววันงานและแจ้งขั้นตอนชำระมัดจำให้ทาง LINE หรือช่องทางที่ติดต่อ
       </p>
+      {chatChannel && saved.quotationUrl && (
+        <p style={{ margin: '-8px 0 20px', fontSize: 13.5, lineHeight: 1.7, color: 'var(--color-accent-700)', fontWeight: 600 }}>
+          เราส่งลิงก์ใบเสนอราคาเข้าห้องแชต {chatChannel} ของคุณให้แล้ว เปิดดูจากแชตได้ตลอด ปิดหน้านี้ได้เลยค่ะ
+        </p>
+      )}
       <div
         style={{
           background: 'var(--color-neutral-100)',

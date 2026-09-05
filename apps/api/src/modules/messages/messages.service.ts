@@ -157,8 +157,10 @@ export class MessagesService {
     adminName?: string;
     replyToId?: string;
     clientTempId?: string;
+    /** Facebook only: retry with this message tag when the 24-hour response window is closed */
+    tag?: 'CONFIRMED_EVENT_UPDATE' | 'HUMAN_AGENT';
   }) {
-    const { oduserId, docId, text, mediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, channel, adminId, adminName, replyToId, clientTempId } = data;
+    const { oduserId, docId, text, mediaType, mediaUrl, previewUrl, stickerId, stickerPackageId, channel, adminId, adminName, replyToId, clientTempId, tag } = data;
 
     if (!oduserId || !docId || !channel) {
       throw new BadRequestException('Missing required fields: oduserId, docId, channel');
@@ -286,6 +288,7 @@ export class MessagesService {
         text,
         adminId,
         adminName,
+        tag,
       }),
     );
 
@@ -318,6 +321,7 @@ export class MessagesService {
 
   private async deliverToPlatform(params: {
     isLine: boolean;
+    tag?: string;
     oduserId: string;
     docId: string;
     channel: string;
@@ -340,7 +344,7 @@ export class MessagesService {
       isLine, oduserId, docId, channel, platformText,
       effectiveMediaType, mediaUrl, previewUrl, stickerId, stickerPackageId,
       quoteToken, replyToMid, messageId, preview, timestamp,
-      text, adminId, adminName,
+      text, adminId, adminName, tag,
     } = params;
 
     let status = 'sent';
@@ -360,7 +364,7 @@ export class MessagesService {
         const fbMediaUrl = stickerId
           ? `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`
           : mediaUrl;
-        platformMid = await this.sendFacebookMessage(oduserId, platformText, fbMediaType, fbMediaUrl, channel, replyToMid);
+        platformMid = await this.sendFacebookMessage(oduserId, platformText, fbMediaType, fbMediaUrl, channel, replyToMid, tag);
       }
     } catch (err: any) {
       status = 'failed';
@@ -511,44 +515,54 @@ export class MessagesService {
     mediaUrl?: string,
     channel?: string,
     replyToMid?: string | null,
+    tag?: string,
   ): Promise<string | null> {
     const pageToken = getFacebookPageToken(channel!);
     let fbMessageId: string | null = null;
 
+    // Standard send is a RESPONSE (inside the 24-hour window). Outside it Graph answers
+    // error code 10; when the caller supplied a message tag we retry once with it.
+    const post = async (message: Record<string, unknown>): Promise<string | null> => {
+      const base = {
+        recipient: { id: userId },
+        message,
+        ...(replyToMid && { reply_to: { mid: replyToMid } }),
+      };
+      const send = (extra: Record<string, unknown>) =>
+        axios({
+          url: 'https://graph.facebook.com/v18.0/me/messages',
+          method: 'POST',
+          params: { access_token: pageToken },
+          data: { ...base, ...extra },
+        });
+      try {
+        const res = await send({ messaging_type: 'RESPONSE' });
+        return res.data?.message_id || null;
+      } catch (err: any) {
+        const code = err?.response?.data?.error?.code;
+        if (tag && code === 10) {
+          this.logger.warn(`FB 24h window closed for ${userId} (${channel}); retrying with tag ${tag}`);
+          const res = await send({ messaging_type: 'MESSAGE_TAG', tag });
+          return res.data?.message_id || null;
+        }
+        throw err;
+      }
+    };
+
     // Send media/file first if present
     if (mediaType && mediaUrl) {
       const fbType = mediaType === 'file' ? 'file' : mediaType;
-      const res = await axios({
-        url: 'https://graph.facebook.com/v18.0/me/messages',
-        method: 'POST',
-        params: { access_token: pageToken },
-        data: {
-          recipient: { id: userId },
-          message: {
-            attachment: {
-              type: fbType,
-              payload: { url: mediaUrl, is_reusable: true },
-            },
-          },
-          ...(replyToMid && { reply_to: { mid: replyToMid } }),
+      fbMessageId = await post({
+        attachment: {
+          type: fbType,
+          payload: { url: mediaUrl, is_reusable: true },
         },
       });
-      fbMessageId = res.data?.message_id || null;
     }
 
     // Send text if present (skip if file was sent with text like [ไฟล์: xxx])
     if (text && !(mediaType === 'file' && text.startsWith('[ไฟล์'))) {
-      const res = await axios({
-        url: 'https://graph.facebook.com/v18.0/me/messages',
-        method: 'POST',
-        params: { access_token: pageToken },
-        data: {
-          recipient: { id: userId },
-          message: { text },
-          ...(replyToMid && { reply_to: { mid: replyToMid } }),
-        },
-      });
-      fbMessageId = res.data?.message_id || fbMessageId || null;
+      fbMessageId = (await post({ text })) || fbMessageId || null;
     }
 
     return fbMessageId;

@@ -24,12 +24,23 @@ const CATALOG_TTL_MS = 5 * 60 * 1000;
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingPresetDto } from './dto/booking-preset.dto';
 import { FlowAccountClient } from '../quotations/flowaccount.client';
+import { MessagesService } from '../messages/messages.service';
 
 const CHANNEL_LABELS: Record<string, string> = { LINE: 'LINE', FACEBOOK: 'Facebook' };
 function channelLabel(channel: string, channelType?: string | null) {
   const pretty = channel.replace(/^(Line|FB)_/i, '').replace(/_/g, ' ');
   const type = CHANNEL_LABELS[String(channelType || '').toUpperCase()];
   return type ? `${type} ${pretty}` : pretty;
+}
+
+/** "2026-09-30" → "พ. 30 ก.ย. 2569" without going through Date timezone maths. */
+function fmtThaiDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  if (!m) return iso;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  return `${days[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()]} ${d} ${months[mo - 1]} ${y + 543}`;
 }
 
 function bookingAddress(b: { venue?: string | null; tambon?: string | null; amphoe?: string | null; province?: string | null; zip?: string | null }) {
@@ -48,6 +59,7 @@ export class BookingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly flowAccount: FlowAccountClient,
+    private readonly messages: MessagesService,
   ) {}
 
   // ── Pricing derived from the flowaccount-app catalog (single source of prices) ──
@@ -260,6 +272,16 @@ export class BookingsService {
       where: { id },
       data: { quotationDocNo: docNo, quotationUrl, quotationPublicUrl: publicUrl, quotationCreatedAt: new Date() },
     });
+
+    // Bookings made through a chat link: drop the public link straight into that chat so the
+    // customer keeps it (they usually opened the form in the LINE/FB in-app browser).
+    if (updated.source === 'chat_link' && publicUrl && !updated.quotationSentAt) {
+      try {
+        await this.sendQuotationToChat(id);
+      } catch (e: any) {
+        console.warn(`[Bookings] chat push failed for ${updated.code}: ${e?.message || e}`);
+      }
+    }
     return {
       booking: updated,
       docNo,
@@ -539,6 +561,58 @@ export class BookingsService {
     };
   }
 
+  /**
+   * Push the public quotation link into the customer's LINE/Facebook chat via the same
+   * pipeline sales use from the inbox. Delivery is asynchronous: the returned Message row's
+   * status becomes sent/failed and is surfaced as `quotationSendStatus` in the lists.
+   */
+  async sendQuotationToChat(id: string, opts: { force?: boolean } = {}) {
+    const b = await this.prisma.booking.findUnique({ where: { id } });
+    if (!b) throw new NotFoundException('Booking not found');
+    if (!b.quotationPublicUrl) throw new BadRequestException('ยังไม่มีใบเสนอราคาสำหรับการจองนี้');
+    if (!b.customerId) throw new BadRequestException('การจองนี้ไม่ได้ผูกกับลูกค้าในแชต');
+    if (b.quotationSentAt && !opts.force) {
+      return { sent: true, messageId: b.quotationMessageId, sentAt: b.quotationSentAt, reused: true };
+    }
+    const c = await this.prisma.customer.findUnique({ where: { id: b.customerId } });
+    if (!c) throw new NotFoundException('ไม่พบลูกค้าในแชต');
+
+    const text = [
+      `ใบเสนอราคา ${b.quotationDocNo} สำหรับ${b.occasion} วันที่ ${fmtThaiDate(b.eventDate)} พร้อมแล้วค่ะ`,
+      'เปิดดูหรือบันทึกเป็น PDF ได้ที่ลิงก์นี้ (เก็บไว้ในแชตนี้ได้เลย)',
+      b.quotationPublicUrl,
+      `ยอดประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท · การจองจะสมบูรณ์เมื่อชำระมัดจำ ทีมงานจะแจ้งขั้นตอนต่อไปค่ะ`,
+    ].join('\n');
+
+    const res = await this.messages.sendMessage({
+      oduserId: c.platformUserId,
+      docId: c.id,
+      channel: c.channel,
+      text,
+      adminId: b.salesId || undefined,
+      adminName: b.salesName || 'IRIS เติมบุญ (อัตโนมัติ)',
+      tag: 'CONFIRMED_EVENT_UPDATE',
+    });
+    const sentAt = new Date();
+    await this.prisma.booking.update({
+      where: { id },
+      data: { quotationSentAt: sentAt, quotationMessageId: res.messageId },
+    });
+    return { sent: true, messageId: res.messageId, sentAt, reused: false };
+  }
+
+  /** Attach the delivery status of the pushed quotation link (from the Message row). */
+  private async withSendStatus<T extends { quotationMessageId: string | null }>(bookings: T[]) {
+    const ids = bookings.map((b) => b.quotationMessageId).filter((x): x is string => !!x);
+    if (!ids.length) return bookings.map((b) => ({ ...b, quotationSendStatus: null as string | null }));
+    const rows = await this.prisma.message.findMany({ where: { id: { in: ids } }, select: { id: true, status: true } });
+    const byId = new Map(rows.map((r) => [r.id, r.status]));
+    return bookings.map((b) => ({
+      ...b,
+      quotationSendStatus: b.quotationMessageId ? byId.get(b.quotationMessageId) || 'sending' : null,
+    }));
+  }
+
   async listForCustomer(customerId: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
     if (!customer) throw new NotFoundException('Customer not found');
@@ -555,7 +629,7 @@ export class BookingsService {
         include: { _count: { select: { bookings: true } } },
       }),
     ]);
-    return { bookings, links: links.map((l) => this.shapeLink(l, l._count.bookings)) };
+    return { bookings: await this.withSendStatus(bookings), links: links.map((l) => this.shapeLink(l, l._count.bookings)) };
   }
 
   async list(status?: string, source?: string, q?: string) {
@@ -590,7 +664,7 @@ export class BookingsService {
       statusCounts[c.status] = c._count;
       total += c._count;
     }
-    return { bookings, statusCounts, total };
+    return { bookings: await this.withSendStatus(bookings), statusCounts, total };
   }
 
   async updateStatus(id: string, status: string) {

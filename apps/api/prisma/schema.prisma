@@ -489,6 +489,9 @@ model Booking {
   quotationUrl       String?   @map("quotation_url")
   quotationPublicUrl String?   @map("quotation_public_url") // read-only link the customer can open without login
   quotationCreatedAt DateTime? @map("quotation_created_at")
+  // The quotation link pushed into the customer's chat (LINE/FB); delivery status lives on that Message row
+  quotationSentAt    DateTime? @map("quotation_sent_at")
+  quotationMessageId String?   @map("quotation_message_id")
 
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")

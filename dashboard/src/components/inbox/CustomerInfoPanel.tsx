@@ -675,7 +675,7 @@ export function CustomerInfoPanel({
                       rel="noopener noreferrer"
                       className="text-[10px] text-brand-600 hover:underline"
                     >
-                      ใบเสนอราคา {b.quotationDocNo}
+                      ใบเสนอราคา {b.quotationDocNo}{b.quotationSendStatus === "sent" ? " ✓ ส่งในแชตแล้ว" : b.quotationSendStatus === "failed" ? " · ส่งในแชตไม่สำเร็จ" : ""}
                     </a>
                   )}
                 </div>

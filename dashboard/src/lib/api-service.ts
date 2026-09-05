@@ -538,6 +538,8 @@ export interface MeritBooking {
   taxId?: string | null;
   floor?: string | null;
   quotationDocNo?: string | null;
+  quotationSentAt?: string | null;
+  quotationSendStatus?: "sent" | "sending" | "failed" | null;
   quotationUrl?: string | null;
   quotationPublicUrl?: string | null;
   quotationCreatedAt?: string | null;
@@ -712,6 +714,10 @@ export async function createBookingLink(
   opts: { packageId?: string; preset?: BookingPreset } = {},
 ) {
   return api.post<BookingLink>("/bookings/link", { customerId, ...opts });
+}
+
+export async function sendBookingQuotationToChat(id: string) {
+  return api.post<{ sent: boolean; messageId: string | null; sentAt: string }>(`/bookings/${id}/send-quotation`, {});
 }
 
 export async function getCustomerBookings(customerId: string) {

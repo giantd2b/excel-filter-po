@@ -209,7 +209,7 @@ export default function App() {
         />
       )}
 
-      {screen === 'done' && saved && <Done saved={saved} onHome={goHome} />}
+      {screen === 'done' && saved && <Done saved={saved} onHome={goHome} chatChannel={linkInfo?.channel ?? null} />}
 
       {/* sticky bottom bar */}
       {showBar && (
