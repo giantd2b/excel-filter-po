@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { TH_AREAS } from '../data/th-areas';
+import { travelAreaLabel, travelFeeFor } from '../data/packages';
 import type { BookingForm } from '../lib/calc';
 import { FieldLabel, inputStyle } from '../ui';
 
@@ -19,10 +20,12 @@ interface Props {
   setForm: (f: BookingForm) => void;
   scope?: AreaScope;
   label?: string;
+  /** show the travel-fee notice for the picked district (venue address, or billing when it doubles as the venue) */
+  showTravelFee?: boolean;
 }
 
 /** ตำบล/แขวง search over the service-area dataset + read-only อำเภอ/จังหวัด/รหัส chips. */
-export default function AreaSearch({ form: f, setForm, scope = 'event', label = 'ตำบล / แขวง' }: Props) {
+export default function AreaSearch({ form: f, setForm, scope = 'event', label = 'ตำบล / แขวง', showTravelFee = scope === 'event' }: Props) {
   const k = AREA_KEYS[scope];
   const [open, setOpen] = useState(false);
   const q = String(f[k.query] || '').trim();
@@ -103,6 +106,11 @@ export default function AreaSearch({ form: f, setForm, scope = 'event', label = 
           </div>
         )}
       </div>
+      {!!tambon && showTravelFee && travelFeeFor(String(f[k.amphoe] || '')) > 0 && (
+        <div style={{ background: '#fff4e0', border: '1px solid #f5b748', borderRadius: 'var(--radius-md)', padding: '10px 13px', fontSize: 13, lineHeight: 1.6, color: '#7c4a03' }}>
+          🚚 สถานที่จัดงานใน{travelAreaLabel(String(f[k.amphoe] || ''), String(f[k.province] || ''))} มีค่าเดินทางเพิ่ม <b>{travelFeeFor(String(f[k.amphoe] || '')).toLocaleString('th-TH')} บาท</b> (รวมอยู่ในราคาประเมินและใบเสนอราคาแล้ว)
+        </div>
+      )}
       {!!tambon && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }}>
           {[

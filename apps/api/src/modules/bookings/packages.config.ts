@@ -50,6 +50,58 @@ export const BOOKING_ADDONS: { id: string; label: string; price: number }[] = [
 ];
 
 export const SELF_TRANSPORT_DISCOUNT = 1000;
+
+// ── Travel fee by อำเภอ of the EVENT VENUE (not the billing address) ─────
+// Editable in the dashboard (จองงานบุญ → ตั้งค่า → ค่าเดินทาง), stored in SystemSetting
+// TRAVEL_FEES_SETTING_KEY, served to the /booking page in GET /bookings/pricing (travelFees)
+// and added as its own line on the quotation. Keys are district names without เขต/อ.
+export const TRAVEL_FEES_SETTING_KEY = 'booking_travel_fees';
+export interface TravelFeeConfig { fees: Record<string, number> }
+export const DEFAULT_TRAVEL_FEES: TravelFeeConfig = {
+  fees: {
+    วังจันทร์: 1000, เขาชะเมา: 2000, แกลง: 1000,
+    เกาะจันทร์: 1000, บ่อทอง: 1500, หนองใหญ่: 1000,
+    บางน้ำเปรี้ยว: 1000, พนมสารคาม: 2000, สนามชัยเขต: 2000, แปลงยาว: 1500, ท่าตะเกียบ: 2000, คลองเขื่อน: 1500,
+    ทุ่งครุ: 500, ตลิ่งชัน: 500, ธนบุรี: 500, ทวีวัฒนา: 500, บางพลัด: 500, บางกอกน้อย: 500, บางบอน: 500,
+    หนองแขม: 500, บางแค: 500, ภาษีเจริญ: 500, บางกอกใหญ่: 500, บางขุนเทียน: 500, ราษฎร์บูรณะ: 500, จอมทอง: 500,
+  },
+};
+/** Bangkok districts are เขต, everything else อ. (used when the province is not known, e.g. link presets). */
+export const BKK_DISTRICTS = new Set(['ทุ่งครุ', 'ตลิ่งชัน', 'ธนบุรี', 'ทวีวัฒนา', 'บางพลัด', 'บางกอกน้อย', 'บางบอน', 'หนองแขม', 'บางแค', 'ภาษีเจริญ', 'บางกอกใหญ่', 'บางขุนเทียน', 'ราษฎร์บูรณะ', 'จอมทอง', 'คลองสาน', 'บางรัก', 'สาทร', 'ปทุมวัน', 'พระนคร', 'ดุสิต', 'บางซื่อ', 'จตุจักร', 'ลาดพร้าว', 'ห้วยขวาง', 'ดินแดง', 'ราชเทวี', 'พญาไท', 'วัฒนา', 'คลองเตย', 'พระโขนง', 'บางนา', 'สวนหลวง', 'ประเวศ', 'บางกะปิ', 'บึงกุ่ม', 'สะพานสูง', 'มีนบุรี', 'คลองสามวา', 'หนองจอก', 'ลาดกระบัง', 'คันนายาว', 'สายไหม', 'บางเขน', 'ดอนเมือง', 'หลักสี่', 'วังทองหลาง', 'ยานนาวา', 'บางคอแหลม', 'สัมพันธวงศ์', 'ป้อมปราบศัตรูพ่าย']);
+
+/** 'เขตทุ่งครุ' / 'อ.แกลง' / ' แกลง ' → 'ทุ่งครุ' / 'แกลง' */
+export function normalizeAmphoe(s: string | null | undefined): string {
+  return String(s || '').trim().replace(/^(เขต|อำเภอ|อ\.)\s*/, '').trim();
+}
+
+export function travelFeeFor(amphoe: string | null | undefined, cfg: TravelFeeConfig = DEFAULT_TRAVEL_FEES): number {
+  const key = normalizeAmphoe(amphoe);
+  if (!key) return 0;
+  const v = cfg.fees[key];
+  return Number.isFinite(v) && v > 0 ? Math.round(v) : 0;
+}
+
+/** 'แกลง' + 'ระยอง' → 'อ.แกลง จ.ระยอง'; Bangkok → 'เขตทุ่งครุ กรุงเทพฯ' */
+export function travelAreaLabel(amphoe: string | null | undefined, province?: string | null): string {
+  const a = normalizeAmphoe(amphoe);
+  if (!a) return '';
+  const bkk = province === 'กรุงเทพฯ' || (!province && BKK_DISTRICTS.has(a));
+  const head = bkk ? `เขต${a}` : `อ.${a}`;
+  const prov = province ? (bkk ? province : `จ.${province}`) : bkk ? 'กรุงเทพฯ' : '';
+  return [head, prov].filter(Boolean).join(' ');
+}
+
+/** Validate + normalise a config coming from the dashboard; null keeps the defaults. */
+export function mergeTravelFees(saved: Partial<TravelFeeConfig> | null | undefined): TravelFeeConfig {
+  if (!saved || typeof saved !== 'object' || !saved.fees || typeof saved.fees !== 'object') return { fees: { ...DEFAULT_TRAVEL_FEES.fees } };
+  const fees: Record<string, number> = {};
+  for (const [k, v] of Object.entries(saved.fees)) {
+    const key = normalizeAmphoe(k);
+    const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
+    if (key && Number.isFinite(n) && n >= 0) fees[key] = Math.round(n);
+  }
+  return { fees };
+}
 export const FIVE_MONKS_DISCOUNT = 1500; // every package (new-package-2025 sheet)
 
 // ── Editable pricing ──────────────────────────────────────────────────
@@ -569,6 +621,9 @@ export function buildFaItems(
     monks: number;
     selfTransport: boolean;
     addons: string[];
+    /** travel fee of the event venue's district (already resolved) — becomes its own line */
+    travelFee?: number;
+    travelArea?: string;
   },
   config: FaRecipeConfig = DEFAULT_FA_RECIPES,
   pricing: PricingConfig = DEFAULT_PRICING,
@@ -635,6 +690,10 @@ export function buildFaItems(
     );
   }
 
+  if (input.travelFee && input.travelFee > 0) {
+    items.push({ description: `ค่าเดินทาง${input.travelArea ? ` (${input.travelArea})` : ''}`, quantity: 1, unit: 'ครั้ง', unitPrice: input.travelFee });
+  }
+
   return { items, vatRate: recipe.vatRate, pkg };
 }
 
@@ -647,6 +706,8 @@ export function calcEstimatedTotal(
     monks: number;
     selfTransport: boolean;
     addons: string[];
+    travelFee?: number;
+    travelArea?: string;
   },
   pricing: PricingConfig = DEFAULT_PRICING,
 ): { total: number; pkg: BookingPackage } | null {
@@ -669,6 +730,7 @@ export function calcEstimatedTotal(
   }
   if (input.selfTransport) total -= pricing.selfTransportDiscount;
   if (input.monks === 5) total -= pricing.fiveMonksDiscount;
+  if (input.travelFee && input.travelFee > 0) total += input.travelFee;
 
   return { total: Math.max(0, total), pkg };
 }
@@ -722,6 +784,7 @@ export function estimateBooking(
   }
   if (input.selfTransport) rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: `−${fmt(pricing.selfTransportDiscount)}` });
   if (input.monks === 5) rows.push({ k: 'พระ 5 รูป', v: `−${fmt(pricing.fiveMonksDiscount)}` });
+  if (input.travelFee && input.travelFee > 0) rows.push({ k: `ค่าเดินทาง${input.travelArea ? ` (${input.travelArea})` : ''}`, v: `+${fmt(input.travelFee)}` });
   const vatAmount = input.wantVat ? Math.round(calc.total * VAT_RATE) : 0;
   if (input.wantVat) rows.push({ k: 'ภาษีมูลค่าเพิ่ม 7%', v: `+${fmt(vatAmount)}` });
   return { total: calc.total, vatAmount, grandTotal: calc.total + vatAmount, foodAmount, depositAmount, depositManual, packageName: calc.pkg.name, rows };

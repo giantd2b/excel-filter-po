@@ -258,6 +258,33 @@ export const DEPOSIT_RULE: { tiers: { upTo: number; amount: number }[]; abovePer
   abovePercent: 20,
 };
 
+/** Travel fee by อำเภอ/เขต of the EVENT VENUE (mirror of apps/api packages.config.ts DEFAULT_TRAVEL_FEES; overwritten by applyPricing). */
+export const TRAVEL_FEES: Record<string, number> = {
+  วังจันทร์: 1000, เขาชะเมา: 2000, แกลง: 1000,
+  เกาะจันทร์: 1000, บ่อทอง: 1500, หนองใหญ่: 1000,
+  บางน้ำเปรี้ยว: 1000, พนมสารคาม: 2000, สนามชัยเขต: 2000, แปลงยาว: 1500, ท่าตะเกียบ: 2000, คลองเขื่อน: 1500,
+  ทุ่งครุ: 500, ตลิ่งชัน: 500, ธนบุรี: 500, ทวีวัฒนา: 500, บางพลัด: 500, บางกอกน้อย: 500, บางบอน: 500,
+  หนองแขม: 500, บางแค: 500, ภาษีเจริญ: 500, บางกอกใหญ่: 500, บางขุนเทียน: 500, ราษฎร์บูรณะ: 500, จอมทอง: 500,
+};
+
+/** 'เขตทุ่งครุ' / 'อ.แกลง' → 'ทุ่งครุ' / 'แกลง' */
+export function normalizeAmphoe(s: string | null | undefined): string {
+  return String(s || '').trim().replace(/^(เขต|อำเภอ|อ\.)\s*/, '').trim();
+}
+
+export function travelFeeFor(amphoe: string | null | undefined): number {
+  const v = TRAVEL_FEES[normalizeAmphoe(amphoe)];
+  return typeof v === 'number' && v > 0 ? v : 0;
+}
+
+/** 'แกลง' + 'ระยอง' → 'อ.แกลง'; Bangkok rows already carry 'เขต…' */
+export function travelAreaLabel(amphoe: string | null | undefined, province?: string | null): string {
+  const raw = String(amphoe || '').trim();
+  if (!raw) return '';
+  if (province === 'กรุงเทพฯ' || raw.startsWith('เขต')) return raw.startsWith('เขต') ? raw : `เขต${raw}`;
+  return `อ.${normalizeAmphoe(raw)}`;
+}
+
 export interface PricingPayload {
   pricing: {
     packages: Record<string, { base?: number | null; buffet?: TierConfig | null; table?: TierConfig | null }>;
@@ -266,6 +293,7 @@ export interface PricingPayload {
     fiveMonksDiscount: number;
   };
   depositRule?: { tiers: { upTo: number; amount: number }[]; abovePercent: number };
+  travelFees?: Record<string, number>;
 }
 
 /**
@@ -295,6 +323,13 @@ export function applyPricing(payload: PricingPayload) {
   if (r?.tiers?.length) {
     DEPOSIT_RULE.tiers = r.tiers.map((t) => ({ upTo: Number(t.upTo), amount: Number(t.amount) }));
     DEPOSIT_RULE.abovePercent = Number(r.abovePercent) || 0;
+  }
+  if (payload.travelFees && typeof payload.travelFees === 'object') {
+    for (const k of Object.keys(TRAVEL_FEES)) delete TRAVEL_FEES[k];
+    for (const [k, v] of Object.entries(payload.travelFees)) {
+      const key = normalizeAmphoe(k);
+      if (key && typeof v === 'number' && v >= 0) TRAVEL_FEES[key] = v;
+    }
   }
 }
 

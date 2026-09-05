@@ -73,6 +73,17 @@ export class BookingPresetDto {
   @Min(0)
   depositAmount?: number;
 
+  /** District / province of the EVENT VENUE when sales already knows it — only used for the travel fee. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  amphoe?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  province?: string;
+
   /** Message from sales shown to the customer above the summary. */
   @IsOptional()
   @IsString()

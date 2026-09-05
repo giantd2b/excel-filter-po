@@ -63,6 +63,7 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
   const [mode, setMode] = useState<"preset" | "free">("preset");
   const [packages, setPackages] = useState(FALLBACK_PACKAGES);
   const [addons, setAddons] = useState<{ id: string; label: string }[]>(FALLBACK_ADDONS);
+  const [travelFees, setTravelFees] = useState<Record<string, number>>({});
   const [preset, setPreset] = useState<BookingPreset>(DEFAULT_PRESET);
   const [estimate, setEstimate] = useState<BookingEstimate | null>(null);
   const [estimating, setEstimating] = useState(false);
@@ -82,6 +83,7 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
       .then((d) => {
         if (d.packages?.length) setPackages(d.packages);
         if (d.addons?.length) setAddons(d.addons);
+        if (d.travelFees) setTravelFees(d.travelFees);
       })
       .catch(() => {});
   }, []);
@@ -296,6 +298,18 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                 ลูกค้านิมนต์รับ-ส่งพระเอง
               </label>
             </div>
+            <label className="block">
+              <span className={lbl}>อำเภอ/เขตของสถานที่จัดงาน (คิดค่าเดินทาง)</span>
+              <select value={preset.amphoe || ""} onChange={(e) => set("amphoe", e.target.value || undefined)} className={field}>
+                <option value="">ไม่มีค่าเดินทาง / ยังไม่ทราบ — คิดตามที่ลูกค้ากรอก</option>
+                {Object.entries(travelFees)
+                  .sort((a, b) => a[0].localeCompare(b[0], "th"))
+                  .map(([k, v]) => (
+                    <option key={k} value={k}>{k} · +{v.toLocaleString("th-TH")} บาท</option>
+                  ))}
+              </select>
+              <span className="text-[10px] text-slate-400">ราคาจริงคิดจากอำเภอที่ลูกค้าเลือกในฟอร์มเสมอ</span>
+            </label>
             <div>
               <span className={lbl}>ออปชั่นเสริม</span>
               <div className="flex flex-wrap gap-2 mt-1">
@@ -448,5 +462,7 @@ function cleanPreset(p: BookingPreset): BookingPreset {
     note: p.note?.trim() || undefined,
     wantVat: typeof p.wantVat === "boolean" ? p.wantVat : undefined,
     depositAmount: typeof p.depositAmount === "number" ? p.depositAmount : undefined,
+    amphoe: p.amphoe?.trim() || undefined,
+    province: p.province?.trim() || undefined,
   };
 }

@@ -596,6 +596,9 @@ export interface MeritBooking {
   phone: string;
   note?: string | null;
   estimatedTotal: number;
+  /** travel fee of the venue district, already included in estimatedTotal */
+  travelFee?: number;
+  travelArea?: string | null;
   // attribution (chat customer / channel / sales who sent the booking link)
   source?: string; // web | chat_link
   customerId?: string | null;
@@ -709,6 +712,18 @@ export interface BookingPricingSettings {
   missingCodes: string[];
   usedCodes: Record<string, { buffet: Record<number, string>; table: Record<number, string>; base?: string }>;
   appUrl: string;
+  /** travel fee by อำเภอ/เขต of the event venue (from the travel-fee settings) */
+  travelFees?: Record<string, number>;
+}
+
+export interface TravelFeeConfig { fees: Record<string, number> }
+
+export async function getTravelFees() {
+  return api.get<{ config: TravelFeeConfig; defaults: TravelFeeConfig }>("/bookings/travel-fees");
+}
+
+export async function saveTravelFees(config: TravelFeeConfig) {
+  return api.put<{ config: TravelFeeConfig }>("/bookings/travel-fees", config);
 }
 
 export async function getBookingPricing() {
@@ -756,6 +771,9 @@ export interface BookingPreset {
   wantVat?: boolean | null;
   /** admin's manual deposit (บาท); omitted = FA's stepped rule on the food cost */
   depositAmount?: number | null;
+  /** district / province of the event venue when known — only drives the travel fee in the estimate */
+  amphoe?: string;
+  province?: string;
 }
 
 export interface BookingEstimate {

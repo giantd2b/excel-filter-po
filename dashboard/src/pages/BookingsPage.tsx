@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, RefreshCw, Trash2, Phone, MapPin, CalendarDays, ExternalLink, FileText, Settings2, Link2, Search, MessageCircle, Send, Check } from "lucide-react";
 import BookingRecipeSettings from "@/components/BookingRecipeSettings";
+import BookingTravelFeeSettings from "@/components/BookingTravelFeeSettings";
 import BookingPricingSettings from "@/components/BookingPricingSettings";
 import {
   getBookings,
@@ -143,7 +144,7 @@ export default function BookingsPage() {
 
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"pricing" | "recipes">("pricing");
+  const [settingsTab, setSettingsTab] = useState<"pricing" | "recipes" | "travel">("pricing");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const createQuote = async (b: MeritBooking) => {
@@ -232,6 +233,7 @@ export default function BookingsPage() {
             {([
               ["pricing", "ราคาแพ็กเกจ"],
               ["recipes", "ผูกสินค้า IRIS Quotation"],
+              ["travel", "ค่าเดินทาง"],
             ] as const).map(([key, label]) => (
               <button
                 key={key}
@@ -244,6 +246,8 @@ export default function BookingsPage() {
           </div>
           {settingsTab === "pricing" ? (
             <BookingPricingSettings onClose={() => setShowSettings(false)} />
+          ) : settingsTab === "travel" ? (
+            <BookingTravelFeeSettings onClose={() => setShowSettings(false)} />
           ) : (
             <BookingRecipeSettings onClose={() => setShowSettings(false)} />
           )}
@@ -402,6 +406,7 @@ export default function BookingsPage() {
               <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100">
                 <div>
                   <div className="font-bold text-brand-700">{formatBaht(b.estimatedTotal)}</div>
+                  {b.travelFee ? <div className="text-[10px] text-amber-700">รวมค่าเดินทาง {b.travelArea || ''} {formatBaht(b.travelFee)}</div> : null}
                   <div className="text-[11px] text-slate-400">จองเมื่อ {formatDateTime(b.createdAt)}</div>
                 </div>
                 <div className="flex gap-2 items-center">

@@ -475,6 +475,8 @@ model Booking {
   depositManual   Boolean      @default(false) @map("deposit_manual")
   note           String?
   estimatedTotal Int           @map("estimated_total")
+  travelFee      Int           @default(0) @map("travel_fee") // ค่าเดินทางตามอำเภอของสถานที่จัดงาน (รวมใน estimatedTotal)
+  travelArea     String?       @map("travel_area") // e.g. "อ.แกลง จ.ระยอง"
 
   // Attribution: which chat customer / channel / sales the booking came from
   source           String       @default("web") // web | chat_link

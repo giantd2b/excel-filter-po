@@ -9,10 +9,12 @@ interface AddressProps {
   /** label of the free-text line (house no. / moo / road / place name) */
   lineLabel: string;
   linePlaceholder: string;
+  /** forwarded to AreaSearch: warn about the travel fee of the picked district */
+  showTravelFee?: boolean;
 }
 
 /** One full address: free-text line + ตำบล search (+ อำเภอ/จังหวัด/รหัส chips). */
-export function AddressFields({ form: f, setForm, scope, lineLabel, linePlaceholder }: AddressProps) {
+export function AddressFields({ form: f, setForm, scope, lineLabel, linePlaceholder, showTravelFee }: AddressProps) {
   const k = AREA_KEYS[scope];
   return (
     <>
@@ -26,7 +28,7 @@ export function AddressFields({ form: f, setForm, scope, lineLabel, linePlacehol
           style={inputStyle}
         />
       </div>
-      <AreaSearch form={f} setForm={setForm} scope={scope} />
+      <AreaSearch form={f} setForm={setForm} scope={scope} showTravelFee={showTravelFee} />
     </>
   );
 }

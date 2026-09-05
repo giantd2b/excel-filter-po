@@ -139,7 +139,7 @@ export function buildNewBookingFlex(b: BookingAlertInput, opts: { crmUrl: string
 
   if (b.phone) rows.push(row('📞 เบอร์', b.phone));
   rows.push(row('💬 ที่มา', sourceLine(b)));
-  rows.push(row('💰 ราคาประเมิน', `${thb(b.estimatedTotal)}${b.wantVat ? ' · ขอใบกำกับภาษี (VAT 7%)' : ''}`));
+  rows.push(row('💰 ราคาประเมิน', `${thb(b.estimatedTotal)}${b.wantVat ? ' · ขอใบกำกับภาษี (VAT 7%)' : ''}${b.travelFee ? ` · รวมค่าเดินทาง ${b.travelArea || ''} ${thb(b.travelFee)}` : ''}`));
   if (b.note) rows.push(row('📝 หมายเหตุ', b.note.length > 200 ? `${b.note.slice(0, 200)}…` : b.note));
 
   const buttons: unknown[] = [

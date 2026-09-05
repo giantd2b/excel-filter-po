@@ -42,7 +42,8 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
   const [submitting, setSubmitting] = useState(false);
   const preset = linkInfo.preset;
   const pkg = pkgById(f.pkg);
-  const c = calc(f, preset && typeof preset.depositAmount === 'number' ? preset.depositAmount : linkInfo.depositAmount ?? undefined);
+  // price the venue the customer actually gets: with "same address" the billing district is the venue
+  const c = calc(finalizeForm(f, 'billing'), preset && typeof preset.depositAmount === 'number' ? preset.depositAmount : linkInfo.depositAmount ?? undefined);
   const hasFood = pkg.kind === 'full';
 
   const setF = <K extends keyof BookingForm>(k: K, v: BookingForm[K]) => {
@@ -221,6 +222,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
           form={f}
           setForm={setAll}
           scope="billing"
+          showTravelFee={f.sameAddress}
           lineLabel="ที่อยู่สำหรับออกใบเสนอราคา (บ้านเลขที่ / หมู่ / ถนน)"
           linePlaceholder="เช่น 99/1 ม.5 ถ.สุขุมวิท"
         />

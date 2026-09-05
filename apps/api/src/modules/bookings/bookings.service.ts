@@ -15,6 +15,12 @@ import {
   VAT_RATE,
   DEFAULT_DEPOSIT_RULE,
   type DepositRule,
+  TRAVEL_FEES_SETTING_KEY,
+  DEFAULT_TRAVEL_FEES,
+  type TravelFeeConfig,
+  mergeTravelFees,
+  travelFeeFor,
+  travelAreaLabel,
   pickRemarkCode,
   DEFAULT_PRICING,
   type FaRecipeConfig,
@@ -125,7 +131,34 @@ export class BookingsService {
       usedCodes,
       appUrl: this.flowAccount.appUrl,
       depositRule: await this.getDepositRule(force),
+      travelFees: (await this.getTravelFees()).fees,
     };
+  }
+
+  // ── Travel fee by district of the event venue (editable from the dashboard) ──
+
+  async getTravelFees(): Promise<TravelFeeConfig> {
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: TRAVEL_FEES_SETTING_KEY } });
+    if (!row?.value) return { fees: { ...DEFAULT_TRAVEL_FEES.fees } };
+    try {
+      return mergeTravelFees(JSON.parse(row.value));
+    } catch {
+      return { fees: { ...DEFAULT_TRAVEL_FEES.fees } };
+    }
+  }
+
+  async saveTravelFees(input: Partial<TravelFeeConfig>): Promise<TravelFeeConfig> {
+    const merged = mergeTravelFees(input);
+    await this.prisma.systemSetting.upsert({
+      where: { key: TRAVEL_FEES_SETTING_KEY },
+      update: { value: JSON.stringify(merged) },
+      create: { key: TRAVEL_FEES_SETTING_KEY, value: JSON.stringify(merged) },
+    });
+    return merged;
+  }
+
+  async travelFeeSettings() {
+    return { config: await this.getTravelFees(), defaults: DEFAULT_TRAVEL_FEES };
   }
 
   // ── Package → flowaccount-app product mapping (editable from the dashboard) ──
@@ -205,6 +238,8 @@ export class BookingsService {
         monks: b.monks,
         selfTransport: b.selfTransport,
         addons: b.addons,
+        travelFee: b.travelFee || 0,
+        travelArea: b.travelArea || travelAreaLabel(b.amphoe, b.province) || undefined,
       },
       config,
       pricing,
@@ -230,6 +265,7 @@ export class BookingsService {
       b.budget ? `งบประมาณ: ${b.budget}` : '',
       `${b.source === 'chat_link' ? 'จองผ่านลิงก์จากแชต' : 'จองผ่านหน้าเว็บ'} ${b.code} · ราคาประเมิน ${b.estimatedTotal.toLocaleString('th-TH')} บาท`,
       `สถานที่จัดงาน: ${bookingAddress(b) || '-'}${b.floor ? ` · ${b.floor}` : ''}`,
+      b.travelFee ? `ค่าเดินทาง: ${b.travelArea || '-'} ${b.travelFee.toLocaleString('th-TH')} บาท (รวมในราคาประเมินแล้ว)` : '',
       typeof b.wantVat === 'boolean' ? (b.wantVat ? 'ลูกค้าต้องการใบกำกับภาษี (VAT 7%)' : 'ลูกค้าไม่รับ VAT') : '',
       b.depositAmount != null ? `มัดจำ: ${b.depositAmount.toLocaleString('th-TH')} บาท (${b.depositManual ? 'แอดมินระบุเอง' : 'ตามกติกาค่าอาหาร'})` : '',
       b.billingName ? `ผู้ติดต่อ: ${b.customerName} ${b.phone}` : '',
@@ -340,6 +376,10 @@ export class BookingsService {
       throw new BadRequestException('กรุณาเลือกตำบล/อำเภอ/จังหวัดจากรายการค้นหา ที่อยู่ในใบเสนอราคาต้องมีตำบล อำเภอ และจังหวัด');
     }
 
+    // travel fee follows the EVENT VENUE district (dto.amphoe); the quick form copies the billing
+    // address onto the venue when "same address" is ticked, so dto.amphoe is always the venue
+    const travelFee = travelFeeFor(dto.amphoe, await this.getTravelFees());
+    const travelArea = travelFee > 0 ? travelAreaLabel(dto.amphoe, dto.province) : null;
     const calc = calcEstimatedTotal(
       {
         packageId: dto.packageId,
@@ -349,6 +389,8 @@ export class BookingsService {
         monks: dto.monks,
         selfTransport: dto.selfTransport,
         addons: dto.addons,
+        travelFee,
+        travelArea: travelArea || undefined,
       },
       await this.getPricing(),
     );
@@ -358,7 +400,7 @@ export class BookingsService {
     const attribution = await this.resolveAttribution(dto.ref, phoneDigits);
     const preset = attribution.linkId ? ((await this.prisma.bookingLink.findUnique({ where: { id: attribution.linkId } }))?.preset as any) : null;
     const est = estimateBooking(
-      { packageId: dto.packageId, foodMode: dto.foodMode, guests: dto.guests, tables: dto.tables, monks: dto.monks, selfTransport: dto.selfTransport, addons: dto.addons, depositAmount: typeof preset?.depositAmount === 'number' ? preset.depositAmount : undefined },
+      { packageId: dto.packageId, foodMode: dto.foodMode, guests: dto.guests, tables: dto.tables, monks: dto.monks, selfTransport: dto.selfTransport, addons: dto.addons, travelFee, travelArea: travelArea || undefined, depositAmount: typeof preset?.depositAmount === 'number' ? preset.depositAmount : undefined },
       await this.getPricing(),
       await this.getDepositRule(),
     );
@@ -407,6 +449,8 @@ export class BookingsService {
         depositManual: !!est?.depositManual,
         note: dto.note || null,
         estimatedTotal: calc.total,
+        travelFee,
+        travelArea,
       },
     });
 
@@ -539,7 +583,12 @@ export class BookingsService {
 
   /** Live estimate for a preset (same numbers the booking page shows). */
   async estimate(preset: BookingPresetDto) {
-    const est = estimateBooking(preset, await this.getPricing(), await this.getDepositRule());
+    const travelFee = travelFeeFor(preset.amphoe, await this.getTravelFees());
+    const est = estimateBooking(
+      { ...preset, travelFee, travelArea: travelFee > 0 ? travelAreaLabel(preset.amphoe, preset.province) : undefined },
+      await this.getPricing(),
+      await this.getDepositRule(),
+    );
     if (!est) throw new BadRequestException(`ไม่พบแพ็กเกจ "${preset.packageId}"`);
     return est;
   }

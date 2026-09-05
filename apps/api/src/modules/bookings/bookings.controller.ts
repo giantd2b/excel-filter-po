@@ -105,6 +105,20 @@ export class BookingsController {
     return { config };
   }
 
+  /** Travel fee per district of the event venue (added to the estimate and as a quotation line). */
+  @UseGuards(FirebaseAuthGuard)
+  @Get('travel-fees')
+  async travelFees() {
+    return this.bookingsService.travelFeeSettings();
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Put('travel-fees')
+  async saveTravelFees(@Body() body: any) {
+    const config = await this.bookingsService.saveTravelFees(body || {});
+    return { config };
+  }
+
   @UseGuards(FirebaseAuthGuard)
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body('status') status: string) {

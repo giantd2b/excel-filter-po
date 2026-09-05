@@ -4,6 +4,8 @@ import {
   DISCOUNTS,
   baht,
   pkgById,
+  travelAreaLabel,
+  travelFeeFor,
   type FoodMode,
   type Pkg,
 } from '../data/packages';
@@ -169,6 +171,9 @@ export interface CalcResult {
   foodAmount: number;
   /** stepped deposit from foodAmount, or the manual amount passed in */
   deposit: number;
+  /** travel fee of the event venue's district (0 when none) */
+  travelFee: number;
+  travelArea: string;
   rows: { k: string; v: string }[];
 }
 
@@ -202,9 +207,17 @@ export function calc(f: BookingForm, manualDeposit?: number | null): CalcResult 
     total -= DISCOUNTS.fiveMonks;
     rows.push({ k: 'พระ 5 รูป', v: '−' + baht(DISCOUNTS.fiveMonks) });
   }
+  // travel fee follows the EVENT VENUE district (f.amphoe) — callers on the quick screen pass
+  // finalizeForm(f, 'billing') so the billing address is copied onto the venue first
+  const travelFee = travelFeeFor(f.amphoe);
+  const travelArea = travelFee ? travelAreaLabel(f.amphoe, f.province) : '';
+  if (travelFee) {
+    total += travelFee;
+    rows.push({ k: `ค่าเดินทาง (${travelArea})`, v: '+' + baht(travelFee) });
+  }
   const vat = f.wantVat ? Math.round(total * VAT_RATE) : 0;
   const deposit = typeof manualDeposit === 'number' ? manualDeposit : computeDeposit(foodAmount);
-  return { pkg, total, vat, grandTotal: total + vat, foodAmount, deposit, rows };
+  return { pkg, total, vat, grandTotal: total + vat, foodAmount, deposit, travelFee, travelArea, rows };
 }
 
 export function summary(f: BookingForm): { k: string; v: string }[] {
@@ -213,6 +226,7 @@ export function summary(f: BookingForm): { k: string; v: string }[] {
     { k: 'ประเภทงาน', v: f.occasion },
     { k: 'วันเวลา', v: (f.date || 'ยังไม่ระบุ') + ' · ' + f.time },
     { k: 'สถานที่', v: `${addressLine(f)}${f.floor ? ` (${f.floor})` : ''}` },
+    ...(c.travelFee ? [{ k: 'ค่าเดินทาง', v: `${c.travelArea} +${baht(c.travelFee)} บาท (รวมในราคาแล้ว)` }] : []),
     ...(f.billingName && f.billingName !== f.name ? [{ k: 'ออกใบเสนอราคาในนาม', v: f.billingName }] : []),
     { k: 'ที่อยู่ออกใบเสนอราคา', v: f.sameAddress ? 'ที่อยู่เดียวกับสถานที่จัดงาน' : billingAddressLine(f) },
     { k: 'ใบกำกับภาษี', v: f.wantVat ? 'ต้องการ (คิด VAT 7%)' : 'ไม่ต้องการ (ไม่รวม VAT)' },
