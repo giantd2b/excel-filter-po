@@ -35,6 +35,16 @@ const FALLBACK_ADDONS: BookingAddonInfo[] = [
   { id: "drinks", label: "เครื่องดื่ม", price: 250, perUnit: "table", lines: ["chinese"] },
 ];
 const LINE_LABELS: Record<BookingPackageLine, string> = { merit: "งานบุญ", buffet: "บุฟเฟต์อาหารไทย", chinese: "โต๊ะจีน" };
+/** the three things sales can offer — picking one filters the package list and every field below */
+const LINE_CHOICES: { line: BookingPackageLine; icon: string; label: string; hint: string }[] = [
+  { line: "merit", icon: "🙏", label: "พิธีสงฆ์ / งานบุญ", hint: "นิมนต์พระ + เลี้ยงแขก (หรือไม่มีแขก)" },
+  { line: "buffet", icon: "🍛", label: "บุฟเฟต์อย่างเดียว", hint: "อาหารไทยต่อท่าน ไม่มีพิธี" },
+  { line: "chinese", icon: "🥢", label: "โต๊ะจีนอย่างเดียว", hint: "ต่อโต๊ะ 8 ท่าน ไม่มีพิธี" },
+];
+/** package the form jumps to when sales switches line (mirrors the storefront defaults) */
+const LINE_FIRST: Record<BookingPackageLine, string> = { merit: "full", buffet: "buffet-standard", chinese: "chinese-2300" };
+/** select value that reveals the free-text occasion input */
+const CUSTOM_OCCASION = "__custom__";
 const OCCASIONS = ["ทำบุญขึ้นบ้านใหม่", "ทำบุญบริษัท / เปิดกิจการ", "ทำบุญวันเกิด", "ทำบุญอุทิศส่วนกุศล", "ทำบุญบ้าน / ครบรอบ", "งานอื่น ๆ"];
 const CATERING_OCCASIONS = ["งานเลี้ยงบริษัท / สัมมนา", "งานแต่งงาน", "งานบวช", "งานศพ", "งานเลี้ยงรุ่น / ครอบครัว", "งานอื่น ๆ"];
 const TIME_SLOTS = [
@@ -106,6 +116,15 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
   const menuParts = menuPkg?.menuParts || [];
   const menuPart = menuParts.length > 1 ? (mode === "preset" ? (preset.foodMode === "table" ? "table" : "buffet") : "all") : "all";
   const includedAddons = pkg?.includedAddons || [];
+  const linePackages = packages.filter((p) => (p.line || "merit") === line);
+  const occasionOptions = line === "merit" ? OCCASIONS : CATERING_OCCASIONS;
+  // an occasion typed by hand (not in the list) keeps the free-text input open
+  const occasionIsCustom = !occasionOptions.includes(preset.occasion || "");
+  const switchLine = (l: BookingPackageLine) => {
+    if (l === line) return;
+    const first = packages.find((p) => p.id === LINE_FIRST[l]) || packages.find((p) => (p.line || "merit") === l);
+    if (first) set("packageId", first.id);
+  };
   // add-ons the selected package can be sold with (its line's, minus the ones it already includes)
   const lineAddons = addons.filter((a) => (!a.lines || a.lines.includes(line)) && !includedAddons.includes(a.id));
   // Keep the preset consistent with the package: drop add-ons it can't have (PRIME's drape, other
@@ -307,39 +326,32 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
           </label>
         ) : (
           <div className="space-y-3">
+            {/* 1. which line — the package list and every field below follow it */}
+            <div>
+              <span className={lbl}>รูปแบบงานที่จะเสนอให้ลูกค้า</span>
+              <div className="mt-1 grid grid-cols-3 gap-2">
+                {LINE_CHOICES.map((c) => (
+                  <button
+                    key={c.line}
+                    type="button"
+                    onClick={() => switchLine(c.line)}
+                    className={`rounded-xl border px-2 py-2 text-left transition-colors ${
+                      line === c.line ? "border-violet-500 bg-violet-50 ring-1 ring-violet-300" : "border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className={`text-xs font-semibold ${line === c.line ? "text-violet-800" : "text-slate-700"}`}>{c.icon} {c.label}</div>
+                    <div className="text-[10px] text-slate-500 leading-snug mt-0.5">{c.hint}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <label className="block col-span-2">
-                <span className={lbl}>ประเภทงาน</span>
-                <input list="booking-occasions" value={preset.occasion || ""} onChange={(e) => set("occasion", e.target.value)} className={field} placeholder="เช่น ทำบุญขึ้นบ้านใหม่" />
-                <datalist id="booking-occasions">
-                  {(line === "merit" ? OCCASIONS : CATERING_OCCASIONS).map((o) => <option key={o} value={o} />)}
-                </datalist>
-              </label>
-              <label className="block">
-                <span className={lbl}>วันที่จัดงาน (เว้นว่างให้ลูกค้าเลือก)</span>
-                <ThaiDateSelect value={preset.eventDate || ""} onChange={(v) => set("eventDate", v)} className="mt-1" />
-                {preset.eventDate && (
-                  <button type="button" onClick={() => set("eventDate", "")} className="mt-1 text-[11px] text-slate-400 hover:text-slate-600">ล้างวันที่ (ให้ลูกค้าเลือก)</button>
-                )}
-                {preset.eventDate && (
-                  <span className="block mt-1 text-[11px] font-semibold text-violet-700">วันที่เลือก: {fmtThaiDate(preset.eventDate)}</span>
-                )}
-              </label>
-              <label className="block">
-                <span className={lbl}>{isCatering ? "ช่วงเวลาเสิร์ฟ" : "ช่วงเวลาพิธี"}</span>
-                <select value={preset.timeSlot || ""} onChange={(e) => set("timeSlot", e.target.value)} className={field}>
-                  {(line === "merit" ? TIME_SLOTS : CATERING_TIME_SLOTS).map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
-                </select>
-              </label>
-              <label className="block col-span-2">
-                <span className={lbl}>แพ็กเกจ</span>
+                <span className={lbl}>แพ็กเกจ · {LINE_LABELS[line]}</span>
                 <select value={preset.packageId} onChange={(e) => set("packageId", e.target.value)} className={field}>
-                  {(["merit", "buffet", "chinese"] as BookingPackageLine[]).map((l) => (
-                    <optgroup key={l} label={LINE_LABELS[l]}>
-                      {packages.filter((p) => (p.line || "merit") === l).map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </optgroup>
+                  {linePackages.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               </label>
@@ -400,6 +412,45 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                   </label>
                 </>
               )}
+            </div>
+
+            <div className="border-t border-slate-100 pt-3 grid grid-cols-2 gap-3">
+              <label className="block col-span-2">
+                <span className={lbl}>ประเภทงาน</span>
+                <select
+                  value={occasionIsCustom ? CUSTOM_OCCASION : preset.occasion || ""}
+                  onChange={(e) => set("occasion", e.target.value === CUSTOM_OCCASION ? "" : e.target.value)}
+                  className={field}
+                >
+                  {occasionOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+                  <option value={CUSTOM_OCCASION}>อื่น ๆ (ระบุเอง)</option>
+                </select>
+                {occasionIsCustom && (
+                  <input
+                    autoFocus
+                    value={preset.occasion || ""}
+                    onChange={(e) => set("occasion", e.target.value)}
+                    className={field}
+                    placeholder={line === "merit" ? "เช่น ทำบุญครบรอบวันตาย" : "เช่น งานเปิดตัวสินค้า"}
+                  />
+                )}
+              </label>
+              <label className="block">
+                <span className={lbl}>วันที่จัดงาน (เว้นว่างให้ลูกค้าเลือก)</span>
+                <ThaiDateSelect value={preset.eventDate || ""} onChange={(v) => set("eventDate", v)} className="mt-1" />
+                {preset.eventDate && (
+                  <button type="button" onClick={() => set("eventDate", "")} className="mt-1 text-[11px] text-slate-400 hover:text-slate-600">ล้างวันที่ (ให้ลูกค้าเลือก)</button>
+                )}
+                {preset.eventDate && (
+                  <span className="block mt-1 text-[11px] font-semibold text-violet-700">วันที่เลือก: {fmtThaiDate(preset.eventDate)}</span>
+                )}
+              </label>
+              <label className="block">
+                <span className={lbl}>{isCatering ? "ช่วงเวลาเสิร์ฟ" : "ช่วงเวลาพิธี"}</span>
+                <select value={preset.timeSlot || ""} onChange={(e) => set("timeSlot", e.target.value)} className={field}>
+                  {(line === "merit" ? TIME_SLOTS : CATERING_TIME_SLOTS).map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
+                </select>
+              </label>
             </div>
             <label className="block">
               <span className={lbl}>อำเภอ/เขตของสถานที่จัดงาน (คิดค่าเดินทาง)</span>

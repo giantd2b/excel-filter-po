@@ -55,6 +55,17 @@ interface Props {
 
 type Mode = 'preset' | 'free';
 
+/** the three things sales can offer — picking one filters the package list and every field below (mirrors dashboard) */
+const LINE_CHOICES: { line: string; icon: string; label: string; hint: string }[] = [
+  { line: 'merit', icon: '🙏', label: 'พิธีสงฆ์ / งานบุญ', hint: 'นิมนต์พระ + เลี้ยงแขก (หรือไม่มีแขก)' },
+  { line: 'buffet', icon: '🍛', label: 'บุฟเฟต์อย่างเดียว', hint: 'อาหารไทยต่อท่าน ไม่มีพิธี' },
+  { line: 'chinese', icon: '🥢', label: 'โต๊ะจีนอย่างเดียว', hint: 'ต่อโต๊ะ 8 ท่าน ไม่มีพิธี' },
+];
+/** package the form jumps to when sales switches line */
+const LINE_FIRST: Record<string, string> = { merit: 'full', buffet: 'buffet-standard', chinese: 'chinese-2300' };
+/** chip value that reveals the free-text occasion input */
+const CUSTOM_OCCASION = '__custom__';
+
 /**
  * "ลิงก์จอง": a unique /booking/?ref=<token> link for one chat customer.
  * preset = sales fixes the whole package (+ live price); free = customer picks in the wizard.
@@ -86,6 +97,14 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
   const isCatering = pkg?.kind === 'catering';
   const line = pkg?.line || 'merit';
   const includedAddons = pkg?.includedAddons || [];
+  const linePackages = packages.filter((p) => (p.line || 'merit') === line);
+  // an occasion typed by hand (not in the list) keeps the free-text input open
+  const occasionIsCustom = !occasionsFor(line).includes(preset.occasion || '');
+  const switchLine = (l: string) => {
+    if (l === line) return;
+    const first = packages.find((p) => p.id === LINE_FIRST[l]) || packages.find((p) => (p.line || 'merit') === l);
+    if (first) set('packageId', first.id);
+  };
   // the package whose menu would be attached: the preset package, or the fixed package in free mode
   const menuPkg = mode === 'preset' ? pkg : packages.find((p) => p.id === freePackageId);
   const menuParts = menuPkg?.menuParts || [];
@@ -298,54 +317,28 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
             </Field>
           ) : (
             <>
-              <Field label="ประเภทงาน">
+              {/* 1. which line — the package list and every field below follow it */}
+              <Field label="รูปแบบงานที่จะเสนอให้ลูกค้า">
+                <View style={styles.lineRow}>
+                  {LINE_CHOICES.map((c) => {
+                    const active = line === c.line;
+                    return (
+                      <TouchableOpacity key={c.line} style={[styles.lineCard, active && styles.lineCardActive]} onPress={() => switchLine(c.line)}>
+                        <Text style={[styles.lineCardTitle, active && styles.lineCardTitleActive]}>{c.icon} {c.label}</Text>
+                        <Text style={styles.lineCardHint}>{c.hint}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </Field>
+
+              <Field label={`แพ็กเกจ · ${LINES.find((l) => l.id === line)?.label || ''}`}>
                 <Chips
-                  options={occasionsFor(line).map((o) => ({ value: o, label: o }))}
-                  value={preset.occasion || ''}
-                  onChange={(v) => set('occasion', v)}
-                />
-                <TextInput
-                  style={[styles.input, { marginTop: 8 }]}
-                  value={preset.occasion || ''}
-                  onChangeText={(v) => set('occasion', v)}
-                  placeholder="หรือพิมพ์เอง เช่น ทำบุญขึ้นบ้านใหม่"
-                  placeholderTextColor="#94a3b8"
+                  options={linePackages.map((p) => ({ value: p.id, label: p.name }))}
+                  value={preset.packageId}
+                  onChange={(v) => set('packageId', v)}
                 />
               </Field>
-
-              <Field label="วันที่จัดงาน (เว้นว่างให้ลูกค้าเลือก)">
-                <ThaiDatePicker value={preset.eventDate || ''} onChange={(v) => set('eventDate', v)} />
-                {preset.eventDate ? (
-                  <View style={[styles.rowWrap, { alignItems: 'center', marginTop: 6 }]}>
-                    <Text style={styles.datePreview}>วันที่เลือก: {fmtThaiDate(preset.eventDate)}</Text>
-                    <TouchableOpacity style={styles.miniBtn} onPress={() => set('eventDate', '')}>
-                      <Text style={[styles.miniBtnText, { color: '#dc2626' }]}>ล้างวันที่ (ให้ลูกค้าเลือก)</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
-              </Field>
-
-              <Field label={isCatering ? 'ช่วงเวลาเสิร์ฟ' : 'ช่วงเวลาพิธี'}>
-                <Chips
-                  options={timeSlotsFor(line).map((t) => ({ value: t.v, label: t.label }))}
-                  value={preset.timeSlot || ''}
-                  onChange={(v) => set('timeSlot', v)}
-                />
-              </Field>
-
-              {LINES.map((l) => {
-                const list = packages.filter((p) => (p.line || 'merit') === l.id);
-                if (!list.length) return null;
-                return (
-                  <Field key={l.id} label={`แพ็กเกจ · ${l.label}`}>
-                    <Chips
-                      options={list.map((p) => ({ value: p.id, label: p.name }))}
-                      value={preset.packageId}
-                      onChange={(v) => set('packageId', v)}
-                    />
-                  </Field>
-                );
-              })}
 
               {isCatering && pkg?.unit === 'guest' ? (
                 <Field label="จำนวนอาหารคาว">
@@ -430,6 +423,46 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                   </View>
                 </>
               ) : null}
+
+              <View style={styles.sectionDivider} />
+
+              <Field label="ประเภทงาน">
+                <Chips
+                  options={[...occasionsFor(line).map((o) => ({ value: o, label: o })), { value: CUSTOM_OCCASION, label: 'อื่น ๆ (ระบุเอง)' }]}
+                  value={occasionIsCustom ? CUSTOM_OCCASION : preset.occasion || ''}
+                  onChange={(v) => set('occasion', v === CUSTOM_OCCASION ? '' : v)}
+                />
+                {occasionIsCustom ? (
+                  <TextInput
+                    style={[styles.input, { marginTop: 8 }]}
+                    value={preset.occasion || ''}
+                    onChangeText={(v) => set('occasion', v)}
+                    placeholder={line === 'merit' ? 'เช่น ทำบุญครบรอบวันตาย' : 'เช่น งานเปิดตัวสินค้า'}
+                    placeholderTextColor="#94a3b8"
+                    autoFocus
+                  />
+                ) : null}
+              </Field>
+
+              <Field label="วันที่จัดงาน (เว้นว่างให้ลูกค้าเลือก)">
+                <ThaiDatePicker value={preset.eventDate || ''} onChange={(v) => set('eventDate', v)} />
+                {preset.eventDate ? (
+                  <View style={[styles.rowWrap, { alignItems: 'center', marginTop: 6 }]}>
+                    <Text style={styles.datePreview}>วันที่เลือก: {fmtThaiDate(preset.eventDate)}</Text>
+                    <TouchableOpacity style={styles.miniBtn} onPress={() => set('eventDate', '')}>
+                      <Text style={[styles.miniBtnText, { color: '#dc2626' }]}>ล้างวันที่ (ให้ลูกค้าเลือก)</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </Field>
+
+              <Field label={isCatering ? 'ช่วงเวลาเสิร์ฟ' : 'ช่วงเวลาพิธี'}>
+                <Chips
+                  options={timeSlotsFor(line).map((t) => ({ value: t.v, label: t.label }))}
+                  value={preset.timeSlot || ''}
+                  onChange={(v) => set('timeSlot', v)}
+                />
+              </Field>
 
               <Field label="ออปชั่นเสริม">
                 <View style={styles.rowWrap}>
@@ -707,6 +740,13 @@ const styles = StyleSheet.create({
   },
   miniBtnText: { fontSize: 12, color: '#475569', fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  lineRow: { flexDirection: 'row', gap: 6 },
+  lineCard: { flex: 1, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 8, backgroundColor: '#fff', gap: 2 },
+  lineCardActive: { borderColor: '#8b5cf6', backgroundColor: '#f5f3ff' },
+  lineCardTitle: { fontSize: 11, fontWeight: '700', color: '#334155' },
+  lineCardTitleActive: { color: '#5b21b6' },
+  lineCardHint: { fontSize: 9.5, color: '#64748b', lineHeight: 13 },
+  sectionDivider: { height: 1, backgroundColor: '#e2e8f0', marginVertical: 2 },
   switchLabel: { fontSize: 13, color: '#334155', fontWeight: '500' },
   estimateBox: {
     backgroundColor: '#fff',
