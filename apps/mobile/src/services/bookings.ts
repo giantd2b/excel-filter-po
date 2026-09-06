@@ -24,8 +24,13 @@ export interface MeritBooking {
   guests?: number;
   tables?: number;
   monks?: number;
+  /** catering buffet: savoury dishes 5–8 */
+  dishCount?: number | null;
   selfTransport?: boolean;
   addons?: string[];
+  /** computed by the API from packageId — 'catering' = บุฟเฟต์/โต๊ะจีน (no monks) */
+  packageKind?: 'ceremony' | 'full' | 'catering' | string | null;
+  packageLine?: 'merit' | 'buffet' | 'chinese' | string | null;
   budget?: string | null;
   customerName?: string;
   phone?: string;
@@ -69,6 +74,8 @@ export interface BookingPreset {
   guests: number;
   tables: number;
   monks: number;
+  /** catering buffet: savoury dishes 5–8 (omit for other packages) */
+  dishCount?: number | null;
   selfTransport: boolean;
   addons: string[];
   note?: string;
@@ -120,10 +127,18 @@ export interface CustomerBookingsResponse {
   links: BookingLink[];
 }
 
+export type PricingLine = 'merit' | 'buffet' | 'chinese';
+
 export interface PricingPackage {
   id: string;
   name: string;
-  kind?: 'ceremony' | 'full' | string;
+  /** ceremony / full = merit packages with monks; catering = บุฟเฟต์ / โต๊ะจีน (food only) */
+  kind?: 'ceremony' | 'full' | 'catering' | string;
+  line?: PricingLine | string;
+  /** catering: priced per guest (บุฟเฟต์) or per table (โต๊ะจีน) */
+  unit?: 'guest' | 'table' | null;
+  minCount?: number | null;
+  courses?: number | null;
   /** add-on ids the package already covers (PRIME → drape); the API sends this, fallbacks mirror it */
   includedAddons?: string[];
 }
@@ -131,6 +146,11 @@ export interface PricingPackage {
 export interface PricingAddon {
   id: string;
   label: string;
+  price?: number;
+  /** 'table' = price × tables (เครื่องดื่มโต๊ะจีน) */
+  perUnit?: 'table' | null;
+  /** package lines that offer the add-on */
+  lines?: string[];
 }
 
 export interface PricingResponse {
@@ -149,6 +169,10 @@ export interface PackagePricing {
   base?: number | null;
   buffet?: TierConfig | null;
   table?: TierConfig | null;
+  /** catering buffet: dish count ("5".."8") → price per guest */
+  perHead?: Record<string, number> | null;
+  /** catering Chinese table: price per table */
+  perTable?: number | null;
 }
 export interface PricingSettings {
   pricing: {
@@ -163,7 +187,7 @@ export interface PricingSettings {
   fetchedAt?: string;
   catalogError?: string | null;
   missingCodes: string[];
-  usedCodes: Record<string, { buffet?: Record<number, string>; table?: Record<number, string>; base?: string }>;
+  usedCodes: Record<string, { buffet?: Record<number, string>; table?: Record<number, string>; base?: string; catering?: string }>;
   travelFees: Record<string, number>;
   appUrl?: string;
 }
@@ -189,10 +213,11 @@ export function apiErrorMessage(err: any, fallback = 'ทำรายการ�
   return err?.message || fallback;
 }
 
-/** Drop empty optional strings so the API validators see undefined, not "". */
-export function cleanPreset(p: BookingPreset): BookingPreset {
+/** Drop empty optional strings so the API validators see undefined, not "". dishCount only travels for buffet catering. */
+export function cleanPreset(p: BookingPreset, pkg?: PricingPackage | null): BookingPreset {
   return {
     ...p,
+    dishCount: pkg?.kind === 'catering' && pkg.unit === 'guest' ? p.dishCount ?? 6 : undefined,
     occasion: p.occasion?.trim() || undefined,
     eventDate: p.eventDate || undefined,
     timeSlot: p.timeSlot || undefined,

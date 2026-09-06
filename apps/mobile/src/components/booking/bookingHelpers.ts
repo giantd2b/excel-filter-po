@@ -75,14 +75,28 @@ export function addressLine(b: MeritBooking) {
   return p.join(' ') || '-';
 }
 
+/** catering bookings (บุฟเฟต์ / โต๊ะจีน) have no monks; older API responses lack packageKind, so fall back on monks === 0 */
+export const isCateringBooking = (b: MeritBooking) => b.packageKind === 'catering' || (b.packageKind == null && b.monks === 0);
+
 export function foodLine(b: MeritBooking) {
+  if (isCateringBooking(b)) {
+    if (b.foodMode === 'table') return `${b.tables ?? 0} โต๊ะ${(b.addons || []).includes('drinks') ? ' + เครื่องดื่ม' : ''}`;
+    return `${b.dishCount ?? '-'} อย่าง · ${b.guests ?? 0} ท่าน`;
+  }
   if (b.foodMode === 'table') return `โต๊ะจีน ${b.tables ?? 0} โต๊ะ`;
   if (b.foodMode === 'buffet') return `บุฟเฟต์ ${b.guests ?? 0} ท่าน`;
   return 'ไม่รวมอาหารเลี้ยงแขก';
 }
 
-/** Big-tent rule: 50+ guests / 8+ tables include one 5x12 tent (≈64 guests = 8 tables); 20 tables include two. */
+/** "แพ็กเกจ · พระ N รูป · อาหาร" for merit, "แพ็กเกจ · อาหาร" for catering (BookingCard headline) */
+export function packageLine(b: MeritBooking) {
+  const name = b.packageName || b.packageId || '-';
+  return isCateringBooking(b) ? `${name} · ${foodLine(b)}` : `${name} · พระ ${b.monks ?? '-'} รูป · ${foodLine(b)}`;
+}
+
+/** Big-tent rule (merit packages only): 50+ guests / 8+ tables include one 5x12 tent (≈64 guests = 8 tables); 20 tables include two. */
 export function tentAdvice(b: MeritBooking): string | null {
+  if (isCateringBooking(b)) return null;
   const guests = b.guests ?? 0;
   const tables = b.tables ?? 0;
   if (b.foodMode === 'buffet' && guests > 64) return `แขก ${guests} ท่าน เกินความจุเต้นท์ใหญ่ 1 หลัง (64 ท่าน)`;
@@ -124,18 +138,32 @@ export function daysInMonth(y: number, mo: number) {
 }
 
 export const FALLBACK_PACKAGES: PricingPackage[] = [
-  { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)', kind: 'ceremony' },
-  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony', includedAddons: ['drape'] },
-  { id: 'full', name: 'ครบวงจร', kind: 'full' },
-  { id: 'full-plus', name: 'ครบวงจร พลัส', kind: 'full' },
-  { id: 'prime', name: 'PRIME ครบวงจร', kind: 'full', includedAddons: ['drape'] },
+  { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)', kind: 'ceremony', line: 'merit' },
+  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony', line: 'merit', includedAddons: ['drape'] },
+  { id: 'full', name: 'ครบวงจร', kind: 'full', line: 'merit' },
+  { id: 'full-plus', name: 'ครบวงจร พลัส', kind: 'full', line: 'merit' },
+  { id: 'prime', name: 'PRIME ครบวงจร', kind: 'full', line: 'merit', includedAddons: ['drape'] },
+  { id: 'buffet-standard', name: 'บุฟเฟต์อาหารไทย แพคเกจเริ่มต้น', kind: 'catering', line: 'buffet', unit: 'guest', minCount: 40 },
+  { id: 'buffet-premium', name: 'บุฟเฟต์อาหารไทย แพคเกจพรีเมียม', kind: 'catering', line: 'buffet', unit: 'guest', minCount: 40 },
+  { id: 'chinese-2000', name: 'โต๊ะจีน 2,000 (8 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, courses: 8 },
+  { id: 'chinese-2300', name: 'โต๊ะจีน 2,300 (9 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, courses: 9 },
+  { id: 'chinese-2600', name: 'โต๊ะจีน 2,600 (10 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, courses: 10 },
 ];
 
 export const FALLBACK_ADDONS: PricingAddon[] = [
-  { id: 'stage', label: 'เวทีพระ' },
-  { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง' },
-  { id: 'drape', label: 'โยงผ้าประดับเพิ่ม' },
+  { id: 'stage', label: 'เวทีพระ', price: 5000, lines: ['merit'] },
+  { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง', price: 3000, lines: ['merit'] },
+  { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', price: 1000, lines: ['merit'] },
+  { id: 'drinks', label: 'เครื่องดื่ม', price: 250, perUnit: 'table', lines: ['chinese'] },
 ];
+
+export const LINES: { id: string; label: string }[] = [
+  { id: 'merit', label: 'งานบุญ' },
+  { id: 'buffet', label: 'บุฟเฟต์อาหารไทย' },
+  { id: 'chinese', label: 'โต๊ะจีน' },
+];
+
+export const DISH_COUNTS = [5, 6, 7, 8];
 
 export const OCCASIONS = [
   'ทำบุญขึ้นบ้านใหม่',
@@ -146,11 +174,22 @@ export const OCCASIONS = [
   'งานอื่น ๆ',
 ];
 
+export const CATERING_OCCASIONS = ['งานเลี้ยงบริษัท / สัมมนา', 'งานแต่งงาน', 'งานบวช', 'งานศพ', 'งานเลี้ยงรุ่น / ครอบครัว', 'งานอื่น ๆ'];
+
 export const TIME_SLOTS = [
   { v: '', label: 'ให้ลูกค้าเลือก' },
   { v: 'เช้า 07.00-07.30 น.', label: 'ทำบุญเช้า' },
   { v: 'เพล 10.00-10.30 น.', label: 'ถวายเพล' },
 ];
+
+export const CATERING_TIME_SLOTS = [
+  { v: '', label: 'ให้ลูกค้าเลือก' },
+  { v: 'เที่ยง 11.00-13.00 น.', label: 'มื้อเที่ยง' },
+  { v: 'เย็น 17.00-19.00 น.', label: 'มื้อเย็น' },
+];
+
+export const occasionsFor = (line: string) => (line === 'merit' ? OCCASIONS : CATERING_OCCASIONS);
+export const timeSlotsFor = (line: string) => (line === 'merit' ? TIME_SLOTS : CATERING_TIME_SLOTS);
 
 export const DEFAULT_PRESET: BookingPreset = {
   occasion: 'ทำบุญขึ้นบ้านใหม่',
@@ -161,6 +200,7 @@ export const DEFAULT_PRESET: BookingPreset = {
   guests: 30,
   tables: 10,
   monks: 9,
+  dishCount: 6,
   selfTransport: false,
   addons: [],
   note: '',
@@ -168,13 +208,47 @@ export const DEFAULT_PRESET: BookingPreset = {
   depositAmount: null,
 };
 
+/**
+ * Keep a preset consistent with the package it names (mirrors the dashboard modal): drop add-ons the
+ * package can't have, no monks / self-transport for catering, food mode follows the catering unit,
+ * counts lifted to the minimum, occasion / time reset when they belong to another line.
+ */
+export function normalizePresetFor(p: BookingPreset, pkg: PricingPackage | undefined, addons: PricingAddon[]): BookingPreset {
+  if (!pkg) return p;
+  const line = pkg.line || 'merit';
+  const ok = new Set(addons.filter((a) => (!a.lines || a.lines.includes(line)) && !(pkg.includedAddons || []).includes(a.id)).map((a) => a.id));
+  const next: BookingPreset = { ...p, addons: p.addons.filter((a) => ok.has(a)) };
+  if (pkg.kind === 'catering') {
+    next.foodMode = pkg.unit === 'table' ? 'table' : 'buffet';
+    next.monks = 0;
+    next.selfTransport = false;
+    const min = pkg.minCount ?? 1;
+    if (pkg.unit === 'table') next.tables = Math.max(min, p.tables || 0);
+    else next.guests = Math.max(min, p.guests || 0);
+    if (!(next.dishCount && next.dishCount >= 5 && next.dishCount <= 8)) next.dishCount = 6;
+  } else if (!p.monks) {
+    next.monks = 9;
+  }
+  const occ = occasionsFor(line);
+  if (next.occasion && !occ.includes(next.occasion) && (OCCASIONS.includes(next.occasion) || CATERING_OCCASIONS.includes(next.occasion))) next.occasion = occ[0];
+  if (next.timeSlot && !timeSlotsFor(line).some((s) => s.v === next.timeSlot)) next.timeSlot = '';
+  return JSON.stringify(next) === JSON.stringify(p) ? p : next;
+}
+
 /** Thai chat message that accompanies a booking link (same wording as the dashboard). */
-export function buildLinkChatText(link: BookingLink, mode: 'preset' | 'free', hasFood: boolean): string {
+export function buildLinkChatText(link: BookingLink, mode: 'preset' | 'free', pkg: PricingPackage | undefined): string {
   if (mode === 'preset' && link.preset) {
     const p = link.preset;
-    const food = hasFood
-      ? p.foodMode === 'table' ? `โต๊ะจีน ${p.tables} โต๊ะ` : `บุฟเฟต์ ${p.guests} ท่าน`
-      : 'อาหารถวายพระ';
+    const isCatering = pkg?.kind === 'catering';
+    const hasFood = pkg?.kind === 'full';
+    const food = isCatering
+      ? pkg?.unit === 'table'
+        ? `${p.tables} โต๊ะ${pkg?.courses ? ` (${pkg.courses} อย่าง)` : ''}${p.addons.includes('drinks') ? ' + เครื่องดื่ม' : ''}`
+        : `${p.dishCount ?? 6} อย่าง · ${p.guests} ท่าน`
+      : hasFood
+        ? p.foodMode === 'table' ? `โต๊ะจีน ${p.tables} โต๊ะ` : `บุฟเฟต์ ${p.guests} ท่าน`
+        : 'อาหารถวายพระ';
+    const head = isCatering ? `${link.packageName} · ${food}` : `${link.packageName} · พระ ${p.monks} รูป · ${food}`;
     const price =
       link.estimatedTotal != null
         ? p.wantVat
@@ -182,12 +256,12 @@ export function buildLinkChatText(link: BookingLink, mode: 'preset' | 'free', ha
           : `ราคาประเมิน ${link.estimatedTotal.toLocaleString('th-TH')} บาท${p.wantVat === false ? ' (ไม่รวม VAT)' : ''}`
         : '';
     return [
-      `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${link.packageName} · พระ ${p.monks} รูป · ${food}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ''}${p.timeSlot ? ` (${p.timeSlot})` : ''}`,
+      `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${head}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ''}${p.timeSlot ? ` (${p.timeSlot})` : ''}`,
       price,
       link.depositAmount != null ? `มัดจำ ${link.depositAmount.toLocaleString('th-TH')} บาท เพื่อยืนยันคิว` : '',
       'กรอกชื่อ เบอร์ และสถานที่จัดงานที่ลิงก์นี้ ระบบจะออกใบเสนอราคาให้ทันทีค่ะ',
       link.url,
     ].filter(Boolean).join('\n');
   }
-  return `จองงานบุญกับ IRIS เติมบุญ ได้ที่ลิงก์นี้เลยค่ะ\n${link.url}\nกรอกรายละเอียดงานแล้วระบบจะออกใบเสนอราคาให้ทันทีค่ะ`;
+  return `จองงานบุญ บุฟเฟต์ หรือโต๊ะจีนกับ IRIS ได้ที่ลิงก์นี้เลยค่ะ\n${link.url}\nกรอกรายละเอียดงานแล้วระบบจะออกใบเสนอราคาให้ทันทีค่ะ`;
 }

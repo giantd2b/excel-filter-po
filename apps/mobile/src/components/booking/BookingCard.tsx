@@ -4,7 +4,7 @@ import type { MeritBooking } from '../../services/bookings';
 import {
   NEXT_STATUS,
   addressLine,
-  foodLine,
+  packageLine,
   formatBaht,
   formatDateTime,
   isGroundFloor,
@@ -85,9 +85,7 @@ export default function BookingCard({
 
       {/* Body */}
       <View style={styles.body}>
-        <Text style={styles.pkg}>
-          {b.packageName || b.packageId || '-'} · พระ {b.monks ?? '-'} รูป · {foodLine(b)}
-        </Text>
+        <Text style={styles.pkg}>{packageLine(b)}</Text>
         {b.depositAmount != null ? (
           <View style={styles.rowWrap}>
             <View style={[styles.tag, styles.tagAmber]}>

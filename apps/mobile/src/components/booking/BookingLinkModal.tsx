@@ -31,12 +31,15 @@ import {
 } from '../../services/bookings';
 import {
   DEFAULT_PRESET,
+  DISH_COUNTS,
   FALLBACK_ADDONS,
   FALLBACK_PACKAGES,
-  OCCASIONS,
-  TIME_SLOTS,
+  LINES,
   buildLinkChatText,
   fmtThaiDate,
+  normalizePresetFor,
+  occasionsFor,
+  timeSlotsFor,
 } from './bookingHelpers';
 import { Chips, Field, ThaiDatePicker } from './FormBits';
 
@@ -64,6 +67,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
   const [travelFees, setTravelFees] = useState<Record<string, number>>({});
   const [preset, setPreset] = useState<BookingPreset>(DEFAULT_PRESET);
   const [estimate, setEstimate] = useState<BookingEstimate | null>(null);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [freePackageId, setFreePackageId] = useState('');
   const [link, setLink] = useState<BookingLink | null>(null);
@@ -76,14 +80,16 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
 
   const pkg = packages.find((p) => p.id === preset.packageId);
   const hasFood = pkg?.kind === 'full';
-  // e.g. PRIME already includes the drape — not selectable, and dropped when the package changes
+  const isCatering = pkg?.kind === 'catering';
+  const line = pkg?.line || 'merit';
   const includedAddons = pkg?.includedAddons || [];
+  // add-ons the selected package can be sold with (its line's, minus the ones it already includes)
+  const lineAddons = addons.filter((a) => (!a.lines || a.lines.includes(line)) && !includedAddons.includes(a.id));
+  // keep the preset consistent with the package (PRIME's drape, other lines' add-ons, no monks for catering …)
   useEffect(() => {
-    if (preset.addons.some((a) => includedAddons.includes(a))) {
-      set('addons', preset.addons.filter((a) => !includedAddons.includes(a)));
-    }
+    setPreset((p) => normalizePresetFor(p, pkg, addons));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset.packageId, packages]);
+  }, [preset.packageId, packages, addons]);
 
   // Reset per open so a previous customer's link never leaks into the next one
   useEffect(() => {
@@ -115,9 +121,9 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
     let cancelled = false;
     setEstimating(true);
     const t = setTimeout(() => {
-      estimateBooking(cleanPreset(preset))
-        .then((e) => { if (!cancelled) setEstimate(e); })
-        .catch(() => { if (!cancelled) setEstimate(null); })
+      estimateBooking(cleanPreset(preset, pkg))
+        .then((e) => { if (!cancelled) { setEstimate(e); setEstimateError(null); } })
+        .catch((e: any) => { if (!cancelled) { setEstimate(null); setEstimateError(apiErrorMessage(e, 'คำนวณราคาไม่สำเร็จ')); } })
         .finally(() => { if (!cancelled) setEstimating(false); });
     }, 300);
     return () => { cancelled = true; clearTimeout(t); };
@@ -161,7 +167,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
     setError(null);
     setSent(false);
     try {
-      setLink(await createBookingLink(customer.id, { preset: cleanPreset(preset) }));
+      setLink(await createBookingLink(customer.id, { preset: cleanPreset(preset, pkg) }));
     } catch (e: any) {
       const msg = apiErrorMessage(e, 'สร้างลิงก์ไม่สำเร็จ');
       setError(msg);
@@ -180,7 +186,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
 
   const sendToChat = async () => {
     if (!link || !customer.oduserId) return;
-    const text = buildLinkChatText(link, mode, hasFood);
+    const text = buildLinkChatText(link, mode, pkg);
     if (onSend) {
       onSend(text);
       setSent(true);
@@ -204,10 +210,12 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
     }
   };
 
-  const numberField = preset.foodMode === 'table' ? 'tables' : 'guests';
-  const numberValue = preset.foodMode === 'table' ? preset.tables : preset.guests;
-  const numberStep = preset.foodMode === 'table' ? 1 : 5;
-  const numberMin = preset.foodMode === 'table' ? 8 : 20;
+  // merit: buffet/table by foodMode (min 20 guests / 8 tables); catering: by the package unit and its minimum
+  const perTable = isCatering ? pkg?.unit === 'table' : preset.foodMode === 'table';
+  const numberField = perTable ? 'tables' : 'guests';
+  const numberValue = perTable ? preset.tables : preset.guests;
+  const numberStep = perTable ? 1 : isCatering ? 10 : 5;
+  const numberMin = isCatering ? pkg?.minCount ?? 1 : perTable ? 8 : 20;
   const vatValue = preset.wantVat === true ? 'yes' : preset.wantVat === false ? 'no' : '';
   const shownTotal = estimate ? (preset.wantVat ? estimate.grandTotal : estimate.total) : 0;
 
@@ -257,7 +265,10 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
           {mode === 'free' ? (
             <Field label="แพ็กเกจเริ่มต้น (ไม่บังคับ)">
               <Chips
-                options={[{ value: '', label: 'ให้ลูกค้าเลือกเอง' }, ...packages.map((p) => ({ value: p.id, label: p.name }))]}
+                options={[
+                  { value: '', label: 'ให้ลูกค้าเลือกเอง' },
+                  ...LINES.flatMap((l) => packages.filter((p) => (p.line || 'merit') === l.id).map((p) => ({ value: p.id, label: p.name }))),
+                ]}
                 value={freePackageId}
                 onChange={setFreePackageId}
               />
@@ -266,7 +277,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
             <>
               <Field label="ประเภทงาน">
                 <Chips
-                  options={OCCASIONS.map((o) => ({ value: o, label: o }))}
+                  options={occasionsFor(line).map((o) => ({ value: o, label: o }))}
                   value={preset.occasion || ''}
                   onChange={(v) => set('occasion', v)}
                 />
@@ -291,21 +302,57 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                 ) : null}
               </Field>
 
-              <Field label="ช่วงเวลาพิธี">
+              <Field label={isCatering ? 'ช่วงเวลาเสิร์ฟ' : 'ช่วงเวลาพิธี'}>
                 <Chips
-                  options={TIME_SLOTS.map((t) => ({ value: t.v, label: t.label }))}
+                  options={timeSlotsFor(line).map((t) => ({ value: t.v, label: t.label }))}
                   value={preset.timeSlot || ''}
                   onChange={(v) => set('timeSlot', v)}
                 />
               </Field>
 
-              <Field label="แพ็กเกจ">
-                <Chips
-                  options={packages.map((p) => ({ value: p.id, label: p.name }))}
-                  value={preset.packageId}
-                  onChange={(v) => set('packageId', v)}
-                />
-              </Field>
+              {LINES.map((l) => {
+                const list = packages.filter((p) => (p.line || 'merit') === l.id);
+                if (!list.length) return null;
+                return (
+                  <Field key={l.id} label={`แพ็กเกจ · ${l.label}`}>
+                    <Chips
+                      options={list.map((p) => ({ value: p.id, label: p.name }))}
+                      value={preset.packageId}
+                      onChange={(v) => set('packageId', v)}
+                    />
+                  </Field>
+                );
+              })}
+
+              {isCatering && pkg?.unit === 'guest' ? (
+                <Field label="จำนวนอาหารคาว">
+                  <Chips
+                    options={DISH_COUNTS.map((n) => ({ value: String(n), label: `${n} อย่าง` }))}
+                    value={String(preset.dishCount ?? 6)}
+                    onChange={(v) => set('dishCount', parseInt(v, 10))}
+                  />
+                </Field>
+              ) : null}
+
+              {isCatering ? (
+                <Field label={perTable ? `จำนวนโต๊ะ (ขั้นต่ำ ${numberMin} · โต๊ะละ 8 ท่าน)` : `จำนวนแขก (ท่าน, ขั้นต่ำ ${numberMin})`}>
+                  <View style={styles.stepRow}>
+                    <TouchableOpacity style={styles.stepBtn} onPress={() => set(numberField, Math.max(numberMin, numberValue - numberStep))}>
+                      <Text style={styles.stepBtnText}>−</Text>
+                    </TouchableOpacity>
+                    <TextInput
+                      style={[styles.input, styles.numberInput]}
+                      keyboardType="number-pad"
+                      value={String(numberValue)}
+                      onChangeText={(v) => set(numberField, Math.max(0, parseInt(v || '0', 10) || 0))}
+                      selectTextOnFocus
+                    />
+                    <TouchableOpacity style={styles.stepBtn} onPress={() => set(numberField, numberValue + numberStep)}>
+                      <Text style={styles.stepBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Field>
+              ) : null}
 
               {hasFood ? (
                 <>
@@ -339,27 +386,32 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                 </>
               ) : null}
 
-              <Field label="พระสงฆ์">
-                <Chips
-                  options={[{ value: '9', label: '9 รูป' }, { value: '5', label: '5 รูป (ลด 1,500)' }]}
-                  value={String(preset.monks)}
-                  onChange={(v) => set('monks', parseInt(v, 10))}
-                />
-              </Field>
+              {!isCatering ? (
+                <>
+                  <Field label="พระสงฆ์">
+                    <Chips
+                      options={[{ value: '9', label: '9 รูป' }, { value: '5', label: '5 รูป (ลด 1,500)' }]}
+                      value={String(preset.monks)}
+                      onChange={(v) => set('monks', parseInt(v, 10))}
+                    />
+                  </Field>
 
-              <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>ลูกค้านิมนต์รับ-ส่งพระเอง</Text>
-                <Switch
-                  value={preset.selfTransport}
-                  onValueChange={(v) => set('selfTransport', v)}
-                  trackColor={{ true: '#a5b4fc', false: '#e2e8f0' }}
-                  thumbColor={preset.selfTransport ? '#6366f1' : '#fff'}
-                />
-              </View>
+                  <View style={styles.switchRow}>
+                    <Text style={styles.switchLabel}>ลูกค้านิมนต์รับ-ส่งพระเอง</Text>
+                    <Switch
+                      value={preset.selfTransport}
+                      onValueChange={(v) => set('selfTransport', v)}
+                      trackColor={{ true: '#a5b4fc', false: '#e2e8f0' }}
+                      thumbColor={preset.selfTransport ? '#6366f1' : '#fff'}
+                    />
+                  </View>
+                </>
+              ) : null}
 
               <Field label="ออปชั่นเสริม">
                 <View style={styles.rowWrap}>
-                  {addons.map((a) => {
+                  {lineAddons.length === 0 ? <Text style={styles.muted}>แพ็กเกจนี้ไม่มีออปชั่นเสริม</Text> : null}
+                  {addons.filter((a) => !a.lines || a.lines.includes(line)).map((a) => {
                     const included = includedAddons.includes(a.id);
                     const on = !included && preset.addons.includes(a.id);
                     return (
@@ -371,7 +423,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                       >
                         <Text style={[styles.chipText, on && styles.chipTextActive]}>
                           {a.label}
-                          {included ? ' · รวมในแพ็กเกจแล้ว' : ''}
+                          {included ? ' · รวมในแพ็กเกจแล้ว' : a.perUnit === 'table' ? ` · ${(a.price ?? 250).toLocaleString('th-TH')}/โต๊ะ` : ''}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -469,8 +521,8 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                 ) : (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     {estimating ? <ActivityIndicator size="small" color="#94a3b8" /> : null}
-                    <Text style={styles.estimateHint}>
-                      {estimating ? 'กำลังคำนวณราคาจาก IRIS Quotation…' : 'คำนวณราคาไม่สำเร็จ — ตรวจสอบการเชื่อมต่อแล้วแก้ค่าอีกครั้ง'}
+                    <Text style={[styles.estimateHint, !estimating && estimateError ? styles.estimateError : null]}>
+                      {estimating ? 'กำลังคำนวณราคาจาก IRIS Quotation…' : estimateError || 'คำนวณราคาไม่สำเร็จ — ตรวจสอบการเชื่อมต่อแล้วแก้ค่าอีกครั้ง'}
                     </Text>
                   </View>
                 )}
@@ -571,6 +623,8 @@ const styles = StyleSheet.create({
   field: { gap: 6 },
   fieldLabel: { fontSize: 12, fontWeight: '600', color: '#475569' },
   fieldHint: { fontSize: 11, color: '#94a3b8' },
+  muted: { fontSize: 12, color: '#94a3b8', fontStyle: 'italic' },
+  estimateError: { fontSize: 12, color: '#b91c1c' },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,

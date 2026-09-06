@@ -128,7 +128,35 @@ export default function BookingPricingScreen() {
           <View key={pkg.id} style={styles.card}>
             <Text style={styles.pkgName}>{pkg.name}</Text>
             <Text style={styles.code}>{pkg.id}</Text>
-            {pkg.kind === 'ceremony' ? (
+            {pkg.kind === 'catering' ? (
+              <View style={styles.tierBox}>
+                <Text style={styles.tierTitle}>
+                  {pkg.unit === 'table' ? `โต๊ะจีน ${pkg.courses ?? ''} อย่าง (ต่อโต๊ะ 8 ท่าน)` : 'บุฟเฟต์ (ต่อท่าน ตามจำนวนอย่าง)'}
+                  {used?.catering ? <Text style={styles.code}>  {used.catering}</Text> : null}
+                </Text>
+                {pkg.unit === 'table' ? (
+                  <View style={styles.line}>
+                    <Text style={styles.lineKey}>ราคาต่อโต๊ะ</Text>
+                    <Text style={styles.lineVal}>{fmt(pp.perTable)}</Text>
+                  </View>
+                ) : (
+                  Object.entries(pp.perHead || {})
+                    .sort((a, b) => Number(a[0]) - Number(b[0]))
+                    .map(([n, price]) => (
+                      <View key={n} style={styles.line}>
+                        <Text style={styles.lineKey}>{n} อย่าง / ท่าน</Text>
+                        <Text style={styles.lineVal}>{fmt(price)}</Text>
+                      </View>
+                    ))
+                )}
+                <View style={styles.line}>
+                  <Text style={[styles.lineKey, styles.muted]}>ขั้นต่ำ</Text>
+                  <Text style={[styles.lineVal, styles.muted]}>
+                    {pkg.minCount ?? '—'} {pkg.unit === 'table' ? 'โต๊ะ' : 'ท่าน'}
+                  </Text>
+                </View>
+              </View>
+            ) : pkg.kind === 'ceremony' ? (
               <View style={styles.line}>
                 <Text style={styles.lineKey}>ราคาแพ็กเกจ{used?.base ? <Text style={styles.code}>  {used.base}</Text> : null}</Text>
                 <Text style={styles.lineVal}>{fmt(pp.base)} บาท</Text>
