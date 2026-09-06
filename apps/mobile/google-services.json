@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "818715663979",
+    "project_id": "excel-filter-po",
+    "storage_bucket": "excel-filter-po.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:818715663979:android:e7c0278fe22246415adb2e",
+        "android_client_info": {
+          "package_name": "com.iriscrm.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvyj6zhg-kyTgIXovLBp8Frce6505fBOI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:818715663979:android:66b9d6cfecb9057d5adb2e",
+        "android_client_info": {
+          "package_name": "com.iristermboon.quotations"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvyj6zhg-kyTgIXovLBp8Frce6505fBOI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

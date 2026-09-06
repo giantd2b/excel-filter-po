@@ -35,6 +35,8 @@ module.exports = {
         backgroundColor: '#f8fafc',
       },
       package: 'com.iriscrm.app',
+      // FCM config for expo-notifications on Android (Firebase project excel-filter-po)
+      googleServicesFile: './google-services.json',
       permissions: ['CAMERA', 'READ_EXTERNAL_STORAGE'],
     },
     web: {
