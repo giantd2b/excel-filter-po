@@ -32,6 +32,10 @@
         "ascApiKeyId": "2T7Y4T2VD8",
         "ascApiKeyIssuerId": "8a8dd29a-8e5d-4c4e-9eb4-49a50c2b6b80",
         "ascApiKeyPath": "./credentials/AuthKey_2T7Y4T2VD8.p8"
+      },
+      "android": {
+        "track": "internal",
+        "releaseStatus": "completed"
       }
     }
   }
