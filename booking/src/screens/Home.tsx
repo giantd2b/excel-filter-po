@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { FAQS, LINES, PKGS, PROVINCES, REVIEWS, baht, priceUnitLabel, startPrice, type Pkg, type PkgLine } from '../data/packages';
-import { BRAND, SITE, SITE_LINES } from '../lib/site';
+import { BRAND, SITE_FAMILY, SITE_LINES } from '../lib/site';
 import { SectionTitle, charm } from '../ui';
 
 const WORK_SLOTS = BRAND.work;
 const SITE_TABS = LINES.filter((l) => SITE_LINES.includes(l.id));
-const SITE_FAQS = FAQS.filter((q) => !q.site || q.site === SITE);
+const SITE_FAQS = FAQS.filter((q) => !q.site || q.site === SITE_FAMILY);
 
 function WorkImage({ file, label }: { file: string; label: string }) {
   const [missing, setMissing] = useState(false);
@@ -204,7 +204,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
                   fontWeight: 600,
                   cursor: 'pointer',
                   background: on ? 'var(--color-accent-700)' : 'transparent',
-                  color: on ? '#f5ead8' : 'var(--color-neutral-700)',
+                  color: on ? 'var(--color-logo-text)' : 'var(--color-neutral-700)',
                   transition: 'background .15s',
                 }}
               >

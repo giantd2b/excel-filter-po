@@ -565,11 +565,11 @@ export class BookingsService {
     });
   }
 
-  /** /booking (งานบุญ) or /catering (บุฟเฟต์ / โต๊ะจีน) storefront, chosen by the link's package line */
+  /** storefront by the link's package line: /booking (งานบุญ), /buffet, /chinese */
   private bookingPublicUrl(token: string, packageId?: string | null) {
     const base = (process.env.BOOKING_PUBLIC_URL || 'https://crm.iristermboon.com').replace(/\/$/, '');
     const line = packageId ? packageById(packageId)?.line : undefined;
-    const path = line === 'buffet' || line === 'chinese' ? 'catering' : 'booking';
+    const path = line === 'buffet' ? 'buffet' : line === 'chinese' ? 'chinese' : 'booking';
     return `${base}/${path}/?ref=${token}`;
   }
 

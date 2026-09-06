@@ -226,7 +226,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                       fontWeight: 600,
                       cursor: 'pointer',
                       background: on ? 'var(--color-accent-700)' : 'transparent',
-                      color: on ? '#f5ead8' : 'var(--color-neutral-700)',
+                      color: on ? 'var(--color-logo-text)' : 'var(--color-neutral-700)',
                     }}
                   >
                     {l.short}

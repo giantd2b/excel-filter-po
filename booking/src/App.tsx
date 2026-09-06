@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { findPkg, pkgById, type Pkg, type PkgLine } from './data/packages';
 import { formForPackage, initialForm, type BookingForm } from './lib/calc';
-import { BRAND, SITE, isSiteLine } from './lib/site';
+import { BRAND, SITE_FAMILY, isSiteLine } from './lib/site';
 import { getBookingLink, type BookingLinkInfo } from './lib/api';
 import { loadPricing } from './lib/pricing';
 import Home from './screens/Home';
@@ -32,7 +32,7 @@ export default function App() {
   const [form, setForm] = useState<BookingForm>(() => formForPackage(initialForm, BRAND.defaultPkg));
   // storefront theme + title (the same bundle serves /booking and /catering)
   useEffect(() => {
-    document.documentElement.dataset.theme = SITE;
+    document.documentElement.dataset.theme = SITE_FAMILY;
     document.title = BRAND.docTitle;
   }, []);
   const [saved, setSaved] = useState<SavedBooking | null>(null);
