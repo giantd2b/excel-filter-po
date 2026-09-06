@@ -310,10 +310,24 @@ export const MENUS: Record<string, MenuGroup[]> = {
 
 const IMG = (f: string) => `${import.meta.env.BASE_URL}img/${f}`;
 
+const BUFFET_STANDARD_PAGES = [1, 2, 3, 4, 5, 6].map((n) => IMG(`menu-buffet-standard-${n}.jpg`));
+const BUFFET_PREMIUM_PAGES = [1, 2, 3, 4, 5, 6].map((n) => IMG(`menu-buffet-premium-${n}.jpg`));
+
 /** poster pages of the menu (photos + dish names) shown as a swipeable gallery on the detail page */
 export const MENU_IMAGES: Record<string, string[]> = {
-  'buffet-standard': [1, 2, 3, 4, 5, 6].map((n) => IMG(`menu-buffet-standard-${n}.jpg`)),
-  'buffet-premium': [1, 2, 3, 4, 5, 6].map((n) => IMG(`menu-buffet-premium-${n}.jpg`)),
+  'buffet-standard': BUFFET_STANDARD_PAGES,
+  'buffet-premium': BUFFET_PREMIUM_PAGES,
+};
+
+/**
+ * Merit packages with guest food (kind 'full') serve the same kitchens: ครบวงจร gets the standard
+ * buffet menu and the 2,300 Chinese-table set; ครบวงจรพลัส and PRIME get the premium buffet menu and
+ * the 2,600 set. Shown on the detail page as two galleries (บุฟเฟต์ / โต๊ะจีน).
+ */
+export const MERIT_MENU_IMAGES: Record<string, { buffet: string[]; table: string[] }> = {
+  full: { buffet: BUFFET_STANDARD_PAGES, table: [IMG('menu-chinese-merit-2300.jpg')] },
+  'full-plus': { buffet: BUFFET_PREMIUM_PAGES, table: [IMG('menu-chinese-merit-2600.jpg')] },
+  prime: { buffet: BUFFET_PREMIUM_PAGES, table: [IMG('menu-chinese-merit-2600.jpg')] },
 };
 
 /** one-line intro shown above the menu for each line */

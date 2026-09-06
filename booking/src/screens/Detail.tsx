@@ -1,6 +1,54 @@
 import { DISCOUNTS, DISH_COUNTS, baht, priceUnitLabel, startPrice, type Pkg } from '../data/packages';
-import { MENUS, MENU_IMAGES, MENU_INTRO } from '../data/menus';
+import { MENUS, MENU_IMAGES, MENU_INTRO, MERIT_MENU_IMAGES } from '../data/menus';
 import { BackLink, charm } from '../ui';
+
+/** menu poster pages: swipe sideways, tap to open full size */
+function MenuGallery({ images, title }: { images: string[]; title?: string }) {
+  if (!images.length) return null;
+  return (
+    <div style={{ margin: '0 -20px 14px' }}>
+      {title && <div style={{ padding: '0 20px 8px', fontSize: 15, fontWeight: 700, color: 'var(--color-accent-800)' }}>{title}</div>}
+      <div
+        style={{
+          display: 'flex',
+          gap: 10,
+          overflowX: 'auto',
+          padding: '2px 20px 8px',
+          scrollSnapType: 'x mandatory',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {images.map((src, i) => (
+          <a
+            key={src}
+            href={src}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              flex: images.length > 1 ? '0 0 78%' : '0 0 100%',
+              scrollSnapAlign: 'center',
+              borderRadius: 'var(--radius-md)',
+              overflow: 'hidden',
+              boxShadow: 'var(--shadow-md)',
+              background: 'var(--color-neutral-200)',
+              display: 'block',
+            }}
+          >
+            <img
+              src={src}
+              alt={`${title || 'เมนู'} หน้า ${i + 1}`}
+              loading="lazy"
+              style={{ width: '100%', aspectRatio: '1 / 1.414', objectFit: 'cover', display: 'block' }}
+            />
+          </a>
+        ))}
+      </div>
+      <div style={{ padding: '0 20px', fontSize: 12, color: 'var(--color-neutral-600)' }}>
+        {images.length > 1 ? `เลื่อนดูเมนูทั้ง ${images.length} หน้า · ` : ''}แตะรูปเพื่อดูขนาดเต็ม
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   pkg: Pkg;
@@ -57,6 +105,7 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
 
   const menu = MENUS[pkg.id] || [];
   const menuImages = MENU_IMAGES[pkg.id] || [];
+  const meritMenus = pkg.kind === 'full' ? MERIT_MENU_IMAGES[pkg.id] : undefined;
   const eyebrow = isCatering
     ? pkg.unit === 'table'
       ? 'IRIS Catering · โต๊ะจีน'
@@ -159,49 +208,7 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
         <div style={{ padding: '0 20px 24px' }}>
           <h2 style={{ ...charm, fontSize: 25, margin: '0 0 6px', color: 'var(--color-accent-900)' }}>รายการเมนู</h2>
           <p style={{ margin: '0 0 12px', fontSize: 13.5, lineHeight: 1.6, color: 'var(--color-neutral-600)' }}>{MENU_INTRO[pkg.line]}</p>
-          {/* menu poster pages: swipe sideways, tap to open full size */}
-          {menuImages.length > 0 && (
-            <div style={{ margin: '0 -20px 14px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 10,
-                  overflowX: 'auto',
-                  padding: '2px 20px 8px',
-                  scrollSnapType: 'x mandatory',
-                  WebkitOverflowScrolling: 'touch',
-                }}
-              >
-                {menuImages.map((src, i) => (
-                  <a
-                    key={src}
-                    href={src}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      flex: '0 0 78%',
-                      scrollSnapAlign: 'center',
-                      borderRadius: 'var(--radius-md)',
-                      overflow: 'hidden',
-                      boxShadow: 'var(--shadow-md)',
-                      background: 'var(--color-neutral-200)',
-                      display: 'block',
-                    }}
-                  >
-                    <img
-                      src={src}
-                      alt={`เมนูหน้า ${i + 1}`}
-                      loading="lazy"
-                      style={{ width: '100%', aspectRatio: '1447 / 2048', objectFit: 'cover', display: 'block' }}
-                    />
-                  </a>
-                ))}
-              </div>
-              <div style={{ padding: '0 20px', fontSize: 12, color: 'var(--color-neutral-600)' }}>
-                เลื่อนดูเมนูทั้ง {menuImages.length} หน้า · แตะรูปเพื่อดูขนาดเต็ม
-              </div>
-            </div>
-          )}
+          <MenuGallery images={menuImages} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {menu.map((g) => (
               <details key={g.category} style={{ ...cardBox, padding: 0 }}>
@@ -242,6 +249,18 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
               </details>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* merit packages with guest food: the buffet / Chinese-table menus this package serves */}
+      {meritMenus && (
+        <div style={{ padding: '0 20px 24px' }}>
+          <h2 style={{ ...charm, fontSize: 25, margin: '0 0 6px', color: 'var(--color-accent-900)' }}>เมนูอาหารเลี้ยงแขก</h2>
+          <p style={{ margin: '0 0 12px', fontSize: 13.5, lineHeight: 1.6, color: 'var(--color-neutral-600)' }}>
+            เลือกรูปแบบบุฟเฟต์หรือโต๊ะจีนในขั้นตอนจอง แล้วยืนยันรายการอาหารกับทีมงานหลังจอง
+          </p>
+          <MenuGallery images={meritMenus.buffet} title="เมนูบุฟเฟต์" />
+          <MenuGallery images={meritMenus.table} title="เมนูโต๊ะจีน" />
         </div>
       )}
 
