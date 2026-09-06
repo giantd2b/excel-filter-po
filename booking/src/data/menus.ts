@@ -308,6 +308,14 @@ export const MENUS: Record<string, MenuGroup[]> = {
   'chinese-2600': CHINESE_2600,
 };
 
+const IMG = (f: string) => `${import.meta.env.BASE_URL}img/${f}`;
+
+/** poster pages of the menu (photos + dish names) shown as a swipeable gallery on the detail page */
+export const MENU_IMAGES: Record<string, string[]> = {
+  'buffet-standard': [1, 2, 3, 4, 5, 6].map((n) => IMG(`menu-buffet-standard-${n}.jpg`)),
+  'buffet-premium': [1, 2, 3, 4, 5, 6].map((n) => IMG(`menu-buffet-premium-${n}.jpg`)),
+};
+
 /** one-line intro shown above the menu for each line */
 export const MENU_INTRO: Record<string, string> = {
   buffet: 'เลือกอาหารคาวตามจำนวนอย่างที่จอง จากรายการทั้งหมดด้านล่าง (ยืนยันเมนูกับทีมงานหลังจอง) + ขนมหวาน 1 อย่าง',
