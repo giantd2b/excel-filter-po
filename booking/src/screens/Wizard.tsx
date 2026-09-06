@@ -19,7 +19,8 @@ import {
   type PkgLine,
 } from '../data/packages';
 import { AddressFields, FloorField } from '../components/AddressFields';
-import { calc, cateringUnit, finalizeForm, formForPackage, summary, tentRecommendation, type BookingForm } from '../lib/calc';
+import { calc, cateringUnit, finalizeForm, formForPackage, smallOrderFee, summary, tentRecommendation, type BookingForm } from '../lib/calc';
+import SmallOrderNotice from '../components/SmallOrderNotice';
 import { SITE_LINES } from '../lib/site';
 import { submitBooking } from '../lib/api';
 import { BackLink, CheckIcon, FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
@@ -377,7 +378,8 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                     )}
                     {p.kind === 'catering' && p.unit === 'table' && (
                       <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-neutral-600)', lineHeight: 1.7 }}>
-                        โต๊ะละ {baht(p.perTable ?? 0)}.- ({p.courses} อย่าง) · ขั้นต่ำ {p.minCount} โต๊ะ · ไม่รวมเครื่องดื่ม
+                        โต๊ะละ {baht(p.perTable ?? 0)}.- ({p.courses} อย่าง) · ขั้นต่ำ {p.minCount} โต๊ะ
+                        {p.smallOrder ? ` · จัดต่ำกว่า ${p.smallOrder.below} โต๊ะ +${p.smallOrder.fee} บาท/โต๊ะ` : ''} · ไม่รวมเครื่องดื่ม
                       </div>
                     )}
                   </div>
@@ -603,7 +605,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)', marginTop: 8, lineHeight: 1.6 }}>
                 {pkg.unit === 'table'
-                  ? `ขั้นต่ำ ${pkg.minCount} โต๊ะ · โต๊ะละ ${baht(cateringUnit(pkg, f))} บาท (${pkg.courses} อย่าง) · ราคายังไม่รวมเครื่องดื่ม · จัดงานชั้น 2 มีค่าบริการเพิ่มเติม`
+                  ? `ขั้นต่ำ ${pkg.minCount} โต๊ะ · โต๊ะละ ${baht(cateringUnit(pkg, f))} บาท (${pkg.courses} อย่าง)${pkg.smallOrder ? ` · จัดต่ำกว่า ${pkg.smallOrder.below} โต๊ะ มีค่าบริการจัดเลี้ยงเพิ่ม ${pkg.smallOrder.fee} บาท/โต๊ะ` : ''} · ราคายังไม่รวมเครื่องดื่ม · จัดงานชั้น 2 มีค่าบริการเพิ่มเติม`
                   : `ขั้นต่ำ ${pkg.minCount} ท่าน · ${f.dishCount} อย่าง ${baht(cateringUnit(pkg, f))} บาท/ท่าน · เพิ่มจำนวนแขกคิดราคาต่อท่าน × จำนวนที่เพิ่ม`}
               </div>
             </div>
@@ -618,8 +620,9 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
               }}
             >
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-accent-2-800)' }}>ราคาอาหารประเมิน</span>
-              <span style={{ ...charm, fontSize: 22, color: 'var(--color-accent-2-800)' }}>{baht(cateringUnit(pkg, f) * (pkg.unit === 'table' ? f.tables : f.guests))} บาท</span>
+              <span style={{ ...charm, fontSize: 22, color: 'var(--color-accent-2-800)' }}>{baht(cateringUnit(pkg, f) * (pkg.unit === 'table' ? f.tables : f.guests) + smallOrderFee(pkg, f).fee)} บาท</span>
             </div>
+            {pkg.smallOrder && <SmallOrderNotice pkg={pkg} tables={f.tables} />}
           </div>
         )}
         {step === 2 && !isCatering && (

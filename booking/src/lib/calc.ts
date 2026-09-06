@@ -172,6 +172,13 @@ export function cateringUnit(pkg: Pkg, f: { dishCount: number }): number {
   return pkg.perHead?.[d] ?? 0;
 }
 
+/** ค่าบริการจัดเลี้ยงเพิ่มเติม for a small stand-alone โต๊ะจีน order (0 when the rule does not apply). */
+export function smallOrderFee(pkg: Pkg, f: { tables: number }): { fee: number; count: number; perUnit: number; below: number } {
+  const rule = pkg.kind === 'catering' && pkg.unit === 'table' ? pkg.smallOrder : undefined;
+  if (!rule || f.tables >= rule.below || f.tables <= 0) return { fee: 0, count: 0, perUnit: rule?.fee ?? 0, below: rule?.below ?? 0 };
+  return { fee: rule.fee * f.tables, count: f.tables, perUnit: rule.fee, below: rule.below };
+}
+
 export function tierPrice(pkg: Pkg, f: BookingForm): { base: number; label: string } {
   if (pkg.kind === 'catering') {
     const unit = cateringUnit(pkg, f);
@@ -237,6 +244,12 @@ export function calc(f: BookingForm, manualDeposit?: number | null): CalcResult 
   let foodAmount = foodCfg ? Math.round(foodCfg.extra * (f.foodMode === 'table' ? f.tables : f.guests)) : 0;
   const rows: { k: string; v: string }[] = [{ k: t.label, v: baht(t.base) }];
   let total = t.base;
+  // stand-alone โต๊ะจีน under 15 tables: catering service fee per table (mirrors the API + quotation line)
+  const small = smallOrderFee(pkg, f);
+  if (small.fee > 0) {
+    total += small.fee;
+    rows.push({ k: `ค่าบริการจัดเลี้ยงเพิ่มเติม (จัดต่ำกว่า ${small.below} โต๊ะ) ${small.perUnit} × ${small.count} โต๊ะ`, v: '+' + baht(small.fee) });
+  }
   let addonsTotal = 0;
   for (const a of applicableAddons(f.pkg)) {
     if (!f.addons.includes(a.id)) continue;
@@ -288,6 +301,10 @@ export function summary(f: BookingForm): { k: string; v: string }[] {
       k: 'อาหาร',
       v: c.pkg.unit === 'table' ? `โต๊ะจีน ${f.tables} โต๊ะ (${c.pkg.courses} อย่าง)` : `บุฟเฟต์อาหารไทย ${f.dishCount} อย่าง · ${f.guests} ท่าน`,
     });
+    const small = smallOrderFee(c.pkg, f);
+    if (small.fee > 0) {
+      rows.push({ k: 'ค่าบริการจัดเลี้ยงเพิ่มเติม', v: `จัดต่ำกว่า ${small.below} โต๊ะ +${baht(small.fee)} บาท (${small.perUnit} บาท/โต๊ะ รวมในราคาแล้ว)` });
+    }
     return rows;
   }
   rows.push({ k: 'พระสงฆ์', v: f.monks + ' รูป' });

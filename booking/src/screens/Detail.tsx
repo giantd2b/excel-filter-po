@@ -1,6 +1,7 @@
 import { DISCOUNTS, DISH_COUNTS, baht, priceUnitLabel, startPrice, type Pkg } from '../data/packages';
 import { MENUS, MENU_IMAGES, MENU_INTRO, MERIT_MENU_IMAGES } from '../data/menus';
 import { BackLink, charm } from '../ui';
+import SmallOrderNotice from '../components/SmallOrderNotice';
 
 /** menu poster pages: swipe sideways, tap to open full size */
 function MenuGallery({ images, title }: { images: string[]; title?: string }) {
@@ -94,10 +95,19 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
           ? [
               {
                 title: 'ราคาต่อโต๊ะ',
-                note: `โต๊ะละ 8 ท่าน · ขั้นต่ำ ${pkg.minCount} โต๊ะ · ราคาไม่รวมเครื่องดื่ม (เพิ่ม 250 บาท/โต๊ะ) · ยังไม่รวมภาษีมูลค่าเพิ่ม 7%`,
+                note: `โต๊ะละ 8 ท่าน · ขั้นต่ำ ${pkg.minCount} โต๊ะ${pkg.smallOrder ? ` · จัดต่ำกว่า ${pkg.smallOrder.below} โต๊ะ มีค่าบริการจัดเลี้ยงเพิ่ม ${pkg.smallOrder.fee} บาท/โต๊ะ` : ''} · ราคาไม่รวมเครื่องดื่ม (เพิ่ม 250 บาท/โต๊ะ) · ยังไม่รวมภาษีมูลค่าเพิ่ม 7%`,
                 rows: [
                   { k: `โต๊ะจีน ${pkg.courses} อย่าง`, v: `${baht(pkg.perTable ?? 0)}.- /โต๊ะ` },
-                  { k: `ตัวอย่าง ${pkg.minCount} โต๊ะ (${(pkg.minCount ?? 0) * 8} ท่าน)`, v: `${baht((pkg.perTable ?? 0) * (pkg.minCount ?? 0))}.-` },
+                  ...(pkg.smallOrder
+                    ? [
+                        { k: `ค่าบริการจัดเลี้ยงเพิ่มเติม เมื่อจัดต่ำกว่า ${pkg.smallOrder.below} โต๊ะ`, v: `+${pkg.smallOrder.fee}.- /โต๊ะ` },
+                        {
+                          k: `ตัวอย่าง ${pkg.minCount} โต๊ะ (${(pkg.minCount ?? 0) * 8} ท่าน) รวมค่าบริการ`,
+                          v: `${baht(((pkg.perTable ?? 0) + pkg.smallOrder.fee) * (pkg.minCount ?? 0))}.-`,
+                        },
+                        { k: `ตัวอย่าง ${pkg.smallOrder.below} โต๊ะ (${pkg.smallOrder.below * 8} ท่าน) ไม่มีค่าบริการ`, v: `${baht((pkg.perTable ?? 0) * pkg.smallOrder.below)}.-` },
+                      ]
+                    : [{ k: `ตัวอย่าง ${pkg.minCount} โต๊ะ (${(pkg.minCount ?? 0) * 8} ท่าน)`, v: `${baht((pkg.perTable ?? 0) * (pkg.minCount ?? 0))}.-` }]),
                 ],
               },
             ]
@@ -147,6 +157,12 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
           ></div>
         </div>
       </div>
+
+      {pkg.smallOrder && (
+        <div style={{ padding: '0 20px 20px' }}>
+          <SmallOrderNotice pkg={pkg} />
+        </div>
+      )}
 
       {tierTables.length > 0 && (
         <div style={{ padding: '0 20px 24px' }}>

@@ -46,7 +46,13 @@ export interface Pkg {
   courses?: number;
   /** catering: terms shown on the detail page (ขั้นต่ำ, เครื่องดื่ม, ชั้น 2 …) */
   notes?: string[];
+  /** โต๊ะจีนอย่างเดียว: orders below `below` tables pay `fee` บาท/โต๊ะ on top (mirror: apps/api packages.config.ts) */
+  smallOrder?: { below: number; fee: number };
 }
+
+/** owner rule 2026-09-06 — stand-alone โต๊ะจีน only, NOT the Chinese-table food inside merit packages */
+export const CHINESE_SMALL_ORDER = { below: 15, fee: 200 };
+export const SMALL_ORDER_NOTE = `สำคัญ: รับจัดขั้นต่ำ 10 โต๊ะ หากจัดไม่ถึง ${CHINESE_SMALL_ORDER.below} โต๊ะ มีค่าบริการจัดเลี้ยงเพิ่มเติม ${CHINESE_SMALL_ORDER.fee} บาท/โต๊ะ`;
 
 const IMG = (f: string) => `${import.meta.env.BASE_URL}img/${f}`;
 
@@ -261,6 +267,7 @@ export const PKGS: Pkg[] = [
     line: 'chinese',
     unit: 'table',
     minCount: 10,
+    smallOrder: CHINESE_SMALL_ORDER,
     perTable: 2000,
     courses: 8,
     img: IMG('chinese-2000.jpg'),
@@ -269,6 +276,7 @@ export const PKGS: Pkg[] = [
     fit: 'งานเลี้ยงคุมงบ งานบวช งานศพ งานชุมชน',
     diff: ['8 อย่าง: ออเดิร์ฟ กระเพาะปลา ไก่ หมู ปลาทับทิม ต้ม/แกง ข้าวผัด ของหวาน', 'รวมโต๊ะ เก้าอี้ ผ้าคลุมสีขาว', 'บริการ 4 ชั่วโมงนับจากอาหารจานแรก'],
     notes: [
+      SMALL_ORDER_NOTE,
       'ขั้นต่ำ 10 โต๊ะ โต๊ะละ 8 ท่าน (โต๊ะ 120 cm)',
       'ราคาไม่รวมเครื่องดื่ม เพิ่มได้ 250 บาท/โต๊ะ',
       'ระยะเวลาบริการ 4 ชั่วโมงนับจากอาหารจานแรก',
@@ -290,6 +298,7 @@ export const PKGS: Pkg[] = [
     line: 'chinese',
     unit: 'table',
     minCount: 10,
+    smallOrder: CHINESE_SMALL_ORDER,
     perTable: 2300,
     courses: 9,
     badge: 'ยอดนิยม',
@@ -299,6 +308,7 @@ export const PKGS: Pkg[] = [
     fit: 'งานแต่ง งานเลี้ยงบริษัท งานที่อยากได้เมนูหลากหลาย',
     diff: ['9 อย่าง: เพิ่มของทานเล่น + ปลากะพง + ขาหมู/เป็ดอบ', 'รวมโต๊ะ เก้าอี้ ผ้าคลุมสีขาว', 'บริการ 4 ชั่วโมงนับจากอาหารจานแรก'],
     notes: [
+      SMALL_ORDER_NOTE,
       'ขั้นต่ำ 10 โต๊ะ โต๊ะละ 8 ท่าน (โต๊ะ 120 cm)',
       'ราคาไม่รวมเครื่องดื่ม เพิ่มได้ 250 บาท/โต๊ะ',
       'ระยะเวลาบริการ 4 ชั่วโมงนับจากอาหารจานแรก',
@@ -320,6 +330,7 @@ export const PKGS: Pkg[] = [
     line: 'chinese',
     unit: 'table',
     minCount: 10,
+    smallOrder: CHINESE_SMALL_ORDER,
     perTable: 2600,
     courses: 10,
     badge: 'ครบที่สุด',
@@ -329,6 +340,7 @@ export const PKGS: Pkg[] = [
     fit: 'งานแต่ง งานเลี้ยงรับรองแขกผู้ใหญ่ งานที่อยากได้ความพรีเมียม',
     diff: ['10 อย่าง: เพิ่มออเดิร์ฟทะเล ฮ่อยจ๊อปู กระเพาะปลาเนื้อปู และจานกุ้ง', 'รวมโต๊ะ เก้าอี้ ผ้าคลุมสีขาว', 'บริการ 4 ชั่วโมงนับจากอาหารจานแรก'],
     notes: [
+      SMALL_ORDER_NOTE,
       'ขั้นต่ำ 10 โต๊ะ โต๊ะละ 8 ท่าน (โต๊ะ 120 cm)',
       'ราคาไม่รวมเครื่องดื่ม เพิ่มได้ 250 บาท/โต๊ะ',
       'ระยะเวลาบริการ 4 ชั่วโมงนับจากอาหารจานแรก',

@@ -77,6 +77,7 @@ export function menuPriceLine(pkg: BookingPackage, part: MenuPartChoice, live?: 
     const perTable = live?.perTable ?? pkg.perTable ?? 0;
     const parts = [perTable ? `โต๊ะละ ${perTable.toLocaleString('th-TH')} บาท${pkg.courses ? ` (${pkg.courses} อย่าง)` : ''}` : ''];
     if (pkg.minCount) parts.push(`ขั้นต่ำ ${pkg.minCount} โต๊ะ`);
+    if (pkg.smallOrder) parts.push(`จัดต่ำกว่า ${pkg.smallOrder.below} โต๊ะ มีค่าบริการเพิ่ม ${pkg.smallOrder.fee} บาท/โต๊ะ`);
     parts.push('ไม่รวมเครื่องดื่ม');
     return parts.filter(Boolean).join(' · ');
   }

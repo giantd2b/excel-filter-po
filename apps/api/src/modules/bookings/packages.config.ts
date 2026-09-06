@@ -38,7 +38,15 @@ export interface BookingPackage {
   perTable?: number;
   /** catering Chinese table: courses served (display) */
   courses?: number;
+  /**
+   * Stand-alone โต๊ะจีน only (NOT the Chinese-table food inside merit packages): orders below
+   * `below` tables pay `fee` baht per table on top (owner rule 2026-09-06: min 10, under 15 → +200/โต๊ะ).
+   */
+  smallOrder?: { below: number; fee: number };
 }
+
+/** โต๊ะจีนอย่างเดียว: fewer than 15 tables → +200 บาท/โต๊ะ ค่าบริการจัดเลี้ยง (mirror: booking/src/data/packages.ts) */
+export const CHINESE_SMALL_ORDER = { below: 15, fee: 200 } as const;
 
 export const BOOKING_PACKAGES: BookingPackage[] = [
   { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)', kind: 'ceremony', line: 'merit', base: 14990 },
@@ -71,9 +79,9 @@ export const BOOKING_PACKAGES: BookingPackage[] = [
   // ── IRIS Catering (poster prices 2026-09, excl. VAT; drinks not included in โต๊ะจีน) ──
   { id: 'buffet-standard', name: 'บุฟเฟต์อาหารไทย แพคเกจเริ่มต้น', kind: 'catering', line: 'buffet', unit: 'guest', minCount: 40, perHead: { 5: 250, 6: 280, 7: 310, 8: 340 } },
   { id: 'buffet-premium', name: 'บุฟเฟต์อาหารไทย แพคเกจพรีเมียม', kind: 'catering', line: 'buffet', unit: 'guest', minCount: 40, perHead: { 5: 350, 6: 385, 7: 420, 8: 455 } },
-  { id: 'chinese-2000', name: 'โต๊ะจีน 2,000 (8 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, perTable: 2000, courses: 8 },
-  { id: 'chinese-2300', name: 'โต๊ะจีน 2,300 (9 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, perTable: 2300, courses: 9 },
-  { id: 'chinese-2600', name: 'โต๊ะจีน 2,600 (10 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, perTable: 2600, courses: 10 },
+  { id: 'chinese-2000', name: 'โต๊ะจีน 2,000 (8 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, perTable: 2000, courses: 8, smallOrder: CHINESE_SMALL_ORDER },
+  { id: 'chinese-2300', name: 'โต๊ะจีน 2,300 (9 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, perTable: 2300, courses: 9, smallOrder: CHINESE_SMALL_ORDER },
+  { id: 'chinese-2600', name: 'โต๊ะจีน 2,600 (10 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, perTable: 2600, courses: 10, smallOrder: CHINESE_SMALL_ORDER },
 ];
 
 export interface BookingAddon {
@@ -180,6 +188,14 @@ export function cateringUnitPrice(pkg: BookingPackage, pp: PackagePricing | unde
   const d = String(Math.min(8, Math.max(5, Math.round(Number(dishCount) || DEFAULT_DISH_COUNT)))) as `${DishCount}`;
   return pp?.perHead?.[d] ?? pkg.perHead?.[Number(d) as DishCount] ?? 0;
 }
+
+/** ค่าบริการจัดเลี้ยงเพิ่มเติม for a small stand-alone โต๊ะจีน order (0 when the rule does not apply). */
+export function smallOrderFee(pkg: BookingPackage, input: { tables: number }): { fee: number; count: number; perUnit: number; below: number } {
+  const rule = pkg.kind === 'catering' && pkg.unit === 'table' ? pkg.smallOrder : undefined;
+  if (!rule || input.tables >= rule.below || input.tables <= 0) return { fee: 0, count: 0, perUnit: rule?.fee ?? 0, below: rule?.below ?? 0 };
+  return { fee: rule.fee * input.tables, count: input.tables, perUnit: rule.fee, below: rule.below };
+}
+export const smallOrderLabel = (below: number) => `ค่าบริการจัดเลี้ยงเพิ่มเติม (จัดต่ำกว่า ${below} โต๊ะ)`;
 
 /** e.g. "บุฟเฟต์อาหารไทย แพคเกจพรีเมียม 7 อย่าง × 50 ท่าน (420 บาท/ท่าน)" / "โต๊ะจีน 2,300 (9 อย่าง) × 12 โต๊ะ" */
 export function cateringLineLabel(pkg: BookingPackage, input: BookingCalcInput, unitPrice: number): string {
@@ -839,6 +855,10 @@ export function buildFaItems(
         unitPrice,
       });
     }
+    const small = smallOrderFee(pkg, input);
+    if (small.fee > 0) {
+      items.push({ description: smallOrderLabel(small.below), quantity: small.count, unit: 'โต๊ะ', unitPrice: small.perUnit });
+    }
   } else if (pkg.kind === 'ceremony') {
     items.push({
       productCode: pickMonkCode(recipe, 'any', 0),
@@ -916,7 +936,7 @@ export function calcEstimatedTotal(
   let total: number;
   if (pkg.kind === 'catering') {
     const count = pkg.unit === 'table' ? input.tables : input.guests;
-    total = cateringUnitPrice(pkg, pp, input.dishCount) * count;
+    total = cateringUnitPrice(pkg, pp, input.dishCount) * count + smallOrderFee(pkg, input).fee;
   } else if (pkg.kind === 'ceremony') {
     total = pp.base ?? 0;
   } else {
@@ -983,6 +1003,8 @@ export function estimateBooking(
     const count = calc.pkg.unit === 'table' ? input.tables : input.guests;
     const unitPrice = cateringUnitPrice(calc.pkg, pp, input.dishCount);
     rows.push({ k: cateringLineLabel(calc.pkg, input, unitPrice), v: fmt(unitPrice * count) });
+    const small = smallOrderFee(calc.pkg, input);
+    if (small.fee > 0) rows.push({ k: `${smallOrderLabel(small.below)} ${small.perUnit} × ${small.count} โต๊ะ`, v: `+${fmt(small.fee)}` });
   } else if (calc.pkg.kind === 'ceremony') {
     rows.push({ k: 'ราคาแพ็กเกจ', v: fmt(pp.base ?? 0) });
   } else {

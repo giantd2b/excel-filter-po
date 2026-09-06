@@ -139,6 +139,7 @@ export class BookingsService {
         courses: p.courses ?? null,
         includedAddons: p.includedAddons || [],
         menuParts: menuParts(p.id),
+        smallOrder: p.smallOrder ?? null,
       })),
       addons: BOOKING_ADDONS.map((a) => ({ id: a.id, label: a.label, price: a.price, perUnit: a.perUnit ?? null, lines: a.lines, code: config.addons[a.id] || null })),
       source: cat.source,

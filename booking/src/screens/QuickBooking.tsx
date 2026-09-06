@@ -6,6 +6,7 @@ import { FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from 
 import { AddressFields, FloorField } from '../components/AddressFields';
 import type { SavedBooking } from '../App';
 import { fmtThaiDate } from '../lib/date';
+import SmallOrderNotice from '../components/SmallOrderNotice';
 
 interface Props {
   form: BookingForm;
@@ -173,6 +174,11 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
               <span>{r.v}</span>
             </div>
           ))}
+          {pkg.smallOrder && (
+            <div style={{ padding: '6px 0 4px' }}>
+              <SmallOrderNotice pkg={pkg} tables={f.tables} compact />
+            </div>
+          )}
           {f.wantVat && (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', fontSize: 13.5, color: 'var(--color-neutral-700)' }}>

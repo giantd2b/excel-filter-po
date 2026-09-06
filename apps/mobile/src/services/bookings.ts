@@ -143,6 +143,8 @@ export interface PricingPackage {
   includedAddons?: string[];
   /** menu posters available to push into a chat ('buffet' pages / 'table' poster); empty = no menu */
   menuParts?: MenuPart[];
+  /** stand-alone โต๊ะจีน: orders below `below` tables pay `fee` บาท/โต๊ะ on top (priced by the API) */
+  smallOrder?: { below: number; fee: number } | null;
 }
 
 export interface PricingAddon {

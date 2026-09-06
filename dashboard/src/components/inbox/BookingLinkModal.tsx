@@ -24,9 +24,9 @@ const FALLBACK_PACKAGES: BookingPackageInfo[] = [
   { id: "prime", name: "PRIME ครบวงจร", kind: "full", line: "merit", includedAddons: ["drape"] },
   { id: "buffet-standard", name: "บุฟเฟต์อาหารไทย แพคเกจเริ่มต้น", kind: "catering", line: "buffet", unit: "guest", minCount: 40 },
   { id: "buffet-premium", name: "บุฟเฟต์อาหารไทย แพคเกจพรีเมียม", kind: "catering", line: "buffet", unit: "guest", minCount: 40 },
-  { id: "chinese-2000", name: "โต๊ะจีน 2,000 (8 อย่าง)", kind: "catering", line: "chinese", unit: "table", minCount: 10, courses: 8 },
-  { id: "chinese-2300", name: "โต๊ะจีน 2,300 (9 อย่าง)", kind: "catering", line: "chinese", unit: "table", minCount: 10, courses: 9 },
-  { id: "chinese-2600", name: "โต๊ะจีน 2,600 (10 อย่าง)", kind: "catering", line: "chinese", unit: "table", minCount: 10, courses: 10 },
+  { id: "chinese-2000", name: "โต๊ะจีน 2,000 (8 อย่าง)", kind: "catering", line: "chinese", unit: "table", minCount: 10, courses: 8, smallOrder: { below: 15, fee: 200 } },
+  { id: "chinese-2300", name: "โต๊ะจีน 2,300 (9 อย่าง)", kind: "catering", line: "chinese", unit: "table", minCount: 10, courses: 9, smallOrder: { below: 15, fee: 200 } },
+  { id: "chinese-2600", name: "โต๊ะจีน 2,600 (10 อย่าง)", kind: "catering", line: "chinese", unit: "table", minCount: 10, courses: 10, smallOrder: { below: 15, fee: 200 } },
 ];
 const FALLBACK_ADDONS: BookingAddonInfo[] = [
   { id: "stage", label: "เวทีพระ", price: 5000, lines: ["merit"] },
@@ -116,6 +116,9 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
   const menuParts = menuPkg?.menuParts || [];
   const menuPart = menuParts.length > 1 ? (mode === "preset" ? (preset.foodMode === "table" ? "table" : "buffet") : "all") : "all";
   const includedAddons = pkg?.includedAddons || [];
+  // stand-alone โต๊ะจีน under 15 tables: +200 บาท/โต๊ะ (the API adds it to the estimate and the quotation)
+  const smallOrder = isCatering && pkg?.unit === "table" ? pkg?.smallOrder || null : null;
+  const smallOrderApplies = !!smallOrder && preset.tables > 0 && preset.tables < smallOrder.below;
   const linePackages = packages.filter((p) => (p.line || "merit") === line);
   const occasionOptions = line === "merit" ? OCCASIONS : CATERING_OCCASIONS;
   // an occasion typed by hand (not in the list) keeps the free-text input open
@@ -246,6 +249,9 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
       return [
         `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${head}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ""}${p.timeSlot ? ` (${p.timeSlot})` : ""}`,
         price,
+        smallOrderApplies && smallOrder
+          ? `⚠️ จัด ${p.tables} โต๊ะ ต่ำกว่า ${smallOrder.below} โต๊ะ มีค่าบริการจัดเลี้ยงเพิ่มเติม ${smallOrder.fee} บาท/โต๊ะ (รวมในราคาประเมินแล้ว) — ตั้งแต่ ${smallOrder.below} โต๊ะขึ้นไปไม่มีค่าบริการนี้ค่ะ`
+          : "",
         link.depositAmount != null ? `มัดจำ ${link.depositAmount.toLocaleString("th-TH")} บาท เพื่อยืนยันคิว` : "",
         `กรอกชื่อ เบอร์ และสถานที่จัดงานที่ลิงก์นี้ ระบบจะออกใบเสนอราคาให้ทันทีค่ะ`,
         link.url,
@@ -375,6 +381,17 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                     className={field}
                   />
                 </label>
+              )}
+              {smallOrder && (
+                <div className={`col-span-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed border ${smallOrderApplies ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+                  <span className="font-semibold">
+                    ⚠️ {smallOrderApplies
+                      ? `จัด ${preset.tables} โต๊ะ (ต่ำกว่า ${smallOrder.below} โต๊ะ) มีค่าบริการจัดเลี้ยงเพิ่ม +${(smallOrder.fee * preset.tables).toLocaleString("th-TH")} บาท`
+                      : "หมายเหตุสำคัญ"}
+                  </span>{" "}
+                  รับจัดขั้นต่ำ {pkg?.minCount ?? 10} โต๊ะ · จัดไม่ถึง {smallOrder.below} โต๊ะ คิดค่าบริการจัดเลี้ยงเพิ่มเติม {smallOrder.fee} บาท/โต๊ะ
+                  {smallOrderApplies ? " (รวมในราคาประเมินและใบเสนอราคาแล้ว — แจ้งลูกค้าให้ชัดเจน)" : ""}
+                </div>
               )}
               {hasFood && (
                 <>

@@ -40,6 +40,7 @@ import {
   fmtThaiDate,
   normalizePresetFor,
   occasionsFor,
+  smallOrderFor,
   timeSlotsFor,
 } from './bookingHelpers';
 import { Chips, Field, ThaiDatePicker } from './FormBits';
@@ -97,6 +98,9 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
   const isCatering = pkg?.kind === 'catering';
   const line = pkg?.line || 'merit';
   const includedAddons = pkg?.includedAddons || [];
+  // stand-alone โต๊ะจีน under 15 tables: +200 บาท/โต๊ะ (the API adds it to the estimate and the quotation)
+  const smallOrderRule = isCatering && pkg?.unit === 'table' ? pkg?.smallOrder || null : null;
+  const smallOrder = smallOrderFor(pkg, preset.tables);
   const linePackages = packages.filter((p) => (p.line || 'merit') === line);
   // an occasion typed by hand (not in the list) keeps the free-text input open
   const occasionIsCustom = !occasionsFor(line).includes(preset.occasion || '');
@@ -367,6 +371,19 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                       <Text style={styles.stepBtnText}>+</Text>
                     </TouchableOpacity>
                   </View>
+                  {smallOrderRule ? (
+                    <View style={[styles.noticeBox, smallOrder ? styles.noticeBoxHot : null]}>
+                      <Text style={[styles.noticeTitle, smallOrder ? styles.noticeTitleHot : null]}>
+                        ⚠️ {smallOrder
+                          ? `จัด ${preset.tables} โต๊ะ (ต่ำกว่า ${smallOrder.below} โต๊ะ) มีค่าบริการจัดเลี้ยงเพิ่ม +${smallOrder.total.toLocaleString('th-TH')} บาท`
+                          : 'หมายเหตุสำคัญ'}
+                      </Text>
+                      <Text style={styles.noticeText}>
+                        รับจัดขั้นต่ำ {pkg?.minCount ?? 10} โต๊ะ · จัดไม่ถึง {smallOrderRule.below} โต๊ะ คิดค่าบริการจัดเลี้ยงเพิ่มเติม {smallOrderRule.fee} บาท/โต๊ะ
+                        {smallOrder ? ' (รวมในราคาประเมินและใบเสนอราคาแล้ว — แจ้งลูกค้าให้ชัดเจน)' : ''}
+                      </Text>
+                    </View>
+                  ) : null}
                 </Field>
               ) : null}
 
@@ -747,6 +764,11 @@ const styles = StyleSheet.create({
   lineCardTitleActive: { color: '#5b21b6' },
   lineCardHint: { fontSize: 9.5, color: '#64748b', lineHeight: 13 },
   sectionDivider: { height: 1, backgroundColor: '#e2e8f0', marginVertical: 2 },
+  noticeBox: { marginTop: 8, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fcd34d', borderRadius: 10, padding: 10, gap: 2 },
+  noticeBoxHot: { backgroundColor: '#fef2f2', borderColor: '#fca5a5' },
+  noticeTitle: { fontSize: 12, fontWeight: '700', color: '#b45309' },
+  noticeTitleHot: { color: '#b91c1c' },
+  noticeText: { fontSize: 11, color: '#334155', lineHeight: 16 },
   switchLabel: { fontSize: 13, color: '#334155', fontWeight: '500' },
   estimateBox: {
     backgroundColor: '#fff',

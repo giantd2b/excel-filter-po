@@ -58,7 +58,7 @@ const CTA_DETAIL: Record<PkgLine, string> = {
 const LINE_INTRO: Record<PkgLine, { title: string; sub: string }> = {
   merit: { title: 'แพ็กเกจงานบุญ', sub: 'แตะที่การ์ดเพื่อดูสิ่งที่ได้ในแพ็กเกจทั้งหมด' },
   buffet: { title: 'บุฟเฟต์อาหารไทย', sub: 'คิดราคาต่อท่านตามจำนวนอย่างที่เลือก (5-8 อย่าง) ขั้นต่ำ 40 ท่าน · แตะดูเมนูทั้งหมด' },
-  chinese: { title: 'โต๊ะจีน', sub: 'คิดราคาต่อโต๊ะ 8 ท่าน เลือกได้จานละ 1 เมนู ขั้นต่ำ 10 โต๊ะ · แตะดูเมนูแต่ละจาน' },
+  chinese: { title: 'โต๊ะจีน', sub: 'คิดราคาต่อโต๊ะ 8 ท่าน เลือกได้จานละ 1 เมนู ขั้นต่ำ 10 โต๊ะ · จัดต่ำกว่า 15 โต๊ะ มีค่าบริการจัดเลี้ยงเพิ่ม 200 บาท/โต๊ะ · แตะดูเมนูแต่ละจาน' },
 };
 
 export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, onBookPkg }: Props) {

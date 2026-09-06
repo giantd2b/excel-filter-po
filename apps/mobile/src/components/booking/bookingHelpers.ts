@@ -145,9 +145,9 @@ export const FALLBACK_PACKAGES: PricingPackage[] = [
   { id: 'prime', name: 'PRIME ครบวงจร', kind: 'full', line: 'merit', includedAddons: ['drape'] },
   { id: 'buffet-standard', name: 'บุฟเฟต์อาหารไทย แพคเกจเริ่มต้น', kind: 'catering', line: 'buffet', unit: 'guest', minCount: 40 },
   { id: 'buffet-premium', name: 'บุฟเฟต์อาหารไทย แพคเกจพรีเมียม', kind: 'catering', line: 'buffet', unit: 'guest', minCount: 40 },
-  { id: 'chinese-2000', name: 'โต๊ะจีน 2,000 (8 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, courses: 8 },
-  { id: 'chinese-2300', name: 'โต๊ะจีน 2,300 (9 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, courses: 9 },
-  { id: 'chinese-2600', name: 'โต๊ะจีน 2,600 (10 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, courses: 10 },
+  { id: 'chinese-2000', name: 'โต๊ะจีน 2,000 (8 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, courses: 8, smallOrder: { below: 15, fee: 200 } },
+  { id: 'chinese-2300', name: 'โต๊ะจีน 2,300 (9 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, courses: 9, smallOrder: { below: 15, fee: 200 } },
+  { id: 'chinese-2600', name: 'โต๊ะจีน 2,600 (10 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, courses: 10, smallOrder: { below: 15, fee: 200 } },
 ];
 
 export const FALLBACK_ADDONS: PricingAddon[] = [
@@ -236,6 +236,13 @@ export function normalizePresetFor(p: BookingPreset, pkg: PricingPackage | undef
 }
 
 /** Thai chat message that accompanies a booking link (same wording as the dashboard). */
+/** stand-alone โต๊ะจีน under 15 tables: the per-table catering fee (0 when the rule does not apply) */
+export function smallOrderFor(pkg: PricingPackage | undefined | null, tables: number): { below: number; fee: number; total: number } | null {
+  const rule = pkg?.kind === 'catering' && pkg?.unit === 'table' ? pkg?.smallOrder : null;
+  if (!rule || !(tables > 0) || tables >= rule.below) return null;
+  return { below: rule.below, fee: rule.fee, total: rule.fee * tables };
+}
+
 export function buildLinkChatText(link: BookingLink, mode: 'preset' | 'free', pkg: PricingPackage | undefined): string {
   if (mode === 'preset' && link.preset) {
     const p = link.preset;
@@ -258,6 +265,12 @@ export function buildLinkChatText(link: BookingLink, mode: 'preset' | 'free', pk
     return [
       `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${head}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ''}${p.timeSlot ? ` (${p.timeSlot})` : ''}`,
       price,
+      (() => {
+        const so = smallOrderFor(pkg, p.tables);
+        return so
+          ? `⚠️ จัด ${p.tables} โต๊ะ ต่ำกว่า ${so.below} โต๊ะ มีค่าบริการจัดเลี้ยงเพิ่มเติม ${so.fee} บาท/โต๊ะ (รวมในราคาประเมินแล้ว) — ตั้งแต่ ${so.below} โต๊ะขึ้นไปไม่มีค่าบริการนี้ค่ะ`
+          : '';
+      })(),
       link.depositAmount != null ? `มัดจำ ${link.depositAmount.toLocaleString('th-TH')} บาท เพื่อยืนยันคิว` : '',
       'กรอกชื่อ เบอร์ และสถานที่จัดงานที่ลิงก์นี้ ระบบจะออกใบเสนอราคาให้ทันทีค่ะ',
       link.url,
