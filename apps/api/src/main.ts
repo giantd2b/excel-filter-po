@@ -39,6 +39,12 @@ async function bootstrap() {
   if (fs.existsSync(publicPath)) {
     console.log(`Serving frontend from: ${publicPath}`);
     app.use(express.static(publicPath));
+    // /catering is the IRIS Catering storefront: the same booking bundle (assets stay under /booking/),
+    // the app switches lines/theme by looking at its own path
+    const bookingIndex = join(publicPath, 'booking', 'index.html');
+    if (fs.existsSync(bookingIndex)) {
+      app.use('/catering', (_req: any, res: any) => res.sendFile(bookingIndex));
+    }
 
     // SPA fallback — serve index.html for all non-API routes
     app.use((req: any, res: any, next: any) => {

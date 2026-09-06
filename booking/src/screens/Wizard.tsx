@@ -20,6 +20,7 @@ import {
 } from '../data/packages';
 import { AddressFields, FloorField } from '../components/AddressFields';
 import { calc, cateringUnit, finalizeForm, formForPackage, summary, tentRecommendation, type BookingForm } from '../lib/calc';
+import { SITE_LINES } from '../lib/site';
 import { submitBooking } from '../lib/api';
 import { BackLink, CheckIcon, FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
 import type { SavedBooking } from '../App';
@@ -201,9 +202,10 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
         {/* step 1: package pick */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* product line: งานบุญ / บุฟเฟต์ / โต๊ะจีน */}
+            {/* product line switch — only the lines this storefront sells, hidden when there is just one */}
+            {SITE_LINES.length > 1 && (
             <div style={{ display: 'flex', gap: 6, padding: 4, background: 'var(--color-neutral-200)', borderRadius: 999 }}>
-              {LINES.map((l) => {
+              {LINES.filter((l) => SITE_LINES.includes(l.id)).map((l) => {
                 const on = l.id === line;
                 return (
                   <div
@@ -232,6 +234,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 );
               })}
             </div>
+            )}
             {line === 'merit' && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                 {[
@@ -283,7 +286,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                             padding: '2px 9px',
                             borderRadius: 999,
                             background: 'var(--color-accent-2-600)',
-                            color: '#fff',
+                            color: 'var(--color-on-accent)',
                             fontSize: 11,
                             fontWeight: 600,
                           }}
@@ -791,7 +794,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--color-neutral-200)', color: 'var(--color-neutral-700)' }}>รวมในแพ็กเกจแล้ว</span>
                           )}
                           {a.id === 'tent' && tentReason && (
-                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--color-accent-2-500)', color: '#fff' }}>แนะนำ</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--color-accent-2-500)', color: 'var(--color-on-accent)' }}>แนะนำ</span>
                           )}
                         </div>
                         <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>{a.sub}</div>
@@ -1089,7 +1092,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
             cursor: 'pointer',
             boxShadow: 'var(--shadow-md)',
             background: 'var(--color-accent)',
-            color: '#fff',
+            color: 'var(--color-on-accent)',
             opacity: submitting ? 0.6 : 1,
           }}
         >

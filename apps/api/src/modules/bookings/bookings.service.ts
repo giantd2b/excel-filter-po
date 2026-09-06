@@ -565,9 +565,12 @@ export class BookingsService {
     });
   }
 
-  private bookingPublicUrl(token: string) {
+  /** /booking (งานบุญ) or /catering (บุฟเฟต์ / โต๊ะจีน) storefront, chosen by the link's package line */
+  private bookingPublicUrl(token: string, packageId?: string | null) {
     const base = (process.env.BOOKING_PUBLIC_URL || 'https://crm.iristermboon.com').replace(/\/$/, '');
-    return `${base}/booking/?ref=${token}`;
+    const line = packageId ? packageById(packageId)?.line : undefined;
+    const path = line === 'buffet' || line === 'chinese' ? 'catering' : 'booking';
+    return `${base}/${path}/?ref=${token}`;
   }
 
   private shapeLink(
@@ -590,7 +593,7 @@ export class BookingsService {
   ) {
     return {
       token: link.token,
-      url: this.bookingPublicUrl(link.token),
+      url: this.bookingPublicUrl(link.token, link.packageId),
       customerName: link.customerName,
       channel: channelLabel(link.channel, link.channelType),
       packageId: link.packageId,

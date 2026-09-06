@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { LINE_URL, PHONE, PHONE_LABEL, baht } from '../data/packages';
+import { baht } from '../data/packages';
+import { BRAND } from '../lib/site';
 import { charm } from '../ui';
 import type { SavedBooking } from '../App';
 
@@ -124,7 +125,7 @@ export default function Done({ saved, onHome, chatChannel }: Props) {
               padding: 16,
               borderRadius: 999,
               background: 'var(--color-accent-700)',
-              color: '#f5ead8',
+              color: 'var(--color-on-accent)',
               textAlign: 'center',
               fontSize: 17,
               fontWeight: 600,
@@ -136,14 +137,14 @@ export default function Done({ saved, onHome, chatChannel }: Props) {
           </a>
         )}
         <a
-          href={LINE_URL}
+          href={BRAND.lineUrl}
           target="_blank"
           rel="noreferrer"
           style={{
             padding: 16,
             borderRadius: 999,
             background: '#06c755',
-            color: '#fff',
+            color: 'var(--color-on-accent)',
             textAlign: 'center',
             fontSize: 17,
             fontWeight: 600,
@@ -151,7 +152,7 @@ export default function Done({ saved, onHome, chatChannel }: Props) {
             display: 'block',
           }}
         >
-          ส่งรายละเอียดทาง LINE @temboon
+          ส่งรายละเอียดทาง {BRAND.lineLabel}
         </a>
         <div
           onClick={copySummary}
@@ -170,7 +171,7 @@ export default function Done({ saved, onHome, chatChannel }: Props) {
           {copied ? 'คัดลอกแล้ว' : 'คัดลอกรายละเอียด'}
         </div>
         <a
-          href={`tel:${PHONE}`}
+          href={`tel:${BRAND.phone}`}
           style={{
             padding: 15,
             borderRadius: 999,
@@ -182,7 +183,7 @@ export default function Done({ saved, onHome, chatChannel }: Props) {
             display: 'block',
           }}
         >
-          โทร {PHONE_LABEL}
+          โทร {BRAND.phoneLabel}
         </a>
         <div
           onClick={onHome}

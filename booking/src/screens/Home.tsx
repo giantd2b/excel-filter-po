@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { FAQS, LINES, PKGS, PROVINCES, REVIEWS, baht, priceUnitLabel, startPrice, type Pkg, type PkgLine } from '../data/packages';
+import { BRAND, SITE, SITE_LINES } from '../lib/site';
 import { SectionTitle, charm } from '../ui';
 
-const WORK_SLOTS = [
-  { file: 'work1.jpg', label: 'รูปพิธีสงฆ์' },
-  { file: 'work2.jpg', label: 'รูปโต๊ะหมู่บูชา' },
-  { file: 'work3.jpg', label: 'รูปอาหารเลี้ยงพระ' },
-  { file: 'work4.jpg', label: 'รูปไลน์อาหาร' },
-];
+const WORK_SLOTS = BRAND.work;
+const SITE_TABS = LINES.filter((l) => SITE_LINES.includes(l.id));
+const SITE_FAQS = FAQS.filter((q) => !q.site || q.site === SITE);
 
 function WorkImage({ file, label }: { file: string; label: string }) {
   const [missing, setMissing] = useState(false);
@@ -104,9 +102,9 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
               textWrap: 'pretty',
             }}
           >
-            จัดงานบุญให้เรียบร้อย
+            {BRAND.heroTitle[0]}
             <br />
-            ตั้งแต่ต้นจนจบ
+            {BRAND.heroTitle[1]}
           </h1>
           <p
             style={{
@@ -118,7 +116,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
               textWrap: 'pretty',
             }}
           >
-            เลือกแพ็กเกจ กรอกรายละเอียดงาน รับใบเสนอราคาเบื้องต้นได้ทันที ทีมงานจะยืนยันคิววันงานและแจ้งขั้นตอนมัดจำกลับภายในวันเดียวกัน
+            {BRAND.heroSub}
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             <div
@@ -129,7 +127,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
                 padding: '15px 18px',
                 borderRadius: 999,
                 background: 'var(--color-accent)',
-                color: '#fff',
+                color: 'var(--color-on-accent)',
                 textAlign: 'center',
                 fontSize: 16,
                 fontWeight: 600,
@@ -161,11 +159,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
 
       {/* stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, padding: '0 20px 26px' }}>
-        {[
-          ['7 ปี', 'ประสบการณ์จัดงาน'],
-          ['10,000+', 'งานบุญที่ดูแลแล้ว'],
-          ['ครบชุด', 'พระ · อาหาร · อุปกรณ์'],
-        ].map(([big, small]) => (
+        {BRAND.stats.map(([big, small]) => (
           <div
             key={small}
             style={{
@@ -183,7 +177,8 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
 
       {/* packages */}
       <div id="pkgs" style={{ padding: '4px 20px 8px' }}>
-        {/* product line tabs */}
+        {/* product line tabs (only when this storefront sells more than one line) */}
+        {SITE_TABS.length > 1 && (
         <div
           style={{
             display: 'flex',
@@ -194,7 +189,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
             borderRadius: 999,
           }}
         >
-          {LINES.map((l) => {
+          {SITE_TABS.map((l) => {
             const on = l.id === line;
             return (
               <div
@@ -218,6 +213,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
             );
           })}
         </div>
+        )}
         <SectionTitle style={{ margin: '0 0 6px' }}>{LINE_INTRO[line].title}</SectionTitle>
         <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--color-neutral-600)' }}>{LINE_INTRO[line].sub}</p>
       </div>
@@ -288,7 +284,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
                             padding: '3px 10px',
                             borderRadius: 999,
                             background: 'var(--color-accent-2-600)',
-                            color: '#fff',
+                            color: 'var(--color-on-accent)',
                             fontSize: 11,
                             fontWeight: 600,
                             flex: 'none',
@@ -356,7 +352,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
                   height: 42,
                   borderRadius: 999,
                   background: 'var(--color-accent)',
-                  color: '#fff',
+                  color: 'var(--color-on-accent)',
                   display: 'grid',
                   placeItems: 'center',
                   fontSize: 21,
@@ -422,7 +418,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
       <div style={{ background: 'var(--color-surface)', padding: '8px 20px 40px' }}>
         <SectionTitle style={{ margin: '0 0 14px' }}>คำถามที่พบบ่อย</SectionTitle>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {FAQS.map((q, i) => (
+          {SITE_FAQS.map((q, i) => (
             <div
               key={q.q}
               onClick={() => setOpenFaq(openFaq === i ? -1 : i)}

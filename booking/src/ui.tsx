@@ -11,7 +11,7 @@ export function chipStyle(sel: boolean): CSSProperties {
     borderWidth: 1.5,
     borderStyle: 'solid',
     ...(sel
-      ? { background: 'var(--color-accent)', color: '#fff', borderColor: 'var(--color-accent)' }
+      ? { background: 'var(--color-accent)', color: 'var(--color-on-accent)', borderColor: 'var(--color-accent)' }
       : {
           background: 'var(--color-neutral-100)',
           color: 'var(--color-neutral-700)',
@@ -41,7 +41,7 @@ export function checkStyle(on: boolean, color: string): CSSProperties {
     display: 'grid',
     placeItems: 'center',
     flex: 'none',
-    color: '#fff',
+    color: 'var(--color-on-accent)',
     fontSize: 14,
     background: on ? color : 'var(--color-neutral-300)',
   };

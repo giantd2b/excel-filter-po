@@ -323,7 +323,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
             cursor: 'pointer',
             boxShadow: 'var(--shadow-md)',
             background: 'var(--color-accent)',
-            color: '#fff',
+            color: 'var(--color-on-accent)',
             opacity: submitting ? 0.6 : 1,
           }}
         >

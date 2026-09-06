@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { LINE_URL, PHONE, findPkg, pkgById, type Pkg, type PkgLine } from './data/packages';
+import { findPkg, pkgById, type Pkg, type PkgLine } from './data/packages';
 import { formForPackage, initialForm, type BookingForm } from './lib/calc';
+import { BRAND, SITE, isSiteLine } from './lib/site';
 import { getBookingLink, type BookingLinkInfo } from './lib/api';
 import { loadPricing } from './lib/pricing';
 import Home from './screens/Home';
@@ -26,9 +27,14 @@ const PKGS_FIRST: Record<PkgLine, string> = { merit: 'ceremony-prime', buffet: '
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
-  const [pkgId, setPkgId] = useState('ceremony-prime');
-  const [homeLine, setHomeLine] = useState<PkgLine>('merit');
-  const [form, setForm] = useState<BookingForm>(initialForm);
+  const [pkgId, setPkgId] = useState(BRAND.defaultPkg);
+  const [homeLine, setHomeLine] = useState<PkgLine>(BRAND.defaultLine);
+  const [form, setForm] = useState<BookingForm>(() => formForPackage(initialForm, BRAND.defaultPkg));
+  // storefront theme + title (the same bundle serves /booking and /catering)
+  useEffect(() => {
+    document.documentElement.dataset.theme = SITE;
+    document.title = BRAND.docTitle;
+  }, []);
   const [saved, setSaved] = useState<SavedBooking | null>(null);
   const [wizardStep, setWizardStep] = useState(0);
   // Live prices come from the CRM (edited in the dashboard); bump state to re-render once applied
@@ -76,7 +82,9 @@ export default function App() {
       });
       if (linkPkg) {
         setPkgId(linkPkg.id);
-        setHomeLine(linkPkg.line);
+        // a link for a line this storefront doesn't sell (e.g. a โต๊ะจีน preset opened on /booking)
+        // still works — the wizard/quick form follow the package — only the home tab stays put
+        if (isSiteLine(linkPkg.line)) setHomeLine(linkPkg.line);
       }
       // sales fixed the package: skip straight to the short confirmation form
       if (p) setScreen('quick');
@@ -112,7 +120,7 @@ export default function App() {
           alignItems: 'center',
           gap: 12,
           padding: '12px 18px',
-          background: 'rgba(245,234,216,.92)',
+          background: 'var(--color-header-bg)',
           backdropFilter: 'blur(10px)',
           borderBottom: '1px solid var(--color-divider)',
         }}
@@ -128,20 +136,18 @@ export default function App() {
               height: 38,
               borderRadius: 999,
               background: 'var(--color-accent-700)',
-              color: '#f5ead8',
+              color: 'var(--color-logo-text)',
               display: 'grid',
               placeItems: 'center',
               fontSize: 20,
               flex: 'none',
             }}
           >
-            บ
+            {BRAND.mark}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ ...charm, fontSize: 19, lineHeight: 1.4, color: 'var(--color-accent-800)' }}>IRIS เติมบุญ · IRIS Catering</div>
-            <div style={{ fontSize: 11, color: 'var(--color-neutral-600)', letterSpacing: '.02em' }}>
-              รับจัดงานบุญ · บุฟเฟต์อาหารไทย · โต๊ะจีน
-            </div>
+            <div style={{ ...charm, fontSize: 19, lineHeight: 1.4, color: 'var(--color-accent-800)' }}>{BRAND.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-neutral-600)', letterSpacing: '.02em' }}>{BRAND.tagline}</div>
           </div>
         </div>
       </div>
@@ -240,13 +246,13 @@ export default function App() {
             display: 'flex',
             gap: 10,
             padding: '12px 18px calc(12px + env(safe-area-inset-bottom))',
-            background: 'rgba(245,234,216,.94)',
+            background: 'var(--color-header-bg)',
             backdropFilter: 'blur(10px)',
             borderTop: '1px solid var(--color-divider)',
           }}
         >
           <a
-            href={`tel:${PHONE}`}
+            href={`tel:${BRAND.phone}`}
             style={{
               flex: 1,
               padding: 13,
@@ -266,7 +272,7 @@ export default function App() {
             โทรสอบถาม
           </a>
           <a
-            href={LINE_URL}
+            href={BRAND.lineUrl}
             target="_blank"
             rel="noreferrer"
             style={{
@@ -274,7 +280,7 @@ export default function App() {
               padding: 13,
               borderRadius: 999,
               background: '#06c755',
-              color: '#fff',
+              color: 'var(--color-on-accent)',
               textAlign: 'center',
               fontSize: 15,
               fontWeight: 600,
@@ -284,7 +290,7 @@ export default function App() {
               gap: 7,
             }}
           >
-            LINE @temboon
+            {BRAND.lineLabel}
           </a>
         </div>
       )}

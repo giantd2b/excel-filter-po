@@ -241,7 +241,7 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
             padding: 16,
             borderRadius: 999,
             background: 'var(--color-accent)',
-            color: '#fff',
+            color: 'var(--color-on-accent)',
             textAlign: 'center',
             fontSize: 17,
             fontWeight: 600,
