@@ -231,6 +231,7 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
           const r = config.packages[pkg.id];
           if (!r) return null;
           const isFull = pkg.kind === "full";
+          const isCatering = pkg.kind === "catering";
           const open = !!advanced[pkg.id];
           return (
             <section key={pkg.id} className="rounded-xl ring-1 ring-slate-200 overflow-hidden">
@@ -238,7 +239,9 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
                 <div className="flex items-baseline gap-2">
                   <span className="font-semibold text-slate-800">{pkg.name}</span>
                   <span className="text-[11px] font-mono text-slate-400">{pkg.id}</span>
-                  <span className="text-[11px] text-slate-400">{isFull ? "· พิธีสงฆ์ + อาหาร + โต๊ะ/เก้าอี้" : "· พิธีสงฆ์อย่างเดียว"}</span>
+                  <span className="text-[11px] text-slate-400">
+                    {isCatering ? (pkg.unit === "table" ? "· จัดเลี้ยงโต๊ะจีน (ไม่มีพิธีสงฆ์)" : "· จัดเลี้ยงบุฟเฟต์ (ไม่มีพิธีสงฆ์)") : isFull ? "· พิธีสงฆ์ + อาหาร + โต๊ะ/เก้าอี้" : "· พิธีสงฆ์อย่างเดียว"}
+                  </span>
                 </div>
                 <label className="text-xs text-slate-600 flex items-center gap-1.5">
                   VAT
@@ -250,7 +253,30 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
               </header>
 
               <div className="p-4 space-y-4">
-                {isFull ? (
+                {isCatering ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className={labelCls}>
+                        {pkg.unit === "table"
+                          ? "สินค้าโต๊ะจีน (คิดต่อโต๊ะ · ว่าง = ส่งเป็นข้อความ ราคาตามโปสเตอร์)"
+                          : "สินค้าบุฟเฟต์ (PACKAGE ที่มีตัวแปร guests และ dishes · ว่าง = ส่งเป็นข้อความ ราคาตามโปสเตอร์)"}
+                      </label>
+                      <ProductSelect
+                        value={r.cateringCode}
+                        onChange={(v) => setPkg(pkg.id, { cateringCode: v || null })}
+                        options={pkg.unit === "guest" && buffetProducts.length ? buffetProducts : allProducts}
+                        allowEmpty
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        ราคาที่หน้า booking แสดง = ราคาสินค้านี้{pkg.unit === "table" ? " ต่อ 1 โต๊ะ" : ` ที่ ${pkg.minCount ?? 40} ท่าน หารกลับเป็นต่อท่าน (แยกตามจำนวนอย่าง 5-8)`}
+                      </p>
+                    </div>
+                    <div>
+                      <label className={labelCls}>หมายเหตุในใบเสนอราคา</label>
+                      <RemarkSelect value={r.remarkCode} onChange={(v) => setPkg(pkg.id, { remarkCode: v })} emptyLabel="(ใช้เทมเพลตค่าเริ่มต้นของ FlowAccount)" />
+                    </div>
+                  </div>
+                ) : isFull ? (
                   <>
                     {/* 1. ceremony product per tier */}
                     <div>
@@ -300,7 +326,8 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
                   </div>
                 )}
 
-                {/* advanced */}
+                {/* advanced (merit packages only — catering has no ceremony product / display tiers) */}
+                {!isCatering && (
                 <div className="border-t border-slate-100 pt-2">
                   <button type="button" onClick={() => setAdvanced((a) => ({ ...a, [pkg.id]: !open }))} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
                     {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />} ตั้งค่าขั้นสูง
@@ -331,6 +358,7 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
                     </div>
                   )}
                 </div>
+                )}
               </div>
             </section>
           );

@@ -103,7 +103,37 @@ export default function BookingPricingSettings({ onClose }: { onClose?: () => vo
                 <div className="font-medium text-slate-800">{pkg.name}</div>
                 <div className="text-[11px] font-mono text-slate-400">{pkg.id}</div>
               </div>
-              {pkg.kind === "ceremony" ? (
+              {pkg.kind === "catering" ? (
+                <div className="rounded-lg bg-white ring-1 ring-slate-100 p-3">
+                  <div className="text-xs font-semibold text-slate-700 mb-1.5">
+                    {pkg.unit === "table" ? `โต๊ะจีน ${pkg.courses ?? ""} อย่าง (ต่อโต๊ะ 8 ท่าน)` : "บุฟเฟต์ (ต่อท่าน ตามจำนวนอย่าง)"}
+                    <Code code={used?.catering} />
+                  </div>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {pkg.unit === "table" ? (
+                        <tr className="border-t border-slate-50">
+                          <td className="py-1 text-slate-600">ราคาต่อโต๊ะ</td>
+                          <td className="py-1 text-right font-semibold tabular-nums">{fmt(pp.perTable)}</td>
+                        </tr>
+                      ) : (
+                        Object.entries(pp.perHead || {})
+                          .sort((a, b) => Number(a[0]) - Number(b[0]))
+                          .map(([n, price]) => (
+                            <tr key={n} className="border-t border-slate-50">
+                              <td className="py-1 text-slate-600">{n} อย่าง / ท่าน</td>
+                              <td className="py-1 text-right font-semibold tabular-nums">{fmt(price)}</td>
+                            </tr>
+                          ))
+                      )}
+                      <tr className="border-t border-slate-100">
+                        <td className="py-1 text-slate-500 text-xs">ขั้นต่ำ</td>
+                        <td className="py-1 text-right text-xs tabular-nums">{pkg.minCount ?? "—"} {pkg.unit === "table" ? "โต๊ะ" : "ท่าน"}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : pkg.kind === "ceremony" ? (
                 <div className="flex items-baseline justify-between text-sm">
                   <span className="text-slate-600">
                     ราคาแพ็กเกจ <Code code={used?.base} />
@@ -156,6 +186,7 @@ export default function BookingPricingSettings({ onClose }: { onClose?: () => vo
                 <tr key={a.id} className="border-t border-slate-100">
                   <td className="py-1 text-slate-600">
                     {a.label}
+                    {a.perUnit === "table" ? <span className="text-xs text-slate-400"> /โต๊ะ</span> : null}
                     <Code code={a.code} />
                   </td>
                   <td className="py-1 text-right font-semibold tabular-nums">{fmt(p.addons[a.id])}</td>

@@ -596,6 +596,34 @@ export async function sendQuotationToChat(docNo: string) {
 
 // ─── Merit Bookings (หน้าจองแพคเกจ /booking) ─────────────────────
 
+/** ceremony = monk package · full = monk package + guest food · catering = food only (บุฟเฟต์ / โต๊ะจีน, no monks) */
+export type BookingPackageKind = "ceremony" | "full" | "catering";
+export type BookingPackageLine = "merit" | "buffet" | "chinese";
+
+/** package entry as served by GET /bookings/pricing and /bookings/recipes */
+export interface BookingPackageInfo {
+  id: string;
+  name: string;
+  kind: BookingPackageKind;
+  line?: BookingPackageLine;
+  /** catering: priced per guest (บุฟเฟต์) or per table (โต๊ะจีน) */
+  unit?: "guest" | "table" | null;
+  minCount?: number | null;
+  courses?: number | null;
+  includedAddons?: string[];
+}
+
+export interface BookingAddonInfo {
+  id: string;
+  label: string;
+  price?: number;
+  /** "table" = price × tables (เครื่องดื่มโต๊ะจีน) */
+  perUnit?: "table" | null;
+  /** package lines that offer the add-on */
+  lines?: BookingPackageLine[];
+  code?: string | null;
+}
+
 export interface MeritBooking {
   id: string;
   code: string;
@@ -614,8 +642,13 @@ export interface MeritBooking {
   guests: number;
   tables: number;
   monks: number;
+  /** catering buffet: savoury dishes 5–8 */
+  dishCount?: number | null;
   selfTransport: boolean;
   addons: string[];
+  /** computed by the API from packageId (rows only store the id) */
+  packageKind?: BookingPackageKind | null;
+  packageLine?: BookingPackageLine | null;
   budget?: string | null;
   customerName: string;
   phone: string;
@@ -682,6 +715,8 @@ export interface FaRecipe {
   transportCode: string;
   buffetCode?: string | null;
   chineseTableCode?: string | null;
+  /** catering packages: the one product that prices the line (null = plain text at the default price) */
+  cateringCode?: string | null;
   vatRate: 0 | 7;
   remarkCode?: string | null;
 }
@@ -703,8 +738,8 @@ export interface FaCatalogProduct {
 export interface BookingRecipeSettings {
   config: FaRecipeConfig;
   defaults: FaRecipeConfig;
-  packages: { id: string; name: string; kind: "ceremony" | "full"; includedAddons?: string[] }[];
-  addons: { id: string; label: string; price: number }[];
+  packages: BookingPackageInfo[];
+  addons: BookingAddonInfo[];
   products: FaCatalogProduct[];
   remarkTemplates: { id: number; code: string | null; name: string; isDefault: boolean }[];
   catalogError: string | null;
@@ -722,6 +757,10 @@ export interface PackagePricing {
   base?: number | null;
   buffet?: TierConfig | null;
   table?: TierConfig | null;
+  /** catering buffet: dish count ("5".."8") → price per guest */
+  perHead?: Record<string, number> | null;
+  /** catering Chinese table: price per table */
+  perTable?: number | null;
 }
 
 export interface PricingConfig {
@@ -734,13 +773,13 @@ export interface PricingConfig {
 export interface BookingPricingSettings {
   pricing: PricingConfig;
   defaults: PricingConfig;
-  packages: { id: string; name: string; kind: "ceremony" | "full"; includedAddons?: string[] }[];
-  addons: { id: string; label: string; code: string | null }[];
+  packages: BookingPackageInfo[];
+  addons: BookingAddonInfo[];
   source: "flowaccount" | "cache";
   fetchedAt: string;
   catalogError: string | null;
   missingCodes: string[];
-  usedCodes: Record<string, { buffet: Record<number, string>; table: Record<number, string>; base?: string }>;
+  usedCodes: Record<string, { buffet: Record<number, string>; table: Record<number, string>; base?: string; catering?: string }>;
   appUrl: string;
   /** travel fee by อำเภอ/เขต of the event venue (from the travel-fee settings) */
   travelFees?: Record<string, number>;
@@ -794,6 +833,8 @@ export interface BookingPreset {
   guests: number;
   tables: number;
   monks: number;
+  /** catering buffet: savoury dishes 5–8 (omit for other packages) */
+  dishCount?: number | null;
   selfTransport: boolean;
   addons: string[];
   note?: string;

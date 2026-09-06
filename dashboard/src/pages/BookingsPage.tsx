@@ -64,14 +64,27 @@ function addressLine(b: MeritBooking) {
   return p.join(" ") || "-";
 }
 
+/** catering bookings (บุฟเฟต์ / โต๊ะจีน) have no monks; older API responses lack packageKind, so fall back on monks === 0 */
+const isCatering = (b: MeritBooking) => b.packageKind === "catering" || (b.packageKind == null && b.monks === 0);
+
 function foodLine(b: MeritBooking) {
+  if (isCatering(b)) {
+    if (b.foodMode === "table") return `${b.tables} โต๊ะ${b.addons?.includes("drinks") ? ` + เครื่องดื่ม` : ""}`;
+    return `${b.dishCount ?? "-"} อย่าง · ${b.guests} ท่าน`;
+  }
   if (b.foodMode === "table") return `โต๊ะจีน ${b.tables} โต๊ะ`;
   if (b.foodMode === "buffet") return `บุฟเฟต์ ${b.guests} ท่าน`;
   return "ไม่รวมอาหารเลี้ยงแขก";
 }
 
-/** Big-tent rule: 50+ guests / 8+ tables include one 5x12 tent (≈64 guests = 8 tables); 20 tables include two. */
+/** "แพ็กเกจ · พระ N รูป · อาหาร" for merit, "แพ็กเกจ · อาหาร" for catering */
+function packageLine(b: MeritBooking) {
+  return isCatering(b) ? `${b.packageName} · ${foodLine(b)}` : `${b.packageName} · พระ ${b.monks} รูป · ${foodLine(b)}`;
+}
+
+/** Big-tent rule (merit packages only): 50+ guests / 8+ tables include one 5x12 tent (≈64 guests = 8 tables); 20 tables include two. */
 function tentAdvice(b: MeritBooking): string | null {
+  if (isCatering(b)) return null;
   if (b.foodMode === "buffet" && b.guests > 64) return `แขก ${b.guests} ท่าน เกินความจุเต้นท์ใหญ่ 1 หลัง (64 ท่าน)`;
   if (b.foodMode === "table" && b.tables > 8 && b.tables < 20) return `โต๊ะจีน ${b.tables} โต๊ะ เกินความจุเต้นท์ใหญ่ 1 หลัง (8 โต๊ะ)`;
   return null;
@@ -361,9 +374,7 @@ export default function BookingsPage() {
               </div>
 
               <div className="mt-3 space-y-1.5 text-sm text-slate-600">
-                <div className="font-medium text-slate-700">
-                  {b.packageName} · พระ {b.monks} รูป · {foodLine(b)}
-                </div>
+                <div className="font-medium text-slate-700">{packageLine(b)}</div>
                 {b.depositAmount != null && (
                   <div>
                     <span className="inline-flex text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">

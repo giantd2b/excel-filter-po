@@ -9,27 +9,44 @@ import {
   type BookingLink,
   type BookingPreset,
   type BookingEstimate,
+  type BookingPackageInfo,
+  type BookingAddonInfo,
+  type BookingPackageLine,
 } from "@/lib/api-service";
 
 /** Fallbacks when /bookings/pricing is unreachable (ids match booking/src/data/packages.ts). */
-const FALLBACK_PACKAGES: { id: string; name: string; kind: "ceremony" | "full"; includedAddons?: string[] }[] = [
-  { id: "ceremony", name: "พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)", kind: "ceremony" },
-  { id: "ceremony-prime", name: "PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)", kind: "ceremony", includedAddons: ["drape"] },
-  { id: "full", name: "ครบวงจร", kind: "full" },
-  { id: "full-plus", name: "ครบวงจร พลัส", kind: "full" },
-  { id: "prime", name: "PRIME ครบวงจร", kind: "full", includedAddons: ["drape"] },
+const FALLBACK_PACKAGES: BookingPackageInfo[] = [
+  { id: "ceremony", name: "พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)", kind: "ceremony", line: "merit" },
+  { id: "ceremony-prime", name: "PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)", kind: "ceremony", line: "merit", includedAddons: ["drape"] },
+  { id: "full", name: "ครบวงจร", kind: "full", line: "merit" },
+  { id: "full-plus", name: "ครบวงจร พลัส", kind: "full", line: "merit" },
+  { id: "prime", name: "PRIME ครบวงจร", kind: "full", line: "merit", includedAddons: ["drape"] },
+  { id: "buffet-standard", name: "บุฟเฟต์อาหารไทย แพคเกจเริ่มต้น", kind: "catering", line: "buffet", unit: "guest", minCount: 40 },
+  { id: "buffet-premium", name: "บุฟเฟต์อาหารไทย แพคเกจพรีเมียม", kind: "catering", line: "buffet", unit: "guest", minCount: 40 },
+  { id: "chinese-2000", name: "โต๊ะจีน 2,000 (8 อย่าง)", kind: "catering", line: "chinese", unit: "table", minCount: 10, courses: 8 },
+  { id: "chinese-2300", name: "โต๊ะจีน 2,300 (9 อย่าง)", kind: "catering", line: "chinese", unit: "table", minCount: 10, courses: 9 },
+  { id: "chinese-2600", name: "โต๊ะจีน 2,600 (10 อย่าง)", kind: "catering", line: "chinese", unit: "table", minCount: 10, courses: 10 },
 ];
-const FALLBACK_ADDONS = [
-  { id: "stage", label: "เวทีพระ" },
-  { id: "tent", label: "เต็นท์เพิ่ม 1 หลัง" },
-  { id: "drape", label: "โยงผ้าประดับเพิ่ม" },
+const FALLBACK_ADDONS: BookingAddonInfo[] = [
+  { id: "stage", label: "เวทีพระ", price: 5000, lines: ["merit"] },
+  { id: "tent", label: "เต็นท์เพิ่ม 1 หลัง", price: 3000, lines: ["merit"] },
+  { id: "drape", label: "โยงผ้าประดับเพิ่ม", price: 1000, lines: ["merit"] },
+  { id: "drinks", label: "เครื่องดื่ม", price: 250, perUnit: "table", lines: ["chinese"] },
 ];
+const LINE_LABELS: Record<BookingPackageLine, string> = { merit: "งานบุญ", buffet: "บุฟเฟต์อาหารไทย", chinese: "โต๊ะจีน" };
 const OCCASIONS = ["ทำบุญขึ้นบ้านใหม่", "ทำบุญบริษัท / เปิดกิจการ", "ทำบุญวันเกิด", "ทำบุญอุทิศส่วนกุศล", "ทำบุญบ้าน / ครบรอบ", "งานอื่น ๆ"];
+const CATERING_OCCASIONS = ["งานเลี้ยงบริษัท / สัมมนา", "งานแต่งงาน", "งานบวช", "งานศพ", "งานเลี้ยงรุ่น / ครอบครัว", "งานอื่น ๆ"];
 const TIME_SLOTS = [
   { v: "", label: "ให้ลูกค้าเลือก" },
   { v: "เช้า 07.00-07.30 น.", label: "ทำบุญเช้า 07.00-07.30 น." },
   { v: "เพล 10.00-10.30 น.", label: "ถวายเพล 10.00-10.30 น." },
 ];
+const CATERING_TIME_SLOTS = [
+  { v: "", label: "ให้ลูกค้าเลือก" },
+  { v: "เที่ยง 11.00-13.00 น.", label: "มื้อเที่ยง 11.00-13.00 น." },
+  { v: "เย็น 17.00-19.00 น.", label: "มื้อเย็น 17.00-19.00 น." },
+];
+const DISH_COUNTS = [5, 6, 7, 8];
 
 const DEFAULT_PRESET: BookingPreset = {
   occasion: "ทำบุญขึ้นบ้านใหม่",
@@ -40,6 +57,7 @@ const DEFAULT_PRESET: BookingPreset = {
   guests: 30,
   tables: 10,
   monks: 9,
+  dishCount: 6,
   selfTransport: false,
   addons: [],
   note: "",
@@ -61,8 +79,9 @@ interface Props {
  */
 export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
   const [mode, setMode] = useState<"preset" | "free">("preset");
-  const [packages, setPackages] = useState(FALLBACK_PACKAGES);
-  const [addons, setAddons] = useState<{ id: string; label: string }[]>(FALLBACK_ADDONS);
+  const [packages, setPackages] = useState<BookingPackageInfo[]>(FALLBACK_PACKAGES);
+  const [addons, setAddons] = useState<BookingAddonInfo[]>(FALLBACK_ADDONS);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
   const [travelFees, setTravelFees] = useState<Record<string, number>>({});
   const [preset, setPreset] = useState<BookingPreset>(DEFAULT_PRESET);
   const [estimate, setEstimate] = useState<BookingEstimate | null>(null);
@@ -77,14 +96,38 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
 
   const pkg = packages.find((p) => p.id === preset.packageId);
   const hasFood = pkg?.kind === "full";
-  // e.g. PRIME already includes the drape — not selectable, and dropped when the package changes
+  const isCatering = pkg?.kind === "catering";
+  const line: BookingPackageLine = pkg?.line || "merit";
   const includedAddons = pkg?.includedAddons || [];
+  // add-ons the selected package can be sold with (its line's, minus the ones it already includes)
+  const lineAddons = addons.filter((a) => (!a.lines || a.lines.includes(line)) && !includedAddons.includes(a.id));
+  // Keep the preset consistent with the package: drop add-ons it can't have (PRIME's drape, other
+  // lines' items), no monks / self-transport for catering, food mode follows the catering unit,
+  // counts lifted to the minimum, occasion/time reset when they belong to another line.
   useEffect(() => {
-    if (preset.addons.some((a) => includedAddons.includes(a))) {
-      set("addons", preset.addons.filter((a) => !includedAddons.includes(a)));
-    }
+    if (!pkg) return;
+    setPreset((p) => {
+      const ok = new Set(lineAddons.map((a) => a.id));
+      const next: BookingPreset = { ...p, addons: p.addons.filter((a) => ok.has(a)) };
+      if (pkg.kind === "catering") {
+        next.foodMode = pkg.unit === "table" ? "table" : "buffet";
+        next.monks = 0;
+        next.selfTransport = false;
+        const min = pkg.minCount ?? 1;
+        if (pkg.unit === "table") next.tables = Math.max(min, p.tables || 0);
+        else next.guests = Math.max(min, p.guests || 0);
+        if (!(next.dishCount && next.dishCount >= 5 && next.dishCount <= 8)) next.dishCount = 6;
+      } else if (!p.monks) {
+        next.monks = 9;
+      }
+      const occ = line === "merit" ? OCCASIONS : CATERING_OCCASIONS;
+      if (next.occasion && !occ.includes(next.occasion) && (OCCASIONS.includes(next.occasion) || CATERING_OCCASIONS.includes(next.occasion))) next.occasion = occ[0];
+      const slots = line === "merit" ? TIME_SLOTS : CATERING_TIME_SLOTS;
+      if (next.timeSlot && !slots.some((s) => s.v === next.timeSlot)) next.timeSlot = "";
+      return JSON.stringify(next) === JSON.stringify(p) ? p : next;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset.packageId, packages]);
+  }, [preset.packageId, packages, addons]);
 
   useEffect(() => {
     getBookingPricing()
@@ -102,9 +145,9 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
     let cancelled = false;
     setEstimating(true);
     const t = setTimeout(() => {
-      estimateBooking(cleanPreset(preset))
-        .then((e) => { if (!cancelled) setEstimate(e); })
-        .catch(() => { if (!cancelled) setEstimate(null); })
+      estimateBooking(cleanPreset(preset, pkg))
+        .then((e) => { if (!cancelled) { setEstimate(e); setEstimateError(null); } })
+        .catch((e: any) => { if (!cancelled) { setEstimate(null); setEstimateError(e?.message || null); } })
         .finally(() => { if (!cancelled) setEstimating(false); });
     }, 300);
     return () => { cancelled = true; clearTimeout(t); };
@@ -135,7 +178,7 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
     setError(null);
     setSent(false);
     try {
-      setLink(await createBookingLink(customer.id, { preset: cleanPreset(preset) }));
+      setLink(await createBookingLink(customer.id, { preset: cleanPreset(preset, pkg) }));
     } catch (e: any) {
       setError(e?.message || "สร้างลิงก์ไม่สำเร็จ");
     } finally {
@@ -158,7 +201,16 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
     if (!link) return "";
     if (mode === "preset" && link.preset) {
       const p = link.preset;
-      const food = hasFood ? (p.foodMode === "table" ? `โต๊ะจีน ${p.tables} โต๊ะ` : `บุฟเฟต์ ${p.guests} ท่าน`) : "อาหารถวายพระ";
+      const food = isCatering
+        ? pkg?.unit === "table"
+          ? `${p.tables} โต๊ะ${pkg?.courses ? ` (${pkg.courses} อย่าง)` : ""}${p.addons.includes("drinks") ? " + เครื่องดื่ม" : ""}`
+          : `${p.dishCount ?? 6} อย่าง · ${p.guests} ท่าน`
+        : hasFood
+          ? p.foodMode === "table"
+            ? `โต๊ะจีน ${p.tables} โต๊ะ`
+            : `บุฟเฟต์ ${p.guests} ท่าน`
+          : "อาหารถวายพระ";
+      const head = isCatering ? `${link.packageName} · ${food}` : `${link.packageName} · พระ ${p.monks} รูป · ${food}`;
       const price =
         link.estimatedTotal != null
           ? p.wantVat
@@ -166,14 +218,14 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
             : `ราคาประเมิน ${link.estimatedTotal.toLocaleString("th-TH")} บาท${p.wantVat === false ? " (ไม่รวม VAT)" : ""}`
           : "";
       return [
-        `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${link.packageName} · พระ ${p.monks} รูป · ${food}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ""}${p.timeSlot ? ` (${p.timeSlot})` : ""}`,
+        `สรุปแพ็กเกจที่คุยกันไว้ค่ะ: ${head}${p.eventDate ? ` · วันที่ ${fmtThaiDate(p.eventDate)}` : ""}${p.timeSlot ? ` (${p.timeSlot})` : ""}`,
         price,
         link.depositAmount != null ? `มัดจำ ${link.depositAmount.toLocaleString("th-TH")} บาท เพื่อยืนยันคิว` : "",
         `กรอกชื่อ เบอร์ และสถานที่จัดงานที่ลิงก์นี้ ระบบจะออกใบเสนอราคาให้ทันทีค่ะ`,
         link.url,
       ].filter(Boolean).join("\n");
     }
-    return `จองงานบุญกับ IRIS เติมบุญ ได้ที่ลิงก์นี้เลยค่ะ\n${link.url}\nกรอกรายละเอียดงานแล้วระบบจะออกใบเสนอราคาให้ทันทีค่ะ`;
+    return `จองงานบุญ บุฟเฟต์ หรือโต๊ะจีนกับ IRIS ได้ที่ลิงก์นี้เลยค่ะ\n${link.url}\nกรอกรายละเอียดงานแล้วระบบจะออกใบเสนอราคาให้ทันทีค่ะ`;
   };
 
   const sendToChat = async () => {
@@ -234,8 +286,12 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
             <span className={lbl}>แพ็กเกจเริ่มต้น (ไม่บังคับ)</span>
             <select value={freePackageId} onChange={(e) => setFreePackageId(e.target.value)} className={field}>
               <option value="">ให้ลูกค้าเลือกเอง</option>
-              {packages.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+              {(["merit", "buffet", "chinese"] as BookingPackageLine[]).map((l) => (
+                <optgroup key={l} label={LINE_LABELS[l]}>
+                  {packages.filter((p) => (p.line || "merit") === l).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>
@@ -246,7 +302,7 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                 <span className={lbl}>ประเภทงาน</span>
                 <input list="booking-occasions" value={preset.occasion || ""} onChange={(e) => set("occasion", e.target.value)} className={field} placeholder="เช่น ทำบุญขึ้นบ้านใหม่" />
                 <datalist id="booking-occasions">
-                  {OCCASIONS.map((o) => <option key={o} value={o} />)}
+                  {(line === "merit" ? OCCASIONS : CATERING_OCCASIONS).map((o) => <option key={o} value={o} />)}
                 </datalist>
               </label>
               <label className="block">
@@ -260,19 +316,44 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                 )}
               </label>
               <label className="block">
-                <span className={lbl}>ช่วงเวลาพิธี</span>
+                <span className={lbl}>{isCatering ? "ช่วงเวลาเสิร์ฟ" : "ช่วงเวลาพิธี"}</span>
                 <select value={preset.timeSlot || ""} onChange={(e) => set("timeSlot", e.target.value)} className={field}>
-                  {TIME_SLOTS.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
+                  {(line === "merit" ? TIME_SLOTS : CATERING_TIME_SLOTS).map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
                 </select>
               </label>
               <label className="block col-span-2">
                 <span className={lbl}>แพ็กเกจ</span>
                 <select value={preset.packageId} onChange={(e) => set("packageId", e.target.value)} className={field}>
-                  {packages.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                  {(["merit", "buffet", "chinese"] as BookingPackageLine[]).map((l) => (
+                    <optgroup key={l} label={LINE_LABELS[l]}>
+                      {packages.filter((p) => (p.line || "merit") === l).map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </label>
+              {isCatering && pkg?.unit === "guest" && (
+                <label className="block">
+                  <span className={lbl}>จำนวนอาหารคาว</span>
+                  <select value={preset.dishCount ?? 6} onChange={(e) => set("dishCount", parseInt(e.target.value, 10))} className={field}>
+                    {DISH_COUNTS.map((n) => <option key={n} value={n}>{n} อย่าง</option>)}
+                  </select>
+                </label>
+              )}
+              {isCatering && (
+                <label className="block">
+                  <span className={lbl}>{pkg?.unit === "table" ? `จำนวนโต๊ะ (ขั้นต่ำ ${pkg?.minCount ?? 10})` : `จำนวนแขก (ท่าน, ขั้นต่ำ ${pkg?.minCount ?? 40})`}</span>
+                  <input
+                    type="number"
+                    min={pkg?.minCount ?? 1}
+                    step={pkg?.unit === "table" ? 1 : 10}
+                    value={pkg?.unit === "table" ? preset.tables : preset.guests}
+                    onChange={(e) => set(pkg?.unit === "table" ? "tables" : "guests", Math.max(0, parseInt(e.target.value || "0", 10)))}
+                    className={field}
+                  />
+                </label>
+              )}
               {hasFood && (
                 <>
                   <label className="block">
@@ -294,17 +375,21 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                   </label>
                 </>
               )}
-              <label className="block">
-                <span className={lbl}>พระสงฆ์</span>
-                <select value={preset.monks} onChange={(e) => set("monks", parseInt(e.target.value, 10))} className={field}>
-                  <option value={9}>9 รูป</option>
-                  <option value={5}>5 รูป (ลด 1,500)</option>
-                </select>
-              </label>
-              <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
-                <input type="checkbox" checked={preset.selfTransport} onChange={(e) => set("selfTransport", e.target.checked)} className="w-4 h-4" />
-                ลูกค้านิมนต์รับ-ส่งพระเอง
-              </label>
+              {!isCatering && (
+                <>
+                  <label className="block">
+                    <span className={lbl}>พระสงฆ์</span>
+                    <select value={preset.monks} onChange={(e) => set("monks", parseInt(e.target.value, 10))} className={field}>
+                      <option value={9}>9 รูป</option>
+                      <option value={5}>5 รูป (ลด 1,500)</option>
+                    </select>
+                  </label>
+                  <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={preset.selfTransport} onChange={(e) => set("selfTransport", e.target.checked)} className="w-4 h-4" />
+                    ลูกค้านิมนต์รับ-ส่งพระเอง
+                  </label>
+                </>
+              )}
             </div>
             <label className="block">
               <span className={lbl}>อำเภอ/เขตของสถานที่จัดงาน (คิดค่าเดินทาง)</span>
@@ -321,7 +406,8 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
             <div>
               <span className={lbl}>ออปชั่นเสริม</span>
               <div className="flex flex-wrap gap-2 mt-1">
-                {addons.map((a) => {
+                {lineAddons.length === 0 && <span className="text-xs text-slate-400 italic">แพ็กเกจนี้ไม่มีออปชั่นเสริม</span>}
+                {addons.filter((a) => !a.lines || a.lines.includes(line)).map((a) => {
                   const included = includedAddons.includes(a.id);
                   const on = !included && preset.addons.includes(a.id);
                   return (
@@ -340,7 +426,7 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                       }`}
                     >
                       {a.label}
-                      {included ? " · รวมในแพ็กเกจแล้ว" : ""}
+                      {included ? " · รวมในแพ็กเกจแล้ว" : a.perUnit === "table" ? ` · ${(a.price ?? 250).toLocaleString("th-TH")}/โต๊ะ` : ""}
                     </button>
                   );
                 })}
@@ -392,6 +478,8 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                     <span className="font-bold text-slate-800 tabular-nums">฿{(preset.wantVat ? estimate.grandTotal : estimate.total).toLocaleString("th-TH")}{preset.wantVat ? " รวม VAT" : ""}</span>
                   </div>
                 </>
+              ) : estimateError && !estimating ? (
+                <div className="text-xs text-red-600">{estimateError}</div>
               ) : (
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" /> กำลังคำนวณราคาจาก IRIS Quotation…
@@ -468,10 +556,11 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
   );
 }
 
-/** Drop empty optional strings so the API validators see undefined, not "". */
-function cleanPreset(p: BookingPreset): BookingPreset {
+/** Drop empty optional strings so the API validators see undefined, not "". dishCount only travels for buffet catering. */
+function cleanPreset(p: BookingPreset, pkg?: BookingPackageInfo): BookingPreset {
   return {
     ...p,
+    dishCount: pkg?.kind === "catering" && pkg.unit === "guest" ? p.dishCount ?? 6 : undefined,
     occasion: p.occasion?.trim() || undefined,
     eventDate: p.eventDate || undefined,
     timeSlot: p.timeSlot || undefined,
