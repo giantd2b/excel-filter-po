@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -63,6 +64,21 @@ export default function ChatScreen({ route }: any) {
 
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  // The native-stack header (incl. status bar) sits above this screen. KeyboardAvoidingView measures
+  // its own frame relative to the parent, so the header height must be added back as the offset.
+  const headerHeight = useHeaderHeight();
+  // Android is edge-to-edge (RN 0.76+ / Expo 53+): the window no longer resizes for the keyboard, so
+  // behavior="height" did nothing and the composer sat under the keyboard. We pad instead, and drop
+  // the nav-bar inset while the keyboard is open (the padding already covers the full overlap).
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showHelper, setShowHelper] = useState(false);
@@ -497,8 +513,8 @@ export default function ChatScreen({ route }: any) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : headerHeight}
     >
       {/* Header info bar */}
       <View style={styles.infoBar}>
@@ -892,7 +908,7 @@ export default function ChatScreen({ route }: any) {
         showHelper={showHelper}
         onToggleHelper={toggleHelper}
         onInputFocus={dismissPanels}
-        bottomInset={insets.bottom}
+        bottomInset={Platform.OS === 'android' && keyboardOpen ? 0 : insets.bottom}
       />
     </KeyboardAvoidingView>
   );

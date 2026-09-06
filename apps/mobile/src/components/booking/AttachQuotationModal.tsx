@@ -105,7 +105,7 @@ export default function AttachQuotationModal({ visible, customer, onClose, onAtt
       presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'}
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.root} behavior="padding">
         <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 14 : insets.top + 8 }]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>🔗 ผูกใบเสนอราคากับ {customer.displayName}</Text>
