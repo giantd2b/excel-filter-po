@@ -11,7 +11,6 @@ import { InboxGateway } from '../inbox-gateway/inbox-gateway.gateway';
 import { InboxStatsService } from '../inbox-gateway/inbox-stats.service';
 import { QuotationsService } from '../quotations/quotations.service';
 import { findThaiPhones, formatThaiPhone } from '../../common/utils/phone.utils';
-import { pushGroupMessage } from '../../common/utils/line-notify.utils';
 import { SlipDetectionService } from '../slips/slip-detection.service';
 
 @Injectable()
@@ -330,13 +329,9 @@ export class WebhookService {
 
           // deposit auto-confirm: match the slip against the customer's open quotations (never blocks)
           void this.quotations.matchSlipToDeposit({ id: messageID, customerId, amount: slipData.amount ? parseFloat(String(slipData.amount).replace(/[^0-9.]/g, '')) : null, imageUrl }).catch(() => {});
-          const lines = [`มีสลิปส่งมา ${imageUrl}`];
-          if (slipData.bank_name) lines.push(`ธนาคาร: ${slipData.bank_name}`);
-          if (slipData.amount) lines.push(`จำนวน: ${slipData.amount}`);
-          if (slipData.sender_name) lines.push(`ผู้โอน: ${slipData.sender_name}`);
-          lines.push(`ช่องทาง: ${lineBot}`);
-          await pushGroupMessage(lines.join('\n'));
-          this.logger.log('Slip detected and notified');
+          // The team alert now comes only from matchSlipToDeposit (IRIS BOT group) — the old
+          // "มีสลิปส่งมา" push to LINE_GROUP_ID duplicated it (removed 2026-09-06).
+          this.logger.log('Slip detected');
         }
       }).catch(() => {});
 
@@ -602,13 +597,8 @@ export class WebhookService {
 
           // deposit auto-confirm: match the slip against the customer's open quotations (never blocks)
           void this.quotations.matchSlipToDeposit({ id: messageId, customerId, amount: slipData.amount ? parseFloat(String(slipData.amount).replace(/[^0-9.]/g, '')) : null, imageUrl }).catch(() => {});
-          const lines = [`มีสลิปส่งมา ${imageUrl}`];
-          if (slipData.bank_name) lines.push(`ธนาคาร: ${slipData.bank_name}`);
-          if (slipData.amount) lines.push(`จำนวน: ${slipData.amount}`);
-          if (slipData.sender_name) lines.push(`ผู้โอน: ${slipData.sender_name}`);
-          lines.push(`ช่องทาง: ${fbbot}`);
-          await pushGroupMessage(lines.join('\n'));
-          this.logger.log('Slip detected and notified');
+          // team alert comes only from matchSlipToDeposit (IRIS BOT group) — see the LINE branch
+          this.logger.log('Slip detected');
         }
       }).catch(() => {});
 

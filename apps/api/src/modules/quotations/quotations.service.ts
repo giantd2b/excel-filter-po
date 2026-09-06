@@ -860,12 +860,17 @@ export class QuotationsService {
    */
   async matchSlipToDeposit(slip: { id: string; customerId: string; amount: number | null; imageUrl?: string }) {
     const amount = Math.round((Number(slip.amount) || 0) * 100) / 100;
-    if (!amount || !slip.customerId || !this.flowAccount.isConfigured) return { matched: false, reason: 'no-amount' };
     const already = await this.prisma.slip.findUnique({ where: { id: slip.id }, select: { matchedDocNo: true } }).catch(() => null);
     if (already?.matchedDocNo) return { matched: true, docNo: already.matchedDocNo, reason: 'already' };
 
-    const c = await this.prisma.customer.findUnique({ where: { id: slip.customerId } });
-    const custName = c?.nickname || c?.displayName || slip.customerId;
+    const c = slip.customerId ? await this.prisma.customer.findUnique({ where: { id: slip.customerId } }) : null;
+    const custName = c?.nickname || c?.displayName || slip.customerId || 'ไม่ทราบลูกค้า';
+    // This is the ONLY team alert for a slip (the old "มีสลิปส่งมา" push to the legacy group was removed),
+    // so a slip whose amount could not be read still has to reach the team.
+    if (!amount || !slip.customerId || !this.flowAccount.isConfigured) {
+      void pushTeamText(`💰 สลิปจาก ${custName}${amount ? ` ${amount.toLocaleString('th-TH')} บาท` : ' (อ่านยอดไม่ได้)'}\nกรุณาตรวจสอบและจับคู่ใบเสนอราคาเอง${slip.imageUrl ? `\n${slip.imageUrl}` : ''}`);
+      return { matched: false, reason: 'no-amount' };
+    }
     const list = await this.flowAccount.listQuotations({ crmCustomerId: slip.customerId, limit: 50 }).catch(() => ({ data: [] as any[] }));
     const open = (list.data || []).filter((q: any) => ['PENDING', 'APPROVED'].includes(q.status));
     const eq = (a: number, b: number) => Math.abs(a - b) < 0.5;
