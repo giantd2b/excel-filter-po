@@ -12,12 +12,12 @@ import {
 } from "@/lib/api-service";
 
 /** Fallbacks when /bookings/pricing is unreachable (ids match booking/src/data/packages.ts). */
-const FALLBACK_PACKAGES = [
+const FALLBACK_PACKAGES: { id: string; name: string; kind: "ceremony" | "full"; includedAddons?: string[] }[] = [
   { id: "ceremony", name: "พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)", kind: "ceremony" },
-  { id: "ceremony-prime", name: "PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)", kind: "ceremony" },
+  { id: "ceremony-prime", name: "PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)", kind: "ceremony", includedAddons: ["drape"] },
   { id: "full", name: "ครบวงจร", kind: "full" },
   { id: "full-plus", name: "ครบวงจร พลัส", kind: "full" },
-  { id: "prime", name: "PRIME ครบวงจร", kind: "full" },
+  { id: "prime", name: "PRIME ครบวงจร", kind: "full", includedAddons: ["drape"] },
 ];
 const FALLBACK_ADDONS = [
   { id: "stage", label: "เวทีพระ" },
@@ -77,6 +77,14 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
 
   const pkg = packages.find((p) => p.id === preset.packageId);
   const hasFood = pkg?.kind === "full";
+  // e.g. PRIME already includes the drape — not selectable, and dropped when the package changes
+  const includedAddons = pkg?.includedAddons || [];
+  useEffect(() => {
+    if (preset.addons.some((a) => includedAddons.includes(a))) {
+      set("addons", preset.addons.filter((a) => !includedAddons.includes(a)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset.packageId, packages]);
 
   useEffect(() => {
     getBookingPricing()
@@ -314,17 +322,25 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
               <span className={lbl}>ออปชั่นเสริม</span>
               <div className="flex flex-wrap gap-2 mt-1">
                 {addons.map((a) => {
-                  const on = preset.addons.includes(a.id);
+                  const included = includedAddons.includes(a.id);
+                  const on = !included && preset.addons.includes(a.id);
                   return (
                     <button
                       key={a.id}
                       type="button"
+                      disabled={included}
+                      title={included ? "แพ็กเกจนี้รวมรายการนี้อยู่แล้ว" : undefined}
                       onClick={() => set("addons", on ? preset.addons.filter((x) => x !== a.id) : [...preset.addons, a.id])}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium ring-1 transition-colors ${
-                        on ? "bg-brand-600 text-white ring-brand-600" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
+                        included
+                          ? "bg-slate-100 text-slate-400 ring-slate-200 cursor-not-allowed"
+                          : on
+                            ? "bg-brand-600 text-white ring-brand-600"
+                            : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
                       }`}
                     >
                       {a.label}
+                      {included ? " · รวมในแพ็กเกจแล้ว" : ""}
                     </button>
                   );
                 })}

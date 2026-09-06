@@ -15,11 +15,13 @@ export interface BookingPackage {
   base?: number; // ceremony packages: flat price
   buffet?: TierConfig;
   table?: TierConfig;
+  /** add-on ids the package already covers — never charged, never on the quotation (booking/src/data/packages.ts mirrors this) */
+  includedAddons?: string[];
 }
 
 export const BOOKING_PACKAGES: BookingPackage[] = [
   { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)', kind: 'ceremony', base: 14990 },
-  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony', base: 19990 },
+  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony', base: 19990, includedAddons: ['drape'] },
   {
     id: 'full',
     name: 'ครบวงจร',
@@ -38,6 +40,7 @@ export const BOOKING_PACKAGES: BookingPackage[] = [
     id: 'prime',
     name: 'PRIME ครบวงจร',
     kind: 'full',
+    includedAddons: ['drape'],
     buffet: { tiers: [[20, 25990], [30, 29490], [40, 32990], [50, 38990]], extra: 350 },
     table: { tiers: [[8, 42290], [10, 47490], [20, 75990]], extra: 2600 },
   },
@@ -48,6 +51,17 @@ export const BOOKING_ADDONS: { id: string; label: string; price: number }[] = [
   { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง', price: 3000 },
   { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', price: 1000 },
 ];
+
+/** true when the package already covers the add-on (PRIME includes the drape) */
+export function addonIncludedIn(packageId: string, addonId: string): boolean {
+  const pkg = BOOKING_PACKAGES.find((p) => p.id === packageId);
+  return !!pkg?.includedAddons?.includes(addonId);
+}
+
+/** drop add-ons the package already includes — applied to every incoming booking/preset before pricing or saving */
+export function stripIncludedAddons(packageId: string, addons: string[] | null | undefined): string[] {
+  return (addons || []).filter((a) => !addonIncludedIn(packageId, a));
+}
 
 export const SELF_TRANSPORT_DISCOUNT = 1000;
 
@@ -689,7 +703,7 @@ export function buildFaItems(
   }
 
   for (const a of BOOKING_ADDONS) {
-    if (!input.addons.includes(a.id)) continue;
+    if (!input.addons.includes(a.id) || addonIncludedIn(input.packageId, a.id)) continue;
     const code = config.addons[a.id];
     items.push(
       code
@@ -734,7 +748,7 @@ export function calcEstimatedTotal(
   }
 
   for (const a of BOOKING_ADDONS) {
-    if (input.addons.includes(a.id)) total += pricing.addons[a.id] ?? a.price;
+    if (input.addons.includes(a.id) && !addonIncludedIn(input.packageId, a.id)) total += pricing.addons[a.id] ?? a.price;
   }
   if (input.selfTransport) total -= pricing.selfTransportDiscount;
   if (input.monks === 5) total -= pricing.fiveMonksDiscount;
@@ -788,7 +802,7 @@ export function estimateBooking(
     rows.push({ k: `ราคาแพ็กเกจ (${count} ${unit})`, v: fmt(cfg ? tierTotalFor(cfg, count).tierTotal : 0) });
   }
   for (const a of BOOKING_ADDONS) {
-    if (input.addons.includes(a.id)) rows.push({ k: a.label, v: `+${fmt(pricing.addons[a.id] ?? a.price)}` });
+    if (input.addons.includes(a.id) && !addonIncludedIn(input.packageId, a.id)) rows.push({ k: a.label, v: `+${fmt(pricing.addons[a.id] ?? a.price)}` });
   }
   if (input.selfTransport) rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: `−${fmt(pricing.selfTransportDiscount)}` });
   if (input.monks === 5) rows.push({ k: 'พระ 5 รูป', v: `−${fmt(pricing.fiveMonksDiscount)}` });

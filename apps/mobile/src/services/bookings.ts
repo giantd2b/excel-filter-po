@@ -124,6 +124,8 @@ export interface PricingPackage {
   id: string;
   name: string;
   kind?: 'ceremony' | 'full' | string;
+  /** add-on ids the package already covers (PRIME → drape); the API sends this, fallbacks mirror it */
+  includedAddons?: string[];
 }
 
 export interface PricingAddon {

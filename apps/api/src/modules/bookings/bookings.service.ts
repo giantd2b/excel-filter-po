@@ -10,6 +10,7 @@ import {
   FA_RECIPES_SETTING_KEY,
   BOOKING_PACKAGES,
   BOOKING_ADDONS,
+  stripIncludedAddons,
   derivePricing,
   estimateBooking,
   VAT_RATE,
@@ -125,7 +126,7 @@ export class BookingsService {
     return {
       pricing,
       defaults: DEFAULT_PRICING,
-      packages: BOOKING_PACKAGES.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
+      packages: BOOKING_PACKAGES.map((p) => ({ id: p.id, name: p.name, kind: p.kind, includedAddons: p.includedAddons || [] })),
       addons: BOOKING_ADDONS.map((a) => ({ id: a.id, label: a.label, code: config.addons[a.id] || null })),
       source: cat.source,
       fetchedAt: cat.fetchedAt,
@@ -207,7 +208,7 @@ export class BookingsService {
     return {
       config,
       defaults: DEFAULT_FA_RECIPES,
-      packages: BOOKING_PACKAGES.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
+      packages: BOOKING_PACKAGES.map((p) => ({ id: p.id, name: p.name, kind: p.kind, includedAddons: p.includedAddons || [] })),
       addons: BOOKING_ADDONS,
       products: products.map((p) => ({
         code: p.code,
@@ -382,6 +383,9 @@ export class BookingsService {
     if (!isServiceProvince(dto.province || dto.billingProvince)) {
       throw new BadRequestException(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาติดต่อทีมงานทาง LINE`);
     }
+
+    // PRIME already includes the drape: never store or charge it as an extra
+    dto.addons = stripIncludedAddons(dto.packageId, dto.addons);
 
     // travel fee follows the EVENT VENUE district (dto.amphoe); the quick form copies the billing
     // address onto the venue when "same address" is ticked, so dto.amphoe is always the venue

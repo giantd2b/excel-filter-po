@@ -125,10 +125,10 @@ export function daysInMonth(y: number, mo: number) {
 
 export const FALLBACK_PACKAGES: PricingPackage[] = [
   { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)', kind: 'ceremony' },
-  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony' },
+  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony', includedAddons: ['drape'] },
   { id: 'full', name: 'ครบวงจร', kind: 'full' },
   { id: 'full-plus', name: 'ครบวงจร พลัส', kind: 'full' },
-  { id: 'prime', name: 'PRIME ครบวงจร', kind: 'full' },
+  { id: 'prime', name: 'PRIME ครบวงจร', kind: 'full', includedAddons: ['drape'] },
 ];
 
 export const FALLBACK_ADDONS: PricingAddon[] = [

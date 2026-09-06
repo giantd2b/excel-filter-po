@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ADDONS, OCCASIONS, TIME_OPTS, baht, pkgById, SERVICE_AREA_TEXT, isServiceProvince } from '../data/packages';
+import { ADDONS, OCCASIONS, TIME_OPTS, addonIncluded, baht, pkgById, SERVICE_AREA_TEXT, isServiceProvince } from '../data/packages';
 import { calc, finalizeForm, summary, type BookingForm } from '../lib/calc';
 import { submitBooking, type BookingLinkInfo } from '../lib/api';
 import { FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
@@ -97,7 +97,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
     }
   };
 
-  const chosenAddons = ADDONS.filter((a) => f.addons.includes(a.id));
+  const chosenAddons = ADDONS.filter((a) => f.addons.includes(a.id) && !addonIncluded(f.pkg, a.id));
 
   return (
     <div>

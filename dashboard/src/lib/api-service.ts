@@ -703,7 +703,7 @@ export interface FaCatalogProduct {
 export interface BookingRecipeSettings {
   config: FaRecipeConfig;
   defaults: FaRecipeConfig;
-  packages: { id: string; name: string; kind: "ceremony" | "full" }[];
+  packages: { id: string; name: string; kind: "ceremony" | "full"; includedAddons?: string[] }[];
   addons: { id: string; label: string; price: number }[];
   products: FaCatalogProduct[];
   remarkTemplates: { id: number; code: string | null; name: string; isDefault: boolean }[];
@@ -734,7 +734,7 @@ export interface PricingConfig {
 export interface BookingPricingSettings {
   pricing: PricingConfig;
   defaults: PricingConfig;
-  packages: { id: string; name: string; kind: "ceremony" | "full" }[];
+  packages: { id: string; name: string; kind: "ceremony" | "full"; includedAddons?: string[] }[];
   addons: { id: string; label: string; code: string | null }[];
   source: "flowaccount" | "cache";
   fetchedAt: string;

@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ADDONS,
+  addonIncluded,
+  stripIncludedAddons,
   DISCOUNTS,
   OCCASIONS,
   PKGS,
@@ -47,6 +49,13 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
 
 
   const tentSuggested = useRef(false);
+
+  // PRIME already includes the drape: drop it from the picks whenever the package changes
+  useEffect(() => {
+    const clean = stripIncludedAddons(f.pkg, f.addons);
+    if (clean.length !== f.addons.length) setF('addons', clean);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f.pkg]);
   const tentReason = tentRecommendation(f);
 
   const next = async () => {
@@ -585,17 +594,29 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
               <FieldLabel>ออปชั่นเสริม</FieldLabel>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                 {ADDONS.map((a) => {
-                  const on = f.addons.includes(a.id);
+                  // e.g. the drape is part of PRIME: show it greyed out, not selectable, no price
+                  const included = addonIncluded(f.pkg, a.id);
+                  const on = !included && f.addons.includes(a.id);
                   return (
                     <div
                       key={a.id}
-                      onClick={() => setF('addons', on ? f.addons.filter((x) => x !== a.id) : [...f.addons, a.id])}
-                      style={cardStyle(on, { display: 'flex', alignItems: 'center', gap: 13, padding: '14px 16px' })}
+                      onClick={included ? undefined : () => setF('addons', on ? f.addons.filter((x) => x !== a.id) : [...f.addons, a.id])}
+                      aria-disabled={included || undefined}
+                      style={cardStyle(on, {
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 13,
+                        padding: '14px 16px',
+                        ...(included ? { opacity: 0.55, cursor: 'default', background: 'var(--color-neutral-100)' } : {}),
+                      })}
                     >
-                      <div style={checkStyle(on, 'var(--color-accent)')}>{on ? '✓' : ''}</div>
+                      <div style={checkStyle(on, 'var(--color-accent)')}>{included ? '✓' : on ? '✓' : ''}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)', display: 'flex', alignItems: 'center', gap: 8 }}>
                           {a.label}
+                          {included && (
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--color-neutral-200)', color: 'var(--color-neutral-700)' }}>รวมในแพ็กเกจแล้ว</span>
+                          )}
                           {a.id === 'tent' && tentReason && (
                             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--color-accent-2-500)', color: '#fff' }}>แนะนำ</span>
                           )}
@@ -606,7 +627,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                         )}
                       </div>
                       <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-accent-700)', whiteSpace: 'nowrap' }}>
-                        +{baht(a.price)}
+                        {included ? <span style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>รวมแล้ว</span> : `+${baht(a.price)}`}
                       </div>
                     </div>
                   );

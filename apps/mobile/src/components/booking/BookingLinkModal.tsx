@@ -76,6 +76,14 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
 
   const pkg = packages.find((p) => p.id === preset.packageId);
   const hasFood = pkg?.kind === 'full';
+  // e.g. PRIME already includes the drape — not selectable, and dropped when the package changes
+  const includedAddons = pkg?.includedAddons || [];
+  useEffect(() => {
+    if (preset.addons.some((a) => includedAddons.includes(a))) {
+      set('addons', preset.addons.filter((a) => !includedAddons.includes(a)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset.packageId, packages]);
 
   // Reset per open so a previous customer's link never leaks into the next one
   useEffect(() => {
@@ -352,14 +360,19 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
               <Field label="ออปชั่นเสริม">
                 <View style={styles.rowWrap}>
                   {addons.map((a) => {
-                    const on = preset.addons.includes(a.id);
+                    const included = includedAddons.includes(a.id);
+                    const on = !included && preset.addons.includes(a.id);
                     return (
                       <TouchableOpacity
                         key={a.id}
-                        style={[styles.chip, on && styles.chipActive]}
+                        disabled={included}
+                        style={[styles.chip, on && styles.chipActive, included && styles.chipDisabled]}
                         onPress={() => set('addons', on ? preset.addons.filter((x) => x !== a.id) : [...preset.addons, a.id])}
                       >
-                        <Text style={[styles.chipText, on && styles.chipTextActive]}>{a.label}</Text>
+                        <Text style={[styles.chipText, on && styles.chipTextActive]}>
+                          {a.label}
+                          {included ? ' · รวมในแพ็กเกจแล้ว' : ''}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -581,6 +594,7 @@ const styles = StyleSheet.create({
   chipCompact: { paddingHorizontal: 10, paddingVertical: 5 },
   dayChip: { minWidth: 36, alignItems: 'center' },
   chipActive: { backgroundColor: '#6366f1', borderColor: '#6366f1' },
+  chipDisabled: { opacity: 0.45 },
   chipText: { fontSize: 12, color: '#475569', fontWeight: '500' },
   chipTextActive: { color: '#fff', fontWeight: '700' },
   dateBlock: { gap: 4 },

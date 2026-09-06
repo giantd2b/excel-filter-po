@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LINE_URL, PHONE, pkgById, type Pkg } from './data/packages';
+import { LINE_URL, PHONE, pkgById, stripIncludedAddons, type Pkg } from './data/packages';
 import { initialForm, type BookingForm } from './lib/calc';
 import { getBookingLink, type BookingLinkInfo } from './lib/api';
 import { loadPricing } from './lib/pricing';
@@ -55,7 +55,8 @@ export default function App() {
               tables: p.tables,
               monks: p.monks,
               selfTransport: p.selfTransport,
-              addons: p.addons || [],
+              // PRIME includes the drape — never carry it in from an admin preset
+              addons: stripIncludedAddons(info.packageId && pkgById(info.packageId) ? info.packageId : f.pkg, p.addons || []),
               occasion: p.occasion || f.occasion,
               date: p.eventDate || f.date,
               time: p.timeSlot || f.time,

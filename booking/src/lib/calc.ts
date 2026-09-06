@@ -1,5 +1,6 @@
 import {
   ADDONS,
+  addonIncluded,
   DEPOSIT_RULE,
   DISCOUNTS,
   baht,
@@ -193,7 +194,7 @@ export function calc(f: BookingForm, manualDeposit?: number | null): CalcResult 
   const rows: { k: string; v: string }[] = [{ k: t.label, v: baht(t.base) }];
   let total = t.base;
   for (const a of ADDONS) {
-    if (f.addons.includes(a.id)) {
+    if (f.addons.includes(a.id) && !addonIncluded(f.pkg, a.id)) {
       total += a.price;
       rows.push({ k: a.label, v: '+' + baht(a.price) });
     }

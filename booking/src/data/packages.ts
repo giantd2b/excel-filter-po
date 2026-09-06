@@ -24,6 +24,8 @@ export interface Pkg {
   buffet?: TierConfig;
   table?: TierConfig;
   features: [string, string][];
+  /** add-on ids already covered by the package (shown as "รวมในแพ็กเกจแล้ว", never charged) */
+  includedAddons?: string[];
 }
 
 const IMG = (f: string) => `${import.meta.env.BASE_URL}img/${f}`;
@@ -59,6 +61,7 @@ export const PKGS: Pkg[] = [
     short: 'PRIME',
     kind: 'ceremony',
     base: 19990,
+    includedAddons: ['drape'],
     badge: 'ยอดนิยม',
     img: IMG('ceremony-prime.jpg'),
     tagline: 'อุปกรณ์และสังฆทานระดับพรีเมี่ยม พร้อมม่าน-ฉากโยงผ้าประดับ',
@@ -145,6 +148,7 @@ export const PKGS: Pkg[] = [
     name: 'PRIME ครบวงจร',
     short: 'PRIME',
     kind: 'full',
+    includedAddons: ['drape'],
     badge: 'ครบที่สุด',
     img: IMG('prime.jpg'),
     tagline: 'อุปกรณ์พรีเมี่ยมเลือกแบบได้ เลือกอาหารบุฟเฟต์ได้ 6 อย่าง พร้อมที่ปรึกษา VIP',
@@ -343,6 +347,16 @@ export function applyPricing(payload: PricingPayload) {
 
 export function pkgById(id: string): Pkg {
   return PKGS.find((p) => p.id === id) || PKGS[1];
+}
+
+/** true when the package already covers this add-on (e.g. PRIME includes the drape) */
+export function addonIncluded(pkgId: string, addonId: string): boolean {
+  return (pkgById(pkgId).includedAddons || []).includes(addonId);
+}
+
+/** drop add-ons the package already includes — used when the package changes or a preset arrives */
+export function stripIncludedAddons(pkgId: string, addons: string[]): string[] {
+  return addons.filter((a) => !addonIncluded(pkgId, a));
 }
 
 // Comparison rows for the package-pick step: price rows + every feature
