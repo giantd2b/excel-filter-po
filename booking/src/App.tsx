@@ -185,6 +185,12 @@ export default function App() {
             setScreen('detail');
             window.scrollTo(0, 0);
           }}
+          onBookPkg={(p: Pkg) => {
+            setPkgId(p.id);
+            setForm(formForPackage(form, p.id));
+            setScreen('book');
+            window.scrollTo(0, 0);
+          }}
         />
       )}
 

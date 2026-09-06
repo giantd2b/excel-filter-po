@@ -44,7 +44,16 @@ interface Props {
   onLineChange: (line: PkgLine) => void;
   onStartBooking: () => void;
   onOpenPkg: (p: Pkg) => void;
+  /** start the wizard with this package already chosen */
+  onBookPkg: (p: Pkg) => void;
 }
+
+/** card button label — the detail page is where the menu lives for catering */
+const CTA_DETAIL: Record<PkgLine, string> = {
+  merit: 'ดูรายละเอียดแพ็กเกจ',
+  buffet: 'ดูเมนูทั้งหมด 100+ รายการ',
+  chinese: 'ดูเมนูทุกจาน',
+};
 
 const LINE_INTRO: Record<PkgLine, { title: string; sub: string }> = {
   merit: { title: 'แพ็กเกจงานบุญ', sub: 'แตะที่การ์ดเพื่อดูสิ่งที่ได้ในแพ็กเกจทั้งหมด' },
@@ -52,7 +61,7 @@ const LINE_INTRO: Record<PkgLine, { title: string; sub: string }> = {
   chinese: { title: 'โต๊ะจีน', sub: 'คิดราคาต่อโต๊ะ 8 ท่าน เลือกได้จานละ 1 เมนู ขั้นต่ำ 10 โต๊ะ · แตะดูเมนูแต่ละจาน' },
 };
 
-export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: Props) {
+export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, onBookPkg }: Props) {
   const [openFaq, setOpenFaq] = useState(-1);
   const shown = PKGS.filter((p) => p.line === line);
 
@@ -321,6 +330,50 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
                       </span>
                       <span style={{ fontSize: 13, color: 'var(--color-neutral-700)' }}>{unit.suffix}</span>
                     </div>
+                  </div>
+                </div>
+                {/* call to action: see the menu / details, or jump straight to a quote for this package */}
+                <div style={{ display: 'flex', gap: 8, padding: '0 14px 14px' }}>
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenPkg(p);
+                    }}
+                    className="hoverable"
+                    style={{
+                      flex: 1.3,
+                      padding: '11px 12px',
+                      borderRadius: 999,
+                      border: '1.5px solid var(--color-accent-400)',
+                      color: 'var(--color-accent-700)',
+                      textAlign: 'center',
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {CTA_DETAIL[p.line]}
+                  </div>
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onBookPkg(p);
+                    }}
+                    className="hoverable"
+                    style={{
+                      flex: 1,
+                      padding: '11px 12px',
+                      borderRadius: 999,
+                      background: 'var(--color-accent)',
+                      color: 'var(--color-on-accent)',
+                      textAlign: 'center',
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: 'var(--shadow-sm)',
+                    }}
+                  >
+                    ขอใบเสนอราคา
                   </div>
                 </div>
               </div>
