@@ -21,6 +21,7 @@ import {
   estimateBooking,
   getBookingPricing,
   sendChatMessage,
+  sendBookingMenuToChat,
   cleanPreset,
   apiErrorMessage,
   type BookingEstimate,
@@ -77,12 +78,20 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [depositText, setDepositText] = useState('');
+  // also push the package menu posters before the link text (packages with a menu only)
+  const [attachMenu, setAttachMenu] = useState(false);
 
   const pkg = packages.find((p) => p.id === preset.packageId);
   const hasFood = pkg?.kind === 'full';
   const isCatering = pkg?.kind === 'catering';
   const line = pkg?.line || 'merit';
   const includedAddons = pkg?.includedAddons || [];
+  // the package whose menu would be attached: the preset package, or the fixed package in free mode
+  const menuPkg = mode === 'preset' ? pkg : packages.find((p) => p.id === freePackageId);
+  const menuParts = menuPkg?.menuParts || [];
+  const menuPart: 'buffet' | 'table' | 'all' =
+    menuParts.length > 1 ? (mode === 'preset' ? (preset.foodMode === 'table' ? 'table' : 'buffet') : 'all') : 'all';
+  const menuPartLabel = menuPart === 'table' ? 'โต๊ะจีน' : menuPart === 'buffet' ? 'บุฟเฟต์' : 'บุฟเฟต์ + โต๊ะจีน';
   // add-ons the selected package can be sold with (its line's, minus the ones it already includes)
   const lineAddons = addons.filter((a) => (!a.lines || a.lines.includes(line)) && !includedAddons.includes(a.id));
   // keep the preset consistent with the package (PRIME's drape, other lines' add-ons, no monks for catering …)
@@ -98,6 +107,7 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
     setPreset(DEFAULT_PRESET);
     setDepositText('');
     setFreePackageId('');
+    setAttachMenu(false);
     setLink(null);
     setError(null);
     setSent(false);
@@ -187,15 +197,28 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
   const sendToChat = async () => {
     if (!link || !customer.oduserId) return;
     const text = buildLinkChatText(link, mode, pkg);
+    setSending(true);
+    setError(null);
+    try {
+      // the menu posters go first so the link lands last in the chat
+      if (attachMenu && menuPkg && menuParts.length) {
+        await sendBookingMenuToChat({ customerId: customer.id, packageId: menuPkg.id, part: menuPart, withLink: false });
+      }
+    } catch (e: any) {
+      setSending(false);
+      const msg = apiErrorMessage(e, 'ส่งรูปเมนูไม่สำเร็จ');
+      setError(msg);
+      Alert.alert('ส่งไม่สำเร็จ', msg);
+      return;
+    }
     if (onSend) {
       onSend(text);
+      setSending(false);
       setSent(true);
       onSent?.();
       onClose();
       return;
     }
-    setSending(true);
-    setError(null);
     try {
       await sendChatMessage({ oduserId: customer.oduserId, docId: customer.id, text, channel: customer.channel });
       setSent(true);
@@ -566,6 +589,18 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                   `จองผ่านลิงก์นี้ ${link.bookingCount ?? 0} รายการ`,
                 ].filter(Boolean).join('  ·  ')}
               </Text>
+            </View>
+          ) : null}
+
+          {menuParts.length > 0 ? (
+            <View style={styles.switchRow}>
+              <Text style={[styles.switchLabel, { flex: 1 }]}>ส่งรูปเมนูอาหาร ({menuPartLabel}) ก่อนลิงก์จองด้วย</Text>
+              <Switch
+                value={attachMenu}
+                onValueChange={setAttachMenu}
+                trackColor={{ true: '#a7f3d0', false: '#e2e8f0' }}
+                thumbColor={attachMenu ? '#059669' : '#fff'}
+              />
             </View>
           ) : null}
 

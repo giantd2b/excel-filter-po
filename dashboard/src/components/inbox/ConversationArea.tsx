@@ -17,10 +17,12 @@ import {
   ChevronUp,
   Briefcase,
   Link2,
+  UtensilsCrossed,
 } from "lucide-react";
 import { setCustomerStatus } from "@/lib/api-service";
 import CreateJobModal from "./CreateJobModal";
 import BookingLinkModal from "./BookingLinkModal";
+import SendMenuModal from "./SendMenuModal";
 
 interface ConversationAreaProps {
   selectedUser: ChatUser | null;
@@ -37,6 +39,7 @@ export function ConversationArea({
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showCreateJob, setShowCreateJob] = useState(false);
   const [showBookingLink, setShowBookingLink] = useState(false);
+  const [showSendMenu, setShowSendMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
@@ -257,6 +260,14 @@ export function ConversationArea({
             ลิงก์จอง
           </button>
           <button
+            onClick={() => setShowSendMenu(true)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 transition-all duration-150"
+            title="ส่งรูปเมนูอาหารของแพ็กเกจเข้าแชต พร้อมราคาและลิงก์หน้าแพ็กเกจ"
+          >
+            <UtensilsCrossed className="w-3 h-3" />
+            ส่งเมนู
+          </button>
+          <button
             onClick={() => {
               setCustomerStatus(selectedUser.id, "FOLLOW_UP");
               onMessageSent();
@@ -402,6 +413,18 @@ export function ConversationArea({
             displayName: selectedUser.displayName,
           }}
           onClose={() => setShowBookingLink(false)}
+          onSent={onMessageSent}
+        />
+      )}
+      {showSendMenu && (
+        <SendMenuModal
+          customer={{
+            id: selectedUser.id,
+            oduserId: selectedUser.oduserId,
+            channel: selectedUser.channel,
+            displayName: selectedUser.displayName,
+          }}
+          onClose={() => setShowSendMenu(false)}
           onSent={onMessageSent}
         />
       )}

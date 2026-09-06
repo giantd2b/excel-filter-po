@@ -141,6 +141,8 @@ export interface PricingPackage {
   courses?: number | null;
   /** add-on ids the package already covers (PRIME → drape); the API sends this, fallbacks mirror it */
   includedAddons?: string[];
+  /** menu posters available to push into a chat ('buffet' pages / 'table' poster); empty = no menu */
+  menuParts?: MenuPart[];
 }
 
 export interface PricingAddon {
@@ -348,4 +350,38 @@ export async function refreshBookingPricing(): Promise<PricingSettings> {
 
 export async function sendChatMessage(body: { oduserId: string; docId: string; text: string; channel: string }) {
   await api.post('/messages/send', body, { timeout: 15000 });
+}
+
+// ── ส่งเมนูเข้าแชต: menu posters + caption pushed by the API (one message per poster) ──
+
+export type MenuPart = 'buffet' | 'table';
+export type MenuPartChoice = MenuPart | 'all';
+
+export interface MenuPreview {
+  packageId: string;
+  packageName: string;
+  part: MenuPartChoice;
+  parts: MenuPart[];
+  images: string[];
+  text: string;
+  detailUrl: string;
+}
+
+export async function getBookingMenuPreview(packageId: string, part: MenuPartChoice = 'all', withLink = true): Promise<MenuPreview> {
+  const { data } = await api.get(`/bookings/menu/${encodeURIComponent(packageId)}`, {
+    params: { part, withLink: withLink ? '1' : '0' },
+  });
+  return data;
+}
+
+export async function sendBookingMenuToChat(body: {
+  customerId: string;
+  packageId: string;
+  part?: MenuPartChoice;
+  withLink?: boolean;
+  text?: string;
+}): Promise<{ sent: boolean; images: number; messageIds: string[] }> {
+  // 7 pushes in sequence on the server can take a while on a slow LINE/FB round-trip
+  const { data } = await api.post('/bookings/menu/send', body, { timeout: 60000 });
+  return data;
 }

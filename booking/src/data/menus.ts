@@ -313,7 +313,11 @@ const IMG = (f: string) => `${import.meta.env.BASE_URL}img/${f}`;
 const BUFFET_STANDARD_PAGES = [1, 2, 3, 4, 5, 6].map((n) => IMG(`menu-buffet-standard-${n}.jpg`));
 const BUFFET_PREMIUM_PAGES = [1, 2, 3, 4, 5, 6].map((n) => IMG(`menu-buffet-premium-${n}.jpg`));
 
-/** poster pages of the menu (photos + dish names) shown as a swipeable gallery on the detail page */
+/**
+ * poster pages of the menu (photos + dish names) shown as a swipeable gallery on the detail page.
+ * The CRM pushes the same files into chats (ส่งเมนู) from apps/api/src/modules/bookings/menu-assets.ts —
+ * keep MENU_IMAGES / MERIT_MENU_IMAGES and MENU_ASSETS there in sync.
+ */
 export const MENU_IMAGES: Record<string, string[]> = {
   'buffet-standard': BUFFET_STANDARD_PAGES,
   'buffet-premium': BUFFET_PREMIUM_PAGES,

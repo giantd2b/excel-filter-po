@@ -23,6 +23,7 @@ import {
   type CrmQuotation,
 } from "@/lib/api-service";
 import BookingLinkModal from "./BookingLinkModal";
+import SendMenuModal from "./SendMenuModal";
 import AttachQuotationModal from "./AttachQuotationModal";
 import { faStatusLabel, faStatusStyle } from "@/lib/faStatus";
 import { useAuth } from "@/context/AuthContext";
@@ -101,6 +102,7 @@ export function CustomerInfoPanel({
   const [bookings, setBookings] = useState<MeritBooking[]>([]);
   const [bookingLinks, setBookingLinks] = useState<BookingLink[]>([]);
   const [showBookingLink, setShowBookingLink] = useState(false);
+  const [showSendMenu, setShowSendMenu] = useState(false);
   const [quotations, setQuotations] = useState<CrmQuotation[]>([]);
   const [quotationsLoading, setQuotationsLoading] = useState(false);
   const [showAttachQuote, setShowAttachQuote] = useState(false);
@@ -730,12 +732,21 @@ export function CustomerInfoPanel({
               <span className="text-[9px] text-violet-500 font-semibold ml-1">{bookings.length}</span>
             )}
           </div>
-          <button
-            onClick={() => setShowBookingLink(true)}
-            className="text-[10px] font-medium text-violet-600 hover:text-violet-800"
-          >
-            + สร้างลิงก์จอง
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setShowSendMenu(true)}
+              className="text-[10px] font-medium text-emerald-600 hover:text-emerald-800"
+              title="ส่งรูปเมนูอาหารของแพ็กเกจเข้าแชต"
+            >
+              ส่งเมนู
+            </button>
+            <button
+              onClick={() => setShowBookingLink(true)}
+              className="text-[10px] font-medium text-violet-600 hover:text-violet-800"
+            >
+              + สร้างลิงก์จอง
+            </button>
+          </div>
         </div>
         {bookings.length === 0 ? (
           <p className="text-[11px] text-slate-400">ยังไม่มีการจอง — ส่งลิงก์จองให้ลูกค้าเพื่อผูกการจองกับแชตนี้</p>
@@ -805,6 +816,18 @@ export function CustomerInfoPanel({
           </div>
         )}
       </div>
+      {showSendMenu && details && userId && (
+        <SendMenuModal
+          customer={{
+            id: userId,
+            oduserId: details.oduserId || details.platformUserId,
+            channel: details.channel,
+            displayName: details.nickname || details.displayName || "",
+          }}
+          defaultPackageId={bookings[0]?.packageId || bookingLinks[0]?.packageId || null}
+          onClose={() => setShowSendMenu(false)}
+        />
+      )}
       {showBookingLink && details && userId && (
         <BookingLinkModal
           customer={{

@@ -24,6 +24,7 @@ import api from '../services/api';
 import ChatBubble from '../components/ChatBubble';
 import ChatInputBar from '../components/ChatInputBar';
 import BookingLinkModal from '../components/booking/BookingLinkModal';
+import SendMenuModal from '../components/booking/SendMenuModal';
 import { useMessages, type Message } from '../hooks/useMessages';
 
 const STICKER_PACKS = [
@@ -85,6 +86,7 @@ export default function ChatScreen({ route }: any) {
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
   const [showBookingLink, setShowBookingLink] = useState(false);
+  const [showSendMenu, setShowSendMenu] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [pendingImages, setPendingImages] = useState<{
@@ -834,6 +836,19 @@ export default function ChatScreen({ route }: any) {
               </View>
               <Text style={styles.helperLabel}>ลิงก์จอง</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.helperItem}
+              onPress={() => {
+                setShowHelper(false);
+                setShowSendMenu(true);
+              }}
+            >
+              <View style={[styles.helperIcon, { backgroundColor: '#ecfdf5' }]}>
+                <Text style={styles.helperIconText}>🍽️</Text>
+              </View>
+              <Text style={styles.helperLabel}>ส่งเมนู</Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -843,6 +858,13 @@ export default function ChatScreen({ route }: any) {
         customer={{ id: docId, oduserId: userId, channel, displayName }}
         onSend={(text) => handleSend(text)}
         onClose={() => setShowBookingLink(false)}
+      />
+
+      <SendMenuModal
+        visible={showSendMenu}
+        customer={{ id: docId, oduserId: userId, channel, displayName }}
+        onSent={() => refresh()}
+        onClose={() => setShowSendMenu(false)}
       />
 
       {/* Sticker picker */}

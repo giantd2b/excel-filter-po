@@ -43,6 +43,7 @@ import { MessagesService } from '../messages/messages.service';
 import { sendNewBookingAlert } from './booking-alert';
 import { channelLabel } from '../../common/utils/channel-label';
 import { composeQuotationChatMessage } from '../quotations/quotation-chat';
+import { MenuPartChoice, composeMenuChatMessage, menuImageUrls, menuParts, menuPriceLine, packageDetailUrl, storefrontPath } from './menu-assets';
 
 /** "2026-09-30" → "พ. 30 ก.ย. 2569" without going through Date timezone maths. */
 function fmtThaiDate(iso: string): string {
@@ -137,6 +138,7 @@ export class BookingsService {
         minCount: p.minCount ?? null,
         courses: p.courses ?? null,
         includedAddons: p.includedAddons || [],
+        menuParts: menuParts(p.id),
       })),
       addons: BOOKING_ADDONS.map((a) => ({ id: a.id, label: a.label, price: a.price, perUnit: a.perUnit ?? null, lines: a.lines, code: config.addons[a.id] || null })),
       source: cat.source,
@@ -568,9 +570,7 @@ export class BookingsService {
   /** storefront by the link's package line: /booking (งานบุญ), /buffet, /chinese */
   private bookingPublicUrl(token: string, packageId?: string | null) {
     const base = (process.env.BOOKING_PUBLIC_URL || 'https://crm.iristermboon.com').replace(/\/$/, '');
-    const line = packageId ? packageById(packageId)?.line : undefined;
-    const path = line === 'buffet' ? 'buffet' : line === 'chinese' ? 'chinese' : 'booking';
-    return `${base}/${path}/?ref=${token}`;
+    return `${base}/${storefrontPath(packageId)}/?ref=${token}`;
   }
 
   private shapeLink(
@@ -772,6 +772,60 @@ export class BookingsService {
       data: { quotationSentAt: sentAt, quotationMessageId: res.messageId },
     });
     return { sent: true, messageId: res.messageId, sentAt, reused: false };
+  }
+
+  // ── ส่งเมนูเข้าแชต: menu posters + caption pushed into the customer's chat ──
+
+  private resolveMenu(packageId: string, part: MenuPartChoice) {
+    const pkg = packageById(packageId);
+    if (!pkg) throw new NotFoundException('ไม่พบแพ็กเกจ');
+    const parts = menuParts(packageId);
+    if (!parts.length) throw new BadRequestException('แพ็กเกจนี้ไม่มีเมนูอาหาร');
+    const chosen: MenuPartChoice = part === 'all' || parts.includes(part) ? part : parts[0];
+    return { pkg, parts, part: chosen, images: menuImageUrls(packageId, chosen) };
+  }
+
+  /** What the send-menu dialog shows before sending: image URLs, default caption, parts available. */
+  async menuPreview(packageId: string, part: MenuPartChoice = 'all', withLink = true) {
+    const { pkg, parts, part: chosen, images } = this.resolveMenu(packageId, part);
+    const pricing = await this.getPricing().catch(() => null);
+    const detailUrl = packageDetailUrl(packageId);
+    const text = composeMenuChatMessage({
+      pkg,
+      part: chosen,
+      priceLine: menuPriceLine(pkg, chosen, pricing?.packages?.[packageId]),
+      detailUrl: withLink ? detailUrl : null,
+    });
+    return { packageId, packageName: pkg.name, part: chosen, parts, images, text, detailUrl };
+  }
+
+  /**
+   * Push every poster of the menu as an image message, then the caption last (so the conversation
+   * preview shows the text). One sendMessage per image — LINE/FB take one media per message.
+   */
+  async sendMenuToChat(
+    dto: { customerId: string; packageId: string; part?: MenuPartChoice; withLink?: boolean; text?: string },
+    admin: { id?: string; name?: string },
+  ) {
+    const c = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
+    if (!c) throw new NotFoundException('ไม่พบลูกค้าในแชต');
+    const preview = await this.menuPreview(dto.packageId, dto.part || 'all', dto.withLink !== false);
+    const text = (dto.text || '').trim() || preview.text;
+    const common = {
+      oduserId: c.platformUserId,
+      docId: c.id,
+      channel: c.channel,
+      adminId: admin.id,
+      adminName: admin.name || 'IRIS CRM',
+    };
+    const messageIds: string[] = [];
+    for (const url of preview.images) {
+      const r = await this.messages.sendMessage({ ...common, mediaType: 'image', mediaUrl: url, previewUrl: url });
+      messageIds.push(r.messageId);
+    }
+    const r = await this.messages.sendMessage({ ...common, text });
+    messageIds.push(r.messageId);
+    return { sent: true, images: preview.images.length, messageIds };
   }
 
   /**

@@ -5,6 +5,7 @@ import {
   createBookingLink,
   estimateBooking,
   getBookingPricing,
+  sendBookingMenuToChat,
   sendMessage,
   type BookingLink,
   type BookingPreset,
@@ -93,11 +94,17 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  // also push the package menu posters before the link text (packages with a menu only)
+  const [attachMenu, setAttachMenu] = useState(false);
 
   const pkg = packages.find((p) => p.id === preset.packageId);
   const hasFood = pkg?.kind === "full";
   const isCatering = pkg?.kind === "catering";
   const line: BookingPackageLine = pkg?.line || "merit";
+  // the package whose menu would be attached: the preset package, or the fixed package in free mode
+  const menuPkg = mode === "preset" ? pkg : packages.find((p) => p.id === freePackageId);
+  const menuParts = menuPkg?.menuParts || [];
+  const menuPart = menuParts.length > 1 ? (mode === "preset" ? (preset.foodMode === "table" ? "table" : "buffet") : "all") : "all";
   const includedAddons = pkg?.includedAddons || [];
   // add-ons the selected package can be sold with (its line's, minus the ones it already includes)
   const lineAddons = addons.filter((a) => (!a.lines || a.lines.includes(line)) && !includedAddons.includes(a.id));
@@ -233,6 +240,9 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
     setSending(true);
     setError(null);
     try {
+      if (attachMenu && menuPkg && menuParts.length) {
+        await sendBookingMenuToChat({ customerId: customer.id, packageId: menuPkg.id, part: menuPart, withLink: false });
+      }
       await sendMessage({ oduserId: customer.oduserId, docId: customer.id, text: chatText(), channel: customer.channel });
       setSent(true);
       onSent?.();
@@ -528,6 +538,12 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
           </div>
         ) : null}
 
+        {menuParts.length > 0 && (
+          <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+            <input type="checkbox" checked={attachMenu} onChange={(e) => setAttachMenu(e.target.checked)} className="rounded border-slate-300" />
+            ส่งรูปเมนูอาหาร{menuParts.length > 1 ? ` (${menuPart === "table" ? "โต๊ะจีน" : menuPart === "buffet" ? "บุฟเฟต์" : "บุฟเฟต์ + โต๊ะจีน"})` : ""}ก่อนลิงก์จองด้วย
+          </label>
+        )}
         {error && <div className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</div>}
 
         <div className="flex items-center justify-between gap-2 pt-1">

@@ -14,7 +14,7 @@ import {
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
-import { BookingPresetDto, CreateBookingLinkDto } from './dto/booking-preset.dto';
+import { BookingPresetDto, CreateBookingLinkDto, SendMenuDto } from './dto/booking-preset.dto';
 import { FirebaseAuthGuard } from '../../common/guards/auth.guard';
 
 @Controller('bookings')
@@ -77,6 +77,28 @@ export class BookingsController {
   @Get('by-customer/:customerId')
   async byCustomer(@Param('customerId') customerId: string) {
     return this.bookingsService.listForCustomer(customerId);
+  }
+
+  /** Menu posters + default caption for a package, previewed before pushing into a chat. */
+  @UseGuards(FirebaseAuthGuard)
+  @Get('menu/:packageId')
+  async menuPreview(
+    @Param('packageId') packageId: string,
+    @Query('part') part?: string,
+    @Query('withLink') withLink?: string,
+  ) {
+    const p = part === 'buffet' || part === 'table' ? part : 'all';
+    return this.bookingsService.menuPreview(packageId, p, withLink !== 'false' && withLink !== '0');
+  }
+
+  /** Push the menu posters (then the caption) into the customer's LINE/Facebook chat. */
+  @UseGuards(FirebaseAuthGuard)
+  @Post('menu/send')
+  async sendMenu(@Body() dto: SendMenuDto, @Req() req: any) {
+    return this.bookingsService.sendMenuToChat(dto, {
+      id: req.admin?.id || req.user?.uid,
+      name: req.admin?.name || req.user?.name || req.admin?.email || req.user?.email,
+    });
   }
 
   /** Public: package prices for the /booking page, derived from the flowaccount-app catalog (no auth). */

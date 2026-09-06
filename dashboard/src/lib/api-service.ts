@@ -611,6 +611,21 @@ export interface BookingPackageInfo {
   minCount?: number | null;
   courses?: number | null;
   includedAddons?: string[];
+  /** menu posters available to push into a chat ('buffet' pages / 'table' poster); empty = no menu */
+  menuParts?: BookingMenuPart[];
+}
+
+export type BookingMenuPart = "buffet" | "table";
+export type BookingMenuPartChoice = BookingMenuPart | "all";
+
+export interface BookingMenuPreview {
+  packageId: string;
+  packageName: string;
+  part: BookingMenuPartChoice;
+  parts: BookingMenuPart[];
+  images: string[];
+  text: string;
+  detailUrl: string;
 }
 
 export interface BookingAddonInfo {
@@ -885,6 +900,23 @@ export async function createBookingLink(
   opts: { packageId?: string; preset?: BookingPreset } = {},
 ) {
   return api.post<BookingLink>("/bookings/link", { customerId, ...opts });
+}
+
+/** Menu posters + default caption for a package (what "ส่งเมนู" will push). */
+export async function getBookingMenuPreview(packageId: string, part: BookingMenuPartChoice = "all", withLink = true) {
+  const q = new URLSearchParams({ part, withLink: withLink ? "1" : "0" });
+  return api.get<BookingMenuPreview>(`/bookings/menu/${encodeURIComponent(packageId)}?${q.toString()}`);
+}
+
+/** Push the menu posters (then the caption) into the customer's LINE/Facebook chat. */
+export async function sendBookingMenuToChat(body: {
+  customerId: string;
+  packageId: string;
+  part?: BookingMenuPartChoice;
+  withLink?: boolean;
+  text?: string;
+}) {
+  return api.post<{ sent: boolean; images: number; messageIds: string[] }>("/bookings/menu/send", body);
 }
 
 export async function sendBookingQuotationToChat(id: string) {

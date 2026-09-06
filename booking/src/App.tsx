@@ -46,6 +46,16 @@ export default function App() {
   // /booking/?ref=<token>: a link sales created for one chat customer. Prefill what we know and
   // send the token back on submit so the booking is attributed to that customer/channel/sales.
   const [linkRef] = useState(() => new URLSearchParams(window.location.search).get('ref'));
+  // /buffet/?pkg=buffet-premium: the link in a "ส่งเมนู" chat message — open the package detail page
+  // straight away (findPkg: an id this bundle doesn't know just lands on home)
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('pkg');
+    const p = id ? findPkg(id) : undefined;
+    if (!p) return;
+    setPkgId(p.id);
+    if (isSiteLine(p.line)) setHomeLine(p.line);
+    setScreen('detail');
+  }, []);
   const [linkInfo, setLinkInfo] = useState<BookingLinkInfo | null>(null);
   useEffect(() => {
     if (!linkRef) return;

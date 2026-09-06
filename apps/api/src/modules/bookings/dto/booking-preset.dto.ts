@@ -114,3 +114,29 @@ export class CreateBookingLinkDto {
   @Type(() => BookingPresetDto)
   preset?: BookingPresetDto;
 }
+
+/** POST /bookings/menu/send — push a package's menu posters (+ caption) into the customer's chat */
+export class SendMenuDto {
+  @IsString()
+  @MaxLength(200)
+  customerId: string;
+
+  @IsString()
+  @MaxLength(50)
+  packageId: string;
+
+  @IsOptional()
+  @IsIn(['buffet', 'table', 'all'])
+  part?: 'buffet' | 'table' | 'all';
+
+  /** append the storefront detail link to the caption (default true) */
+  @IsOptional()
+  @IsBoolean()
+  withLink?: boolean;
+
+  /** caption edited by sales; empty/absent = the composed default */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  text?: string;
+}
