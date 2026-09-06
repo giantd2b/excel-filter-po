@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FAQS, LINES, PKGS, PROVINCES, REVIEWS, baht, priceUnitLabel, startPrice, type Pkg, type PkgLine } from '../data/packages';
+import { FAQS, LINES, PKGS, PROVINCES, baht, priceUnitLabel, startPrice, type Pkg, type PkgLine } from '../data/packages';
 import { BRAND, SITE_FAMILY, SITE_LINES } from '../lib/site';
 import { SectionTitle, charm } from '../ui';
 
@@ -339,11 +339,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
       >
         <SectionTitle style={{ margin: '0 0 18px' }}>ขอใบเสนอราคาง่าย ๆ 3 ขั้นตอน</SectionTitle>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {[
-            ['เลือกแพ็กเกจและกรอกรายละเอียด', 'วันจัดงาน จำนวนแขก จำนวนพระ และสถานที่'],
-            ['ทีมงานยืนยันทาง LINE', 'ตรวจสอบคิววันงาน สรุปราคาสุทธิ และนัดสำรวจหน้างาน'],
-            ['ทีมงานจัดเตรียมและดูแลหน้างาน', 'เข้าจัดเตรียมก่อน 1 วัน นิมนต์และรับ-ส่งพระ ดูแลจนจบพิธี'],
-          ].map(([title, sub], i) => (
+          {BRAND.steps.map(([title, sub], i) => (
             <div key={title} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
               <div
                 style={{
@@ -386,7 +382,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: 
       <div style={{ background: 'var(--color-surface)', padding: '8px 20px 30px' }}>
         <SectionTitle style={{ margin: '0 0 14px' }}>ลูกค้าพูดถึงเรา</SectionTitle>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {REVIEWS.map((r) => (
+          {BRAND.reviews.map((r) => (
             <div
               key={r.who}
               style={{

@@ -44,10 +44,34 @@ export interface Brand {
   heroSub: string;
   stats: [string, string][];
   work: { file: string; label: string }[];
+  /** "ขอใบเสนอราคาง่าย ๆ 3 ขั้นตอน" — [title, detail] */
+  steps: [string, string][];
+  reviews: { stars: string; text: string; who: string }[];
   /** default package when the wizard is entered without picking one */
   defaultPkg: string;
   defaultLine: PkgLine;
 }
+
+const MERIT_STEPS: [string, string][] = [
+  ['เลือกแพ็กเกจและกรอกรายละเอียด', 'วันจัดงาน จำนวนแขก จำนวนพระ และสถานที่'],
+  ['ทีมงานยืนยันทาง LINE', 'ตรวจสอบคิววันงาน สรุปราคาสุทธิ และนัดสำรวจหน้างาน'],
+  ['ทีมงานจัดเตรียมและดูแลหน้างาน', 'เข้าจัดเตรียมก่อน 1 วัน นิมนต์และรับ-ส่งพระ ดูแลจนจบพิธี'],
+];
+const CATERING_STEPS: [string, string][] = [
+  ['เลือกแพ็กเกจและกรอกรายละเอียด', 'วันจัดงาน จำนวนแขกหรือโต๊ะ และสถานที่'],
+  ['ทีมงานยืนยันทาง LINE', 'ตรวจสอบคิววันงาน ยืนยันรายการอาหาร สรุปราคาสุทธิ และมัดจำ'],
+  ['ทีมงานจัดเตรียมและดูแลหน้างาน', 'เข้าจัดโต๊ะ-ไลน์อาหารก่อนเวลา ทำสดหน้างาน ดูแลจนจบงาน'],
+];
+const MERIT_REVIEWS = [
+  { stars: '★★★★★', text: 'จัดงานทำบุญขึ้นบ้านใหม่ ทีมงานมาเซ็ตให้ตั้งแต่เย็นวันก่อนงาน เช้ามาทุกอย่างเรียบร้อยมาก ไม่ต้องห่วงอะไรเลย', who: 'คุณอรพรรณ · ชลบุรี' },
+  { stars: '★★★★★', text: 'ทำบุญบริษัท 10 โต๊ะจีน อาหารอร่อย พนักงานสุภาพ พระมาตรงเวลา ประทับใจการดูแลมากค่ะ', who: 'คุณธนกฤต · ระยอง' },
+  { stars: '★★★★★', text: 'ปรึกษาทาง LINE ตอบไว บอกงบมาให้เลือกแพ็กเกจได้เหมาะสม ไม่มีบวกเพิ่มทีหลัง', who: 'คุณสุนีย์ · สมุทรปราการ' },
+];
+const CATERING_REVIEWS = [
+  { stars: '★★★★★', text: 'งานเลี้ยงบริษัท 80 ท่าน บุฟเฟต์ 7 อย่าง อาหารมาเติมตลอด ไลน์อาหารสวย พนักงานเก็บโต๊ะเรียบร้อย', who: 'คุณธนกฤต · ระยอง' },
+  { stars: '★★★★★', text: 'โต๊ะจีน 15 โต๊ะ งานแต่งที่บ้าน เสิร์ฟทันเวลาทุกจาน ปลากะพงสด แขกชมทุกโต๊ะ', who: 'คุณอรพรรณ · ชลบุรี' },
+  { stars: '★★★★★', text: 'ปรึกษาทาง LINE ตอบไว บอกงบมาให้เลือกจำนวนอย่างได้เหมาะสม ไม่มีบวกเพิ่มทีหลัง', who: 'คุณสุนีย์ · สมุทรปราการ' },
+];
 
 const MERIT: Brand = {
   name: 'IRIS เติมบุญ',
@@ -71,6 +95,8 @@ const MERIT: Brand = {
     { file: 'work3.jpg', label: 'รูปอาหารเลี้ยงพระ' },
     { file: 'work4.jpg', label: 'รูปไลน์อาหาร' },
   ],
+  steps: MERIT_STEPS,
+  reviews: MERIT_REVIEWS,
   defaultPkg: 'ceremony-prime',
   defaultLine: 'merit',
 };
@@ -78,6 +104,8 @@ const MERIT: Brand = {
 /** shared IRIS Catering identity; the three catering storefronts only differ in copy and default package */
 const CATERING_BASE = {
   name: 'IRIS Catering',
+  steps: CATERING_STEPS,
+  reviews: CATERING_REVIEWS,
   mark: 'IR',
   lineUrl: 'https://line.me/R/ti/p/@iriscatering',
   lineLabel: 'LINE @Iriscatering',
