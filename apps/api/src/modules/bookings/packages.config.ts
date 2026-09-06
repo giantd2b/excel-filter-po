@@ -3,6 +3,17 @@
 
 export type FoodMode = 'buffet' | 'table';
 
+/**
+ * kind drives pricing: ceremony = flat monk package, full = monk package + guest food tiers,
+ * catering = food only (บุฟเฟต์อาหารไทย per guest × dish count, โต๊ะจีน per table), no monks.
+ * line drives grouping in every UI (tabs on /booking, optgroups in the link modals).
+ */
+export type PackageKind = 'ceremony' | 'full' | 'catering';
+export type PackageLine = 'merit' | 'buffet' | 'chinese';
+export type DishCount = 5 | 6 | 7 | 8;
+export const DISH_COUNTS: DishCount[] = [5, 6, 7, 8];
+export const DEFAULT_DISH_COUNT: DishCount = 6;
+
 export interface TierConfig {
   tiers: [number, number][]; // [minCount, price]
   extra: number; // price per extra unit above tier base
@@ -11,21 +22,32 @@ export interface TierConfig {
 export interface BookingPackage {
   id: string;
   name: string;
-  kind: 'ceremony' | 'full';
+  kind: PackageKind;
+  line: PackageLine;
   base?: number; // ceremony packages: flat price
   buffet?: TierConfig;
   table?: TierConfig;
   /** add-on ids the package already covers — never charged, never on the quotation (booking/src/data/packages.ts mirrors this) */
   includedAddons?: string[];
+  /** catering: what the price is per ('guest' = บุฟเฟต์, 'table' = โต๊ะจีน) and the minimum order */
+  unit?: 'guest' | 'table';
+  minCount?: number;
+  /** catering buffet: price per guest by number of savoury dishes */
+  perHead?: Record<DishCount, number>;
+  /** catering Chinese table: price per table (8 seats) */
+  perTable?: number;
+  /** catering Chinese table: courses served (display) */
+  courses?: number;
 }
 
 export const BOOKING_PACKAGES: BookingPackage[] = [
-  { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)', kind: 'ceremony', base: 14990 },
-  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony', base: 19990, includedAddons: ['drape'] },
+  { id: 'ceremony', name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)', kind: 'ceremony', line: 'merit', base: 14990 },
+  { id: 'ceremony-prime', name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)', kind: 'ceremony', line: 'merit', base: 19990, includedAddons: ['drape'] },
   {
     id: 'full',
     name: 'ครบวงจร',
     kind: 'full',
+    line: 'merit',
     buffet: { tiers: [[20, 19490], [30, 21990], [40, 24490], [50, 27990]], extra: 250 },
     table: { tiers: [[8, 33890], [10, 38490], [20, 63990]], extra: 2300 },
   },
@@ -33,6 +55,7 @@ export const BOOKING_PACKAGES: BookingPackage[] = [
     id: 'full-plus',
     name: 'ครบวงจร พลัส',
     kind: 'full',
+    line: 'merit',
     buffet: { tiers: [[20, 21990], [30, 25490], [40, 28490], [50, 34490]], extra: 350 },
     table: { tiers: [[8, 37790], [10, 42990], [20, 71490]], extra: 2600 },
   },
@@ -40,27 +63,128 @@ export const BOOKING_PACKAGES: BookingPackage[] = [
     id: 'prime',
     name: 'PRIME ครบวงจร',
     kind: 'full',
+    line: 'merit',
     includedAddons: ['drape'],
     buffet: { tiers: [[20, 25990], [30, 29490], [40, 32990], [50, 38990]], extra: 350 },
     table: { tiers: [[8, 42290], [10, 47490], [20, 75990]], extra: 2600 },
   },
+  // ── IRIS Catering (poster prices 2026-09, excl. VAT; drinks not included in โต๊ะจีน) ──
+  { id: 'buffet-standard', name: 'บุฟเฟต์อาหารไทย แพคเกจเริ่มต้น', kind: 'catering', line: 'buffet', unit: 'guest', minCount: 40, perHead: { 5: 250, 6: 280, 7: 310, 8: 340 } },
+  { id: 'buffet-premium', name: 'บุฟเฟต์อาหารไทย แพคเกจพรีเมียม', kind: 'catering', line: 'buffet', unit: 'guest', minCount: 40, perHead: { 5: 350, 6: 385, 7: 420, 8: 455 } },
+  { id: 'chinese-2000', name: 'โต๊ะจีน 2,000 (8 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, perTable: 2000, courses: 8 },
+  { id: 'chinese-2300', name: 'โต๊ะจีน 2,300 (9 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, perTable: 2300, courses: 9 },
+  { id: 'chinese-2600', name: 'โต๊ะจีน 2,600 (10 อย่าง)', kind: 'catering', line: 'chinese', unit: 'table', minCount: 10, perTable: 2600, courses: 10 },
 ];
 
-export const BOOKING_ADDONS: { id: string; label: string; price: number }[] = [
-  { id: 'stage', label: 'เวทีพระ', price: 5000 },
-  { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง', price: 3000 },
-  { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', price: 1000 },
+export interface BookingAddon {
+  id: string;
+  label: string;
+  price: number;
+  /** 'table' = price × tables (เครื่องดื่มโต๊ะจีน); absent = flat, quantity 1 */
+  perUnit?: 'table';
+  /** which package lines offer this add-on */
+  lines: PackageLine[];
+}
+
+export const BOOKING_ADDONS: BookingAddon[] = [
+  { id: 'stage', label: 'เวทีพระ', price: 5000, lines: ['merit'] },
+  { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง', price: 3000, lines: ['merit'] },
+  { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', price: 1000, lines: ['merit'] },
+  { id: 'drinks', label: 'เครื่องดื่ม', price: 250, perUnit: 'table', lines: ['chinese'] },
 ];
+
+export function packageById(id: string): BookingPackage | undefined {
+  return BOOKING_PACKAGES.find((p) => p.id === id);
+}
 
 /** true when the package already covers the add-on (PRIME includes the drape) */
 export function addonIncludedIn(packageId: string, addonId: string): boolean {
-  const pkg = BOOKING_PACKAGES.find((p) => p.id === packageId);
-  return !!pkg?.includedAddons?.includes(addonId);
+  return !!packageById(packageId)?.includedAddons?.includes(addonId);
 }
 
-/** drop add-ons the package already includes — applied to every incoming booking/preset before pricing or saving */
-export function stripIncludedAddons(packageId: string, addons: string[] | null | undefined): string[] {
-  return (addons || []).filter((a) => !addonIncludedIn(packageId, a));
+/** add-ons a package can be sold with: offered for its line and not already included */
+export function applicableAddons(packageId: string): BookingAddon[] {
+  const pkg = packageById(packageId);
+  if (!pkg) return [];
+  return BOOKING_ADDONS.filter((a) => a.lines.includes(pkg.line) && !pkg.includedAddons?.includes(a.id));
+}
+
+/** how many units of an add-on a booking buys (drinks are per table) */
+export function addonQuantity(a: BookingAddon, input: { tables: number }): number {
+  return a.perUnit === 'table' ? Math.max(0, Math.round(input.tables || 0)) : 1;
+}
+
+/** keep only add-ons the package can actually be sold with (drops included ones and other lines') */
+export function normalizeAddons(packageId: string, addons: string[] | null | undefined): string[] {
+  const ok = new Set(applicableAddons(packageId).map((a) => a.id));
+  return Array.from(new Set((addons || []).filter((a) => ok.has(a))));
+}
+
+/** @deprecated use normalizeAddons — kept for callers that only need the included-strip */
+export const stripIncludedAddons = normalizeAddons;
+
+/** Everything the pricing / quotation functions need about a booking (DTO, preset or stored row). */
+export interface BookingCalcInput {
+  packageId: string;
+  foodMode: string;
+  guests: number;
+  tables: number;
+  monks: number;
+  /** catering buffet: savoury dishes 5–8; null for everything else */
+  dishCount?: number | null;
+  selfTransport: boolean;
+  addons: string[];
+  /** travel fee of the event venue's district (already resolved) — becomes its own line */
+  travelFee?: number;
+  travelArea?: string;
+}
+
+/**
+ * Make a client-supplied booking consistent with its package before pricing or saving:
+ * catering has no monks/discounts, its foodMode follows the unit, dishCount only exists for buffet.
+ * Add-ons are always reduced to the ones the package can be sold with.
+ */
+export function normalizeBookingInput<T extends BookingCalcInput>(input: T): T {
+  const pkg = packageById(input.packageId);
+  const out: T = { ...input, addons: normalizeAddons(input.packageId, input.addons) };
+  if (pkg?.kind === 'catering') {
+    out.foodMode = pkg.unit === 'table' ? 'table' : 'buffet';
+    out.monks = 0;
+    out.selfTransport = false;
+    out.dishCount = pkg.unit === 'guest' ? Math.min(8, Math.max(5, Math.round(Number(input.dishCount) || DEFAULT_DISH_COUNT))) : null;
+  } else {
+    out.dishCount = null;
+  }
+  return out;
+}
+
+/** Validation the DTOs cannot express (depends on the package): minimum order, monks required for merit packages. */
+export function bookingInputError(input: BookingCalcInput): string | null {
+  const pkg = packageById(input.packageId);
+  if (!pkg) return 'ไม่พบแพ็กเกจที่เลือก';
+  if (pkg.kind === 'catering') {
+    const count = pkg.unit === 'table' ? input.tables : input.guests;
+    const min = pkg.minCount ?? 1;
+    if (count < min) {
+      return pkg.unit === 'table' ? `โต๊ะจีนรับขั้นต่ำ ${min} โต๊ะ` : `บุฟเฟต์อาหารไทยรับขั้นต่ำ ${min} ท่าน`;
+    }
+    return null;
+  }
+  if (!input.monks || input.monks < 1) return 'กรุณาระบุจำนวนพระ';
+  return null;
+}
+
+/** catering unit price (per guest at the chosen dish count, or per table) from live pricing, else package defaults */
+export function cateringUnitPrice(pkg: BookingPackage, pp: PackagePricing | undefined, dishCount?: number | null): number {
+  if (pkg.unit === 'table') return pp?.perTable ?? pkg.perTable ?? 0;
+  const d = String(Math.min(8, Math.max(5, Math.round(Number(dishCount) || DEFAULT_DISH_COUNT)))) as `${DishCount}`;
+  return pp?.perHead?.[d] ?? pkg.perHead?.[Number(d) as DishCount] ?? 0;
+}
+
+/** e.g. "บุฟเฟต์อาหารไทย แพคเกจพรีเมียม 7 อย่าง × 50 ท่าน (420 บาท/ท่าน)" / "โต๊ะจีน 2,300 (9 อย่าง) × 12 โต๊ะ" */
+export function cateringLineLabel(pkg: BookingPackage, input: BookingCalcInput, unitPrice: number): string {
+  if (pkg.unit === 'table') return `${pkg.name} × ${input.tables} โต๊ะ`;
+  return `${pkg.name} ${input.dishCount ?? DEFAULT_DISH_COUNT} อย่าง × ${input.guests} ท่าน (${unitPrice.toLocaleString('th-TH')} บาท/ท่าน)`;
 }
 
 export const SELF_TRANSPORT_DISCOUNT = 1000;
@@ -135,6 +259,8 @@ export interface PackagePricing {
   base?: number | null; // ceremony packages
   buffet?: TierConfig | null; // full packages
   table?: TierConfig | null;
+  perHead?: Record<string, number> | null; // catering buffet: dish count → price per guest
+  perTable?: number | null; // catering Chinese table
 }
 
 export interface PricingConfig {
@@ -148,7 +274,10 @@ export const PRICING_SETTING_KEY = 'booking_pricing';
 
 export const DEFAULT_PRICING: PricingConfig = {
   packages: Object.fromEntries(
-    BOOKING_PACKAGES.map((p) => [p.id, { base: p.base ?? null, buffet: p.buffet ?? null, table: p.table ?? null }]),
+    BOOKING_PACKAGES.map((p) => [
+      p.id,
+      { base: p.base ?? null, buffet: p.buffet ?? null, table: p.table ?? null, perHead: p.perHead ?? null, perTable: p.perTable ?? null },
+    ]),
   ),
   addons: Object.fromEntries(BOOKING_ADDONS.map((a) => [a.id, a.price])),
   selfTransportDiscount: SELF_TRANSPORT_DISCOUNT,
@@ -176,10 +305,17 @@ export function mergePricing(saved: Partial<PricingConfig> | null | undefined): 
   for (const p of BOOKING_PACKAGES) {
     const d = DEFAULT_PRICING.packages[p.id];
     const s = (saved?.packages?.[p.id] || {}) as Partial<PackagePricing>;
-    packages[p.id] =
-      p.kind === 'ceremony'
-        ? { base: num(s.base, d.base ?? 0), buffet: null, table: null }
-        : { base: null, buffet: tierCfg(s.buffet, d.buffet), table: tierCfg(s.table, d.table) };
+    if (p.kind === 'catering') {
+      const perHead = d.perHead
+        ? Object.fromEntries(DISH_COUNTS.map((n) => [String(n), num((s.perHead as any)?.[n], d.perHead?.[String(n)] ?? 0)]))
+        : null;
+      packages[p.id] = { base: null, buffet: null, table: null, perHead, perTable: d.perTable != null ? num(s.perTable, d.perTable) : null };
+    } else {
+      packages[p.id] =
+        p.kind === 'ceremony'
+          ? { base: num(s.base, d.base ?? 0), buffet: null, table: null }
+          : { base: null, buffet: tierCfg(s.buffet, d.buffet), table: tierCfg(s.table, d.table) };
+    }
   }
   const addons: Record<string, number> = {};
   for (const a of BOOKING_ADDONS) addons[a.id] = num(saved?.addons?.[a.id], DEFAULT_PRICING.addons[a.id]);
@@ -319,7 +455,7 @@ export interface DerivedPricing extends PricingConfig {
   /** product codes referenced by the recipes that are missing from the catalog */
   missingCodes: string[];
   /** which product priced each displayed tier, for the settings UI */
-  usedCodes: Record<string, { buffet: Record<number, string>; table: Record<number, string>; base?: string }>;
+  usedCodes: Record<string, { buffet: Record<number, string>; table: Record<number, string>; base?: string; catering?: string }>;
 }
 
 /**
@@ -361,7 +497,29 @@ export function derivePricing(config: FaRecipeConfig, catalog: FaCatalog): Deriv
       if (monksDiscount === null && p9 !== null && p5 !== null && p9 > p5) monksDiscount = p9 - p5;
     }
 
-    if (pkg.kind === 'ceremony') {
+    if (pkg.kind === 'catering') {
+      // Catering is priced by ONE product: buffet = a PACKAGE with `guests` (+ optional `dishes`) variables,
+      // priced at the minimum order and divided back to a per-guest price; Chinese table = any product,
+      // its price for 1 table. No product mapped → poster defaults.
+      const cp = get(r.cateringCode);
+      let perHead: Record<string, number> | null = d.perHead ?? null;
+      let perTable: number | null = d.perTable ?? null;
+      if (cp) {
+        used.catering = r.cateringCode || undefined;
+        if (pkg.unit === 'table') {
+          perTable = productPrice(cp, { tables: 1 }) ?? perTable;
+        } else if (cp.kind === 'PACKAGE') {
+          const min = pkg.minCount || 1;
+          const derived: Record<string, number> = {};
+          for (const n of DISH_COUNTS) {
+            const total = productPrice(cp, { guests: min, dishes: n });
+            if (total !== null) derived[String(n)] = Math.round(total / min);
+          }
+          if (Object.keys(derived).length === DISH_COUNTS.length) perHead = derived;
+        }
+      }
+      packages[pkg.id] = { base: null, buffet: null, table: null, perHead, perTable };
+    } else if (pkg.kind === 'ceremony') {
       const { code, product } = monkProduct('any', 0);
       const price = productPrice(product, { monks: 9 });
       used.base = code;
@@ -462,6 +620,8 @@ export interface FaRecipe {
   buffetCode?: string | null;
   /** Chinese-table product (simple line, qty = tables) */
   chineseTableCode?: string | null;
+  /** catering packages: the single product that prices the whole line (null = plain text line at the default price) */
+  cateringCode?: string | null;
   /** VAT rate for the document: booking FAQ says packages with guest catering exclude 7% VAT */
   vatRate: 0 | 7;
   /** flowaccount-app remark template code used as the printed หมายเหตุ (null = FA's default template) */
@@ -526,6 +686,12 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
       chineseTableCode: 'CHINESE_TABLE_PRIME_MONK',
       vatRate: 7,
     },
+    // Catering: no flowaccount products yet → plain-text lines at the poster prices until an admin maps cateringCode
+    'buffet-standard': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
+    'buffet-premium': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
+    'chinese-2000': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
+    'chinese-2300': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
+    'chinese-2600': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
   },
   addons: { stage: 'STAGE', tent: 'TENT512', drape: 'DRAPE' },
 };
@@ -591,6 +757,7 @@ export function mergeFaRecipes(saved: Partial<FaRecipeConfig> | null | undefined
       transportCode: (typeof s.transportCode === 'string' && s.transportCode.trim()) || d.transportCode,
       buffetCode: optionalCode(s.buffetCode, d.buffetCode),
       chineseTableCode: optionalCode(s.chineseTableCode, d.chineseTableCode),
+      cateringCode: optionalCode(s.cateringCode, d.cateringCode),
       vatRate: s.vatRate === 0 || s.vatRate === 7 ? s.vatRate : d.vatRate,
       remarkCode: typeof s.remarkCode === 'string' && s.remarkCode.trim() ? s.remarkCode.trim().toUpperCase() : null,
     };
@@ -635,18 +802,7 @@ export function pickRemarkCode(recipe: FaRecipe, mode: 'buffet' | 'table' | 'any
 
 /** Build the quotation lines for a booking. Returns null when the package has no recipe. */
 export function buildFaItems(
-  input: {
-    packageId: string;
-    foodMode: string;
-    guests: number;
-    tables: number;
-    monks: number;
-    selfTransport: boolean;
-    addons: string[];
-    /** travel fee of the event venue's district (already resolved) — becomes its own line */
-    travelFee?: number;
-    travelArea?: string;
-  },
+  input: BookingCalcInput,
   config: FaRecipeConfig = DEFAULT_FA_RECIPES,
   pricing: PricingConfig = DEFAULT_PRICING,
 ): { items: FaItem[]; vatRate: 0 | 7; pkg: BookingPackage } | null {
@@ -664,7 +820,26 @@ export function buildFaItems(
   // Lines that reference a catalog product carry NO unitPrice: flowaccount-app prices them
   // (price table by monks, priceFormula by guests, transport/5-monk discounts). Only the
   // plain-text fallback lines (no product mapped) send a price, taken from the derived pricing.
-  if (pkg.kind === 'ceremony') {
+  if (pkg.kind === 'catering') {
+    const isTable = pkg.unit === 'table';
+    const count = isTable ? input.tables : input.guests;
+    const dishes = input.dishCount ?? DEFAULT_DISH_COUNT;
+    const unitPrice = cateringUnitPrice(pkg, pp, dishes);
+    if (recipe.cateringCode) {
+      items.push(
+        isTable
+          ? { productCode: recipe.cateringCode, quantity: count, unit: 'โต๊ะ' }
+          : { productCode: recipe.cateringCode, quantity: 1, variables: { guests: count, dishes } },
+      );
+    } else {
+      items.push({
+        description: isTable ? pkg.name : `${pkg.name} อาหาร ${dishes} อย่าง`,
+        quantity: count,
+        unit: isTable ? 'โต๊ะ' : 'ท่าน',
+        unitPrice,
+      });
+    }
+  } else if (pkg.kind === 'ceremony') {
     items.push({
       productCode: pickMonkCode(recipe, 'any', 0),
       quantity: 1,
@@ -702,13 +877,15 @@ export function buildFaItems(
     }
   }
 
-  for (const a of BOOKING_ADDONS) {
-    if (!input.addons.includes(a.id) || addonIncludedIn(input.packageId, a.id)) continue;
+  for (const a of applicableAddons(input.packageId)) {
+    if (!input.addons.includes(a.id)) continue;
+    const qty = addonQuantity(a, input);
+    if (qty <= 0) continue;
     const code = config.addons[a.id];
     items.push(
       code
-        ? { productCode: code, quantity: 1 }
-        : { description: a.label, quantity: 1, unit: 'ชุด', unitPrice: pricing.addons[a.id] ?? a.price },
+        ? { productCode: code, quantity: qty, ...(a.perUnit ? { unit: 'โต๊ะ' } : {}) }
+        : { description: a.label, quantity: qty, unit: a.perUnit ? 'โต๊ะ' : 'ชุด', unitPrice: pricing.addons[a.id] ?? a.price },
     );
   }
 
@@ -719,18 +896,17 @@ export function buildFaItems(
   return { items, vatRate: recipe.vatRate, pkg };
 }
 
+/** Sum of the selected add-ons (drinks × tables, others × 1). */
+export function addonsTotal(input: BookingCalcInput, pricing: PricingConfig = DEFAULT_PRICING): number {
+  let total = 0;
+  for (const a of applicableAddons(input.packageId)) {
+    if (input.addons.includes(a.id)) total += (pricing.addons[a.id] ?? a.price) * addonQuantity(a, input);
+  }
+  return total;
+}
+
 export function calcEstimatedTotal(
-  input: {
-    packageId: string;
-    foodMode: string;
-    guests: number;
-    tables: number;
-    monks: number;
-    selfTransport: boolean;
-    addons: string[];
-    travelFee?: number;
-    travelArea?: string;
-  },
+  input: BookingCalcInput,
   pricing: PricingConfig = DEFAULT_PRICING,
 ): { total: number; pkg: BookingPackage } | null {
   const pkg = BOOKING_PACKAGES.find((p) => p.id === input.packageId);
@@ -738,7 +914,10 @@ export function calcEstimatedTotal(
   if (!pkg || !pp) return null;
 
   let total: number;
-  if (pkg.kind === 'ceremony') {
+  if (pkg.kind === 'catering') {
+    const count = pkg.unit === 'table' ? input.tables : input.guests;
+    total = cateringUnitPrice(pkg, pp, input.dishCount) * count;
+  } else if (pkg.kind === 'ceremony') {
     total = pp.base ?? 0;
   } else {
     const cfg = input.foodMode === 'table' ? pp.table : pp.buffet;
@@ -747,11 +926,11 @@ export function calcEstimatedTotal(
     total = tierTotalFor(cfg, count).tierTotal;
   }
 
-  for (const a of BOOKING_ADDONS) {
-    if (input.addons.includes(a.id) && !addonIncludedIn(input.packageId, a.id)) total += pricing.addons[a.id] ?? a.price;
+  total += addonsTotal(input, pricing);
+  if (pkg.kind !== 'catering') {
+    if (input.selfTransport) total -= pricing.selfTransportDiscount;
+    if (input.monks === 5) total -= pricing.fiveMonksDiscount;
   }
-  if (input.selfTransport) total -= pricing.selfTransportDiscount;
-  if (input.monks === 5) total -= pricing.fiveMonksDiscount;
   if (input.travelFee && input.travelFee > 0) total += input.travelFee;
 
   return { total: Math.max(0, total), pkg };
@@ -771,10 +950,16 @@ export function computeDeposit(foodAmount: number, rule: DepositRule = DEFAULT_D
 }
 
 /** Food part of a booking: per-guest/table price (tier `extra`) × count; ceremony-only packages have none. */
-export function foodAmountFor(input: { packageId: string; foodMode: string; guests: number; tables: number }, pricing: PricingConfig): number {
+export function foodAmountFor(input: BookingCalcInput, pricing: PricingConfig): number {
   const pkg = BOOKING_PACKAGES.find((p) => p.id === input.packageId);
   const pp = pricing.packages[input.packageId];
-  if (!pkg || !pp || pkg.kind !== 'full') return 0;
+  if (!pkg || !pp) return 0;
+  if (pkg.kind === 'catering') {
+    // owner decision (2026-09-06): the deposit for catering is based on food + drinks (not travel / VAT)
+    const count = pkg.unit === 'table' ? input.tables : input.guests;
+    return Math.round(cateringUnitPrice(pkg, pp, input.dishCount) * count + addonsTotal(input, pricing));
+  }
+  if (pkg.kind !== 'full') return 0;
   const cfg = input.foodMode === 'table' ? pp.table : pp.buffet;
   const count = input.foodMode === 'table' ? input.tables : input.guests;
   return cfg ? Math.round(cfg.extra * count) : 0;
@@ -793,7 +978,12 @@ export function estimateBooking(
   const pp = pricing.packages[input.packageId];
   const fmt = (n: number) => `${n.toLocaleString('th-TH')} บาท`;
   const rows: { k: string; v: string }[] = [];
-  if (calc.pkg.kind === 'ceremony') {
+  const isCatering = calc.pkg.kind === 'catering';
+  if (isCatering) {
+    const count = calc.pkg.unit === 'table' ? input.tables : input.guests;
+    const unitPrice = cateringUnitPrice(calc.pkg, pp, input.dishCount);
+    rows.push({ k: cateringLineLabel(calc.pkg, input, unitPrice), v: fmt(unitPrice * count) });
+  } else if (calc.pkg.kind === 'ceremony') {
     rows.push({ k: 'ราคาแพ็กเกจ', v: fmt(pp.base ?? 0) });
   } else {
     const cfg = input.foodMode === 'table' ? pp.table : pp.buffet;
@@ -801,11 +991,15 @@ export function estimateBooking(
     const unit = input.foodMode === 'table' ? 'โต๊ะ' : 'ท่าน';
     rows.push({ k: `ราคาแพ็กเกจ (${count} ${unit})`, v: fmt(cfg ? tierTotalFor(cfg, count).tierTotal : 0) });
   }
-  for (const a of BOOKING_ADDONS) {
-    if (input.addons.includes(a.id) && !addonIncludedIn(input.packageId, a.id)) rows.push({ k: a.label, v: `+${fmt(pricing.addons[a.id] ?? a.price)}` });
+  for (const a of applicableAddons(input.packageId)) {
+    if (!input.addons.includes(a.id)) continue;
+    const qty = addonQuantity(a, input);
+    if (qty <= 0) continue;
+    const price = pricing.addons[a.id] ?? a.price;
+    rows.push({ k: a.perUnit ? `${a.label} × ${qty} โต๊ะ` : a.label, v: `+${fmt(price * qty)}` });
   }
-  if (input.selfTransport) rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: `−${fmt(pricing.selfTransportDiscount)}` });
-  if (input.monks === 5) rows.push({ k: 'พระ 5 รูป', v: `−${fmt(pricing.fiveMonksDiscount)}` });
+  if (!isCatering && input.selfTransport) rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: `−${fmt(pricing.selfTransportDiscount)}` });
+  if (!isCatering && input.monks === 5) rows.push({ k: 'พระ 5 รูป', v: `−${fmt(pricing.fiveMonksDiscount)}` });
   if (input.travelFee && input.travelFee > 0) rows.push({ k: `ค่าเดินทาง${input.travelArea ? ` (${input.travelArea})` : ''}`, v: `+${fmt(input.travelFee)}` });
   const vatAmount = input.wantVat ? Math.round(calc.total * VAT_RATE) : 0;
   if (input.wantVat) rows.push({ k: 'ภาษีมูลค่าเพิ่ม 7%', v: `+${fmt(vatAmount)}` });

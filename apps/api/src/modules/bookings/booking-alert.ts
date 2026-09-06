@@ -1,4 +1,5 @@
 import { pushLineMessages } from '../../common/utils/line-notify.utils';
+import { BOOKING_ADDONS, packageById } from './packages.config';
 
 /**
  * "จองงานบุญใหม่" team alert → the IRIS BOT LINE group (the same bot/group iris-job
@@ -30,6 +31,7 @@ export interface BookingAlertInput {
   guests?: number | null;
   tables?: number | null;
   monks?: number | null;
+  dishCount?: number | null;
   selfTransport?: boolean | null;
   addons?: string[] | null;
   customerName?: string | null;
@@ -81,11 +83,14 @@ function channelLabel(channel?: string | null): string {
   return type ? `${type} ${pretty}` : pretty;
 }
 
-const ADDON_LABELS: Record<string, string> = {
-  stage: 'เวทีพระ',
-  tent: 'เต็นท์เพิ่ม 1 หลัง',
-  drape: 'โยงผ้าประดับเพิ่ม',
-};
+const isCatering = (b: BookingAlertInput) => packageById(b.packageId || '')?.kind === 'catering';
+
+/** "เครื่องดื่ม × 12 โต๊ะ" for per-table add-ons, plain label otherwise */
+function addonLabel(id: string, b: BookingAlertInput): string {
+  const a = BOOKING_ADDONS.find((x) => x.id === id);
+  if (!a) return id;
+  return a.perUnit === 'table' ? `${a.label} × ${b.tables ?? 0} โต๊ะ` : a.label;
+}
 
 const thb = (n?: number | null) => `${Number(n ?? 0).toLocaleString('th-TH')} บาท`;
 const nonEmpty = (s?: string | null) => (s && s.trim() ? s.trim() : '-');
@@ -105,6 +110,11 @@ function row(label: string, value: string) {
 }
 
 function foodLine(b: BookingAlertInput): string {
+  const pkg = packageById(b.packageId || '');
+  if (pkg?.kind === 'catering') {
+    if (pkg.unit === 'table') return `${b.tables ?? 0} โต๊ะ${pkg.courses ? ` (${pkg.courses} อย่าง)` : ''}`;
+    return `บุฟเฟต์ ${b.dishCount ?? '-'} อย่าง · ${b.guests ?? 0} ท่าน`;
+  }
   if (b.foodMode === 'table') return `โต๊ะจีน ${b.tables ?? 0} โต๊ะ`;
   if (b.foodMode === 'buffet') return `บุฟเฟต์ ${b.guests ?? 0} ท่าน`;
   return 'ไม่รวมอาหารเลี้ยงแขก';
@@ -129,9 +139,12 @@ export function buildNewBookingFlex(b: BookingAlertInput, opts: { crmUrl: string
   }
   rows.push(row('📅 วันงาน', [fmtThaiDate(b.eventDate), b.timeSlot].filter(Boolean).join(' · ')));
   if (b.occasion) rows.push(row('🎉 งาน', b.occasion));
-  rows.push(row('📦 แพ็กเกจ', `${b.packageName || b.packageId || '-'} · พระ ${b.monks ?? '-'} รูป · ${foodLine(b)}`));
+  const catering = isCatering(b);
+  rows.push(
+    row('📦 แพ็กเกจ', catering ? `${b.packageName || b.packageId || '-'} · ${foodLine(b)}` : `${b.packageName || b.packageId || '-'} · พระ ${b.monks ?? '-'} รูป · ${foodLine(b)}`),
+  );
 
-  const extras = (b.addons || []).map((a) => ADDON_LABELS[a] || a);
+  const extras = (b.addons || []).map((a) => addonLabel(a, b));
   if (b.selfTransport) extras.push('นิมนต์รับ-ส่งพระเอง (ลด 1,000)');
   if (extras.length) rows.push(row('➕ เสริม', extras.join(', ')));
 
@@ -166,7 +179,8 @@ export function buildNewBookingFlex(b: BookingAlertInput, opts: { crmUrl: string
     });
   }
 
-  const altText = `🙏 จองงานบุญใหม่ ${b.code || ''} · ${nonEmpty(b.customerName)} · ${fmtThaiDate(b.eventDate)} · ${thb(b.estimatedTotal)}`.slice(0, 400);
+  const heading = catering ? '🍽️ จองจัดเลี้ยงใหม่' : '🙏 จองงานบุญใหม่';
+  const altText = `${heading} ${b.code || ''} · ${nonEmpty(b.customerName)} · ${fmtThaiDate(b.eventDate)} · ${thb(b.estimatedTotal)}`.slice(0, 400);
 
   return {
     type: 'flex',
@@ -179,7 +193,7 @@ export function buildNewBookingFlex(b: BookingAlertInput, opts: { crmUrl: string
         backgroundColor: '#B45309',
         paddingAll: 'md',
         contents: [
-          { type: 'text', text: `🙏 จองงานบุญใหม่ · ${b.code || '-'}`, color: '#ffffff', weight: 'bold', size: 'sm' },
+          { type: 'text', text: `${heading} · ${b.code || '-'}`, color: '#ffffff', weight: 'bold', size: 'sm' },
         ],
       },
       body: {

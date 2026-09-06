@@ -10,7 +10,9 @@ import {
   FA_RECIPES_SETTING_KEY,
   BOOKING_PACKAGES,
   BOOKING_ADDONS,
-  stripIncludedAddons,
+  packageById,
+  normalizeBookingInput,
+  bookingInputError,
   derivePricing,
   estimateBooking,
   VAT_RATE,
@@ -126,8 +128,17 @@ export class BookingsService {
     return {
       pricing,
       defaults: DEFAULT_PRICING,
-      packages: BOOKING_PACKAGES.map((p) => ({ id: p.id, name: p.name, kind: p.kind, includedAddons: p.includedAddons || [] })),
-      addons: BOOKING_ADDONS.map((a) => ({ id: a.id, label: a.label, code: config.addons[a.id] || null })),
+      packages: BOOKING_PACKAGES.map((p) => ({
+        id: p.id,
+        name: p.name,
+        kind: p.kind,
+        line: p.line,
+        unit: p.unit ?? null,
+        minCount: p.minCount ?? null,
+        courses: p.courses ?? null,
+        includedAddons: p.includedAddons || [],
+      })),
+      addons: BOOKING_ADDONS.map((a) => ({ id: a.id, label: a.label, price: a.price, perUnit: a.perUnit ?? null, lines: a.lines, code: config.addons[a.id] || null })),
       source: cat.source,
       fetchedAt: cat.fetchedAt,
       catalogError: cat.error || null,
@@ -208,7 +219,16 @@ export class BookingsService {
     return {
       config,
       defaults: DEFAULT_FA_RECIPES,
-      packages: BOOKING_PACKAGES.map((p) => ({ id: p.id, name: p.name, kind: p.kind, includedAddons: p.includedAddons || [] })),
+      packages: BOOKING_PACKAGES.map((p) => ({
+        id: p.id,
+        name: p.name,
+        kind: p.kind,
+        line: p.line,
+        unit: p.unit ?? null,
+        minCount: p.minCount ?? null,
+        courses: p.courses ?? null,
+        includedAddons: p.includedAddons || [],
+      })),
       addons: BOOKING_ADDONS,
       products: products.map((p) => ({
         code: p.code,
@@ -240,6 +260,7 @@ export class BookingsService {
         guests: b.guests,
         tables: b.tables,
         monks: b.monks,
+        dishCount: b.dishCount,
         selfTransport: b.selfTransport,
         addons: b.addons,
         travelFee: b.travelFee || 0,
@@ -252,10 +273,19 @@ export class BookingsService {
 
     // Products are edited freely in flowaccount-app: if the configured transport component code
     // no longer exists on the product, fall back to the component whose title mentions นิมนต์.
+    // Likewise only send the variables the product actually declares (e.g. a catering product
+    // without a `dishes` variable must not receive one).
     const { catalog } = await this.getCatalog();
     for (const item of built.items) {
-      if (!item.productCode || !item.exclude?.length) continue;
-      const comps = catalog[item.productCode]?.components || [];
+      if (!item.productCode) continue;
+      const product = catalog[item.productCode];
+      if (item.variables && product?.variables) {
+        const declared = new Set(product.variables.map((v) => v.key));
+        item.variables = Object.fromEntries(Object.entries(item.variables).filter(([k]) => declared.has(k)));
+        if (!Object.keys(item.variables).length) delete item.variables;
+      }
+      if (!item.exclude?.length) continue;
+      const comps = product?.components || [];
       item.exclude = item.exclude.map((code) => {
         if (comps.some((c) => c.code === code)) return code;
         const alt = comps.find((c) => c.optional && /นิมนต์|รับ.?ส่งพระ/.test(c.title));
@@ -384,34 +414,34 @@ export class BookingsService {
       throw new BadRequestException(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาติดต่อทีมงานทาง LINE`);
     }
 
-    // PRIME already includes the drape: never store or charge it as an extra
-    dto.addons = stripIncludedAddons(dto.packageId, dto.addons);
-
     // travel fee follows the EVENT VENUE district (dto.amphoe); the quick form copies the billing
     // address onto the venue when "same address" is ticked, so dto.amphoe is always the venue
     const travelFee = travelFeeFor(dto.amphoe, await this.getTravelFees());
     const travelArea = travelFee > 0 ? travelAreaLabel(dto.amphoe, dto.province) : null;
-    const calc = calcEstimatedTotal(
-      {
-        packageId: dto.packageId,
-        foodMode: dto.foodMode,
-        guests: dto.guests,
-        tables: dto.tables,
-        monks: dto.monks,
-        selfTransport: dto.selfTransport,
-        addons: dto.addons,
-        travelFee,
-        travelArea: travelArea || undefined,
-      },
-      await this.getPricing(),
-    );
+    // Make the order consistent with its package (PRIME includes the drape; catering has no monks,
+    // its foodMode follows the unit, add-ons are limited to its line) and enforce minimum orders.
+    const input = normalizeBookingInput({
+      packageId: dto.packageId,
+      foodMode: dto.foodMode,
+      guests: dto.guests,
+      tables: dto.tables,
+      monks: dto.monks,
+      dishCount: dto.dishCount,
+      selfTransport: dto.selfTransport,
+      addons: dto.addons,
+      travelFee,
+      travelArea: travelArea || undefined,
+    });
+    const inputError = bookingInputError(input);
+    if (inputError) throw new BadRequestException(inputError);
+    const calc = calcEstimatedTotal(input, await this.getPricing());
     if (!calc) throw new BadRequestException('ไม่พบแพ็กเกจที่เลือก');
 
     const code = await this.nextCode();
     const attribution = await this.resolveAttribution(dto.ref, phoneDigits);
     const preset = attribution.linkId ? ((await this.prisma.bookingLink.findUnique({ where: { id: attribution.linkId } }))?.preset as any) : null;
     const est = estimateBooking(
-      { packageId: dto.packageId, foodMode: dto.foodMode, guests: dto.guests, tables: dto.tables, monks: dto.monks, selfTransport: dto.selfTransport, addons: dto.addons, travelFee, travelArea: travelArea || undefined, depositAmount: typeof preset?.depositAmount === 'number' ? preset.depositAmount : undefined },
+      { ...input, depositAmount: typeof preset?.depositAmount === 'number' ? preset.depositAmount : undefined },
       await this.getPricing(),
       await this.getDepositRule(),
     );
@@ -430,12 +460,13 @@ export class BookingsService {
         venue: dto.venue || null,
         packageId: dto.packageId,
         packageName: calc.pkg.name,
-        foodMode: calc.pkg.kind === 'ceremony' ? 'none' : dto.foodMode,
-        guests: dto.guests,
-        tables: dto.tables,
-        monks: dto.monks,
-        selfTransport: dto.selfTransport,
-        addons: dto.addons,
+        foodMode: calc.pkg.kind === 'ceremony' ? 'none' : input.foodMode,
+        guests: input.guests,
+        tables: input.tables,
+        monks: input.monks,
+        dishCount: input.dishCount ?? null,
+        selfTransport: input.selfTransport,
+        addons: input.addons,
         budget: dto.budget || null,
         customerName: dto.name.trim(),
         phone: phoneDigits,
@@ -595,11 +626,14 @@ export class BookingsService {
   /** Live estimate for a preset (same numbers the booking page shows). */
   async estimate(preset: BookingPresetDto) {
     const travelFee = travelFeeFor(preset.amphoe, await this.getTravelFees());
-    const est = estimateBooking(
-      { ...preset, travelFee, travelArea: travelFee > 0 ? travelAreaLabel(preset.amphoe, preset.province) : undefined },
-      await this.getPricing(),
-      await this.getDepositRule(),
-    );
+    const input = normalizeBookingInput({
+      ...preset,
+      travelFee,
+      travelArea: travelFee > 0 ? travelAreaLabel(preset.amphoe, preset.province) : undefined,
+    });
+    const inputError = bookingInputError(input);
+    if (inputError) throw new BadRequestException(inputError);
+    const est = estimateBooking(input, await this.getPricing(), await this.getDepositRule());
     if (!est) throw new BadRequestException(`ไม่พบแพ็กเกจ "${preset.packageId}"`);
     return est;
   }
@@ -737,16 +771,24 @@ export class BookingsService {
     return { sent: true, messageId: res.messageId, sentAt, reused: false };
   }
 
-  /** Attach the delivery status of the pushed quotation link (from the Message row). */
-  private async withSendStatus<T extends { quotationMessageId: string | null }>(bookings: T[]) {
+  /**
+   * Attach the delivery status of the pushed quotation link (from the Message row) and the
+   * package kind/line (the row only stores the id; clients need the kind to hide monk wording
+   * and tent advice for catering bookings).
+   */
+  private async withSendStatus<T extends { quotationMessageId: string | null; packageId: string }>(bookings: T[]) {
     const ids = bookings.map((b) => b.quotationMessageId).filter((x): x is string => !!x);
-    if (!ids.length) return bookings.map((b) => ({ ...b, quotationSendStatus: null as string | null }));
-    const rows = await this.prisma.message.findMany({ where: { id: { in: ids } }, select: { id: true, status: true } });
+    const rows = ids.length ? await this.prisma.message.findMany({ where: { id: { in: ids } }, select: { id: true, status: true } }) : [];
     const byId = new Map(rows.map((r) => [r.id, r.status]));
-    return bookings.map((b) => ({
-      ...b,
-      quotationSendStatus: b.quotationMessageId ? byId.get(b.quotationMessageId) || 'sending' : null,
-    }));
+    return bookings.map((b) => {
+      const pkg = packageById(b.packageId);
+      return {
+        ...b,
+        packageKind: pkg?.kind ?? null,
+        packageLine: pkg?.line ?? null,
+        quotationSendStatus: b.quotationMessageId ? byId.get(b.quotationMessageId) || 'sending' : (null as string | null),
+      };
+    });
   }
 
   async listForCustomer(customerId: string) {
@@ -860,7 +902,7 @@ export class BookingsService {
     const travelFee = travelFeeFor(next.amphoe, await this.getTravelFees());
     const travelArea = travelFee > 0 ? travelAreaLabel(next.amphoe, next.province) : null;
     const calc = calcEstimatedTotal(
-      { packageId: b.packageId, foodMode: b.foodMode, guests: b.guests, tables: b.tables, monks: b.monks, selfTransport: b.selfTransport, addons: b.addons, travelFee, travelArea: travelArea || undefined },
+      { packageId: b.packageId, foodMode: b.foodMode, guests: b.guests, tables: b.tables, monks: b.monks, dishCount: b.dishCount, selfTransport: b.selfTransport, addons: b.addons, travelFee, travelArea: travelArea || undefined },
       await this.getPricing(),
     );
     const estimatedTotal = calc?.total ?? b.estimatedTotal;

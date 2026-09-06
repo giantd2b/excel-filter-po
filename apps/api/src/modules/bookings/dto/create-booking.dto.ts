@@ -66,10 +66,18 @@ export class CreateBookingDto {
   @Max(500)
   tables: number;
 
+  /** 0 for catering packages (no ceremony); merit packages need ≥ 1 (checked in the service per package) */
   @IsInt()
-  @Min(1)
+  @Min(0)
   @Max(99)
   monks: number;
+
+  /** catering buffet only: savoury dishes 5–8 */
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(8)
+  dishCount?: number;
 
   @IsBoolean()
   selfTransport: boolean;
