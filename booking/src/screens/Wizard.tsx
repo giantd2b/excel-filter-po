@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ADDONS,
-  addonIncluded,
-  stripIncludedAddons,
   DISCOUNTS,
-  OCCASIONS,
+  DISH_COUNTS,
+  LINES,
   PKGS,
-  STEPS,
-  TIME_OPTS,
+  addonQuantity,
+  applicableAddons,
   baht,
+  occasionsFor,
   pkgById,
+  priceUnitLabel,
+  startPrice,
+  stepsFor,
+  stripIncludedAddons,
+  timeOptsFor,
   SERVICE_AREA_TEXT,
   isServiceProvince,
+  type PkgLine,
 } from '../data/packages';
 import { AddressFields, FloorField } from '../components/AddressFields';
-import { calc, finalizeForm, summary, tentRecommendation, type BookingForm } from '../lib/calc';
+import { calc, cateringUnit, finalizeForm, formForPackage, summary, tentRecommendation, type BookingForm } from '../lib/calc';
 import { submitBooking } from '../lib/api';
 import { BackLink, CheckIcon, FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
 import type { SavedBooking } from '../App';
@@ -43,9 +48,18 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
     setErr('');
   };
 
-  const mode = pkgById(f.pkg).kind;
+  const pkg = pkgById(f.pkg);
+  const mode = pkg.kind;
+  const line: PkgLine = pkg.line;
+  const isCatering = mode === 'catering';
   const hasFood = mode === 'full';
+  const steps = stepsFor(line);
   const c = calc(f);
+  // switching package/line keeps the rest of the form consistent (monks, food mode, add-ons, occasion, time)
+  const pickPkg = (id: string) => {
+    setForm(formForPackage(f, id));
+    setErr('');
+  };
 
 
   const tentSuggested = useRef(false);
@@ -112,11 +126,11 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
       <div style={{ padding: '14px 20px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
         <BackLink label="ย้อนกลับ" onClick={back} />
         <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--color-neutral-600)' }}>
-          ขั้นตอน {step + 1} จาก 5
+          ขั้นตอน {step + 1} จาก {steps.length}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, padding: '12px 20px 0' }}>
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <div
             key={s.t}
             style={{
@@ -131,19 +145,19 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
 
       <div style={{ padding: '20px 20px 24px' }}>
         <h1 style={{ ...charm, fontSize: 29, lineHeight: 1.45, margin: '0 0 6px', color: 'var(--color-accent-900)' }}>
-          {STEPS[step].t}
+          {steps[step].t}
         </h1>
         <p style={{ margin: '0 0 20px', fontSize: 14.5, color: 'var(--color-neutral-600)', lineHeight: 1.6 }}>
-          {STEPS[step].s}
+          {steps[step].s}
         </p>
 
         {/* step 0: event details */}
         {step === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
-              <FieldLabel>ประเภทงานบุญ</FieldLabel>
+              <FieldLabel>{isCatering ? 'ประเภทงาน' : 'ประเภทงานบุญ'}</FieldLabel>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {OCCASIONS.map((o) => (
+                {occasionsFor(line).map((o) => (
                   <div key={o} onClick={() => setF('occasion', o)} style={chipStyle(f.occasion === o)}>
                     {o}
                   </div>
@@ -156,9 +170,9 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
               {f.date && <div style={{ fontSize: 12.5, color: 'var(--color-accent-700)', marginTop: 6 }}>วันที่เลือก: {fmtThaiDate(f.date)}</div>}
             </div>
             <div>
-              <FieldLabel>ช่วงเวลาพิธี</FieldLabel>
+              <FieldLabel>{isCatering ? 'ช่วงเวลาเสิร์ฟ' : 'ช่วงเวลาพิธี'}</FieldLabel>
               <div style={{ display: 'flex', gap: 8 }}>
-                {TIME_OPTS.map((tm) => (
+                {timeOptsFor(line).map((tm) => (
                   <div
                     key={tm.v}
                     onClick={() => setF('time', tm.v)}
@@ -187,25 +201,58 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
         {/* step 1: package pick */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-              {[
-                { id: 'ceremony', label: 'ไม่มีอาหารเลี้ยงแขก', sub: 'พิธีสงฆ์ + อาหารถวายพระ' },
-                { id: 'full', label: 'มีอาหารเลี้ยงแขก', sub: 'พิธีสงฆ์ + บุฟเฟต์ / โต๊ะจีน' },
-              ].map((md) => (
-                <div
-                  key={md.id}
-                  onClick={() => {
-                    const list = PKGS.filter((p) => p.kind === md.id);
-                    const first = md.id === 'ceremony' ? list[1] : list[0];
-                    setF('pkg', first.id);
-                  }}
-                  style={cardStyle(mode === md.id, { flex: 1, padding: '13px 14px' })}
-                >
-                  <div style={{ fontSize: 15.5, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{md.label}</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)', marginTop: 2 }}>{md.sub}</div>
-                </div>
-              ))}
+            {/* product line: งานบุญ / บุฟเฟต์ / โต๊ะจีน */}
+            <div style={{ display: 'flex', gap: 6, padding: 4, background: 'var(--color-neutral-200)', borderRadius: 999 }}>
+              {LINES.map((l) => {
+                const on = l.id === line;
+                return (
+                  <div
+                    key={l.id}
+                    onClick={() => {
+                      if (on) return;
+                      const list = PKGS.filter((p) => p.line === l.id);
+                      // same defaults as the tabs on the home screen: PRIME for merit, the popular set otherwise
+                      const first = l.id === 'merit' ? list[1] : l.id === 'chinese' ? list[1] : list[0];
+                      pickPkg(first.id);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '9px 6px',
+                      borderRadius: 999,
+                      textAlign: 'center',
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: on ? 'var(--color-accent-700)' : 'transparent',
+                      color: on ? '#f5ead8' : 'var(--color-neutral-700)',
+                    }}
+                  >
+                    {l.short}
+                  </div>
+                );
+              })}
             </div>
+            {line === 'merit' && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                {[
+                  { id: 'ceremony', label: 'ไม่มีอาหารเลี้ยงแขก', sub: 'พิธีสงฆ์ + อาหารถวายพระ' },
+                  { id: 'full', label: 'มีอาหารเลี้ยงแขก', sub: 'พิธีสงฆ์ + บุฟเฟต์ / โต๊ะจีน' },
+                ].map((md) => (
+                  <div
+                    key={md.id}
+                    onClick={() => {
+                      const list = PKGS.filter((p) => p.kind === md.id);
+                      const first = md.id === 'ceremony' ? list[1] : list[0];
+                      pickPkg(first.id);
+                    }}
+                    style={cardStyle(mode === md.id, { flex: 1, padding: '13px 14px' })}
+                  >
+                    <div style={{ fontSize: 15.5, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{md.label}</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)', marginTop: 2 }}>{md.sub}</div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div
               style={{
                 background: 'var(--color-accent-2-200)',
@@ -216,12 +263,16 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 color: 'var(--color-accent-2-800)',
               }}
             >
-              {mode === 'ceremony'
-                ? 'ทั้ง 2 แพ็กเกจพิธีสงฆ์ครบถูกต้องเหมือนกัน ต่างกันที่ระดับความพรีเมี่ยมของอุปกรณ์ สังฆทาน และฉากประดับ — อยากได้ภาพงานสวยแนะนำ PRIME'
-                : 'ทั้ง 3 แพ็กเกจมีพิธีสงฆ์ + โต๊ะเก้าอี้ เต็นท์ ทีมงานครบเหมือนกัน ต่างกันที่ระดับอาหารและของเสริม — งานส่วนใหญ่เลือกครบวงจรพลัส'}
+              {line === 'buffet'
+                ? 'บุฟเฟต์อาหารไทยคิดราคาต่อท่านตามจำนวนอย่างที่เลือก (5-8 อย่าง) ขั้นต่ำ 40 ท่าน ทั้ง 2 ระดับฟรีข้าว น้ำดื่ม ขนมหวาน บริการ โต๊ะ-เก้าอี้ และค่าขนส่งในพื้นที่ — ต่างกันที่ระดับวัตถุดิบและรายการเมนู'
+                : line === 'chinese'
+                  ? 'โต๊ะจีนคิดราคาต่อโต๊ะ (8 ท่าน) ขั้นต่ำ 10 โต๊ะ เลือกเมนูได้จานละ 1 อย่าง ราคายังไม่รวมเครื่องดื่ม (เพิ่มได้ 250 บาท/โต๊ะ ในขั้นตอนถัดไป) — ต่างกันที่จำนวนจานและระดับเมนู'
+                  : mode === 'ceremony'
+                    ? 'ทั้ง 2 แพ็กเกจพิธีสงฆ์ครบถูกต้องเหมือนกัน ต่างกันที่ระดับความพรีเมี่ยมของอุปกรณ์ สังฆทาน และฉากประดับ — อยากได้ภาพงานสวยแนะนำ PRIME'
+                    : 'ทั้ง 3 แพ็กเกจมีพิธีสงฆ์ + โต๊ะเก้าอี้ เต็นท์ ทีมงานครบเหมือนกัน ต่างกันที่ระดับอาหารและของเสริม — งานส่วนใหญ่เลือกครบวงจรพลัส'}
             </div>
-            {PKGS.filter((p) => p.kind === mode).map((p) => (
-              <div key={p.id} onClick={() => setF('pkg', p.id)} style={cardStyle(f.pkg === p.id, { padding: '15px 17px' })}>
+            {PKGS.filter((p) => p.line === line && (line !== 'merit' || p.kind === mode)).map((p) => (
+              <div key={p.id} onClick={() => pickPkg(p.id)} style={cardStyle(f.pkg === p.id, { padding: '15px 17px' })}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -246,10 +297,11 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flex: 'none' }}>
-                    <div style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>{p.kind === 'full' ? 'เริ่มต้น' : ''}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>{priceUnitLabel(p).prefix}</div>
                     <div style={{ ...charm, fontSize: 21, color: 'var(--color-accent-700)', lineHeight: 1.4 }}>
-                      {baht(p.kind === 'full' ? p.buffet!.tiers[0][1] : p.base!)}
+                      {baht(startPrice(p))}
                     </div>
+                    {p.kind === 'catering' && <div style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>{priceUnitLabel(p).suffix}</div>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 9 }}>
@@ -315,6 +367,16 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                         โต๊ะจีน: {p.table!.tiers.map((t) => `${t[0]} โต๊ะ = ${baht(t[1])}.-`).join(' · ')}
                       </div>
                     )}
+                    {p.kind === 'catering' && p.unit === 'guest' && p.perHead && (
+                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-neutral-600)', lineHeight: 1.7 }}>
+                        ต่อท่าน: {DISH_COUNTS.map((n) => `${n} อย่าง = ${baht(p.perHead![n])}.-`).join(' · ')}
+                      </div>
+                    )}
+                    {p.kind === 'catering' && p.unit === 'table' && (
+                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-neutral-600)', lineHeight: 1.7 }}>
+                        โต๊ะละ {baht(p.perTable ?? 0)}.- ({p.courses} อย่าง) · ขั้นต่ำ {p.minCount} โต๊ะ · ไม่รวมเครื่องดื่ม
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -344,9 +406,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                   ไล่จากแพ็กเกจเริ่มต้น — การ์ดถัดไปได้ทุกอย่างของการ์ดก่อนหน้า พร้อมส่วนที่เพิ่ม · แตะการ์ดเพื่อเลือก
                 </div>
                 {(() => {
-                  const modePkgs = PKGS.filter((p) => p.kind === mode);
-                  const startPrice = (p: (typeof modePkgs)[0]) =>
-                    p.kind === 'full' ? p.buffet!.tiers[0][1] : p.base!;
+                  const modePkgs = PKGS.filter((p) => p.line === line && (line !== 'merit' || p.kind === mode));
                   return modePkgs.map((p, i) => {
                     const prev = i > 0 ? modePkgs[i - 1] : null;
                     const deltas: { added: boolean; label: string; value: string }[] = [];
@@ -394,10 +454,10 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                             </div>
                             <div style={{ textAlign: 'right' }}>
                               <span style={{ fontSize: 11, color: 'var(--color-neutral-600)', marginRight: 4 }}>
-                                {p.kind === 'full' ? 'เริ่มต้น' : ''}
+                                {priceUnitLabel(p).prefix}
                               </span>
                               <span style={{ ...charm, fontSize: 20, color: 'var(--color-accent-700)' }}>
-                                {baht(startPrice(p))}.-
+                                {baht(startPrice(p))}.-{p.kind === 'catering' ? (p.unit === 'table' ? '/โต๊ะ' : '/ท่าน') : ''}
                               </span>
                             </div>
                           </div>
@@ -462,7 +522,104 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
         )}
 
         {/* step 2: monks & food */}
-        {step === 2 && (
+        {step === 2 && isCatering && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {pkg.unit === 'guest' && pkg.perHead && (
+              <div>
+                <FieldLabel>จำนวนอาหารคาว</FieldLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                  {DISH_COUNTS.map((n) => (
+                    <div key={n} onClick={() => setF('dishCount', n)} style={cardStyle(f.dishCount === n, { padding: '12px 6px', textAlign: 'center' })}>
+                      <div style={{ fontSize: 16, fontWeight: 600 }}>{n} อย่าง</div>
+                      <div style={{ fontSize: 12, color: 'var(--color-accent-700)', fontWeight: 600, marginTop: 2 }}>{baht(pkg.perHead![n])}/ท่าน</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)', marginTop: 8 }}>
+                  ทุกจำนวนอย่างฟรี ข้าวหอมมะลิ น้ำดื่ม และขนมหวาน 1 อย่าง · เลือกรายการอาหารกับทีมงานหลังจอง
+                </div>
+              </div>
+            )}
+            <div>
+              <FieldLabel>{pkg.unit === 'table' ? 'จำนวนโต๊ะ' : 'จำนวนแขก'}</FieldLabel>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  background: 'var(--color-neutral-100)',
+                  border: '1.5px solid var(--color-neutral-300)',
+                  borderRadius: 999,
+                  padding: '7px 10px',
+                }}
+              >
+                <div
+                  onClick={() =>
+                    pkg.unit === 'table'
+                      ? setF('tables', Math.max(pkg.minCount ?? 1, f.tables - 1))
+                      : setF('guests', Math.max(pkg.minCount ?? 1, f.guests - 10))
+                  }
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 999,
+                    background: 'var(--color-accent-200)',
+                    color: 'var(--color-accent-800)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontSize: 24,
+                    cursor: 'pointer',
+                    flex: 'none',
+                  }}
+                >
+                  −
+                </div>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ ...charm, fontSize: 30, color: 'var(--color-accent-800)', lineHeight: 1.25 }}>
+                    {pkg.unit === 'table' ? f.tables : f.guests}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{pkg.unit === 'table' ? 'โต๊ะ (8 ท่าน/โต๊ะ)' : 'ท่าน'}</div>
+                </div>
+                <div
+                  onClick={() => (pkg.unit === 'table' ? setF('tables', f.tables + 1) : setF('guests', f.guests + 10))}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 999,
+                    background: 'var(--color-accent-200)',
+                    color: 'var(--color-accent-800)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontSize: 24,
+                    cursor: 'pointer',
+                    flex: 'none',
+                  }}
+                >
+                  +
+                </div>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)', marginTop: 8, lineHeight: 1.6 }}>
+                {pkg.unit === 'table'
+                  ? `ขั้นต่ำ ${pkg.minCount} โต๊ะ · โต๊ะละ ${baht(cateringUnit(pkg, f))} บาท (${pkg.courses} อย่าง) · ราคายังไม่รวมเครื่องดื่ม · จัดงานชั้น 2 มีค่าบริการเพิ่มเติม`
+                  : `ขั้นต่ำ ${pkg.minCount} ท่าน · ${f.dishCount} อย่าง ${baht(cateringUnit(pkg, f))} บาท/ท่าน · เพิ่มจำนวนแขกคิดราคาต่อท่าน × จำนวนที่เพิ่ม`}
+              </div>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                padding: '12px 16px',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-accent-2-200)',
+              }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-accent-2-800)' }}>ราคาอาหารประเมิน</span>
+              <span style={{ ...charm, fontSize: 22, color: 'var(--color-accent-2-800)' }}>{baht(cateringUnit(pkg, f) * (pkg.unit === 'table' ? f.tables : f.guests))} บาท</span>
+            </div>
+          </div>
+        )}
+        {step === 2 && !isCatering && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
               <FieldLabel>จำนวนพระสงฆ์</FieldLabel>
@@ -592,11 +749,27 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
               <FieldLabel>ออปชั่นเสริม</FieldLabel>
+              {applicableAddons(f.pkg).length === 0 && (
+                <div
+                  style={{
+                    background: 'var(--color-accent-2-200)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '15px 17px',
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                    color: 'var(--color-accent-2-800)',
+                  }}
+                >
+                  แพ็กเกจนี้รวมทุกอย่างที่จำเป็นไว้แล้ว ไม่มีออปชั่นเสริม หากต้องการรายการพิเศษ (เช่น เมนูเพิ่ม เต็นท์ เวที) ระบุในหมายเหตุขั้นตอนถัดไป ทีมงานจะเสนอราคาเพิ่มให้
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {ADDONS.map((a) => {
-                  // e.g. the drape is part of PRIME: show it greyed out, not selectable, no price
-                  const included = addonIncluded(f.pkg, a.id);
+                {applicableAddons(f.pkg).map((a) => {
+                  // the drape is part of PRIME → applicableAddons already drops it; `included` stays for the greyed card of
+                  // a merit package that lists it anyway (defensive — currently never true)
+                  const included = (pkg.includedAddons || []).includes(a.id);
                   const on = !included && f.addons.includes(a.id);
+                  const qty = addonQuantity(a, f);
                   return (
                     <div
                       key={a.id}
@@ -627,13 +800,26 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                         )}
                       </div>
                       <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-accent-700)', whiteSpace: 'nowrap' }}>
-                        {included ? <span style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>รวมแล้ว</span> : `+${baht(a.price)}`}
+                        {included ? (
+                          <span style={{ fontSize: 13, color: 'var(--color-neutral-500)' }}>รวมแล้ว</span>
+                        ) : a.perUnit ? (
+                          <span>
+                            +{baht(a.price)}
+                            <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--color-neutral-600)' }}>/โต๊ะ</span>
+                            <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--color-neutral-600)', textAlign: 'right' }}>
+                              × {qty} = {baht(a.price * qty)}
+                            </div>
+                          </span>
+                        ) : (
+                          `+${baht(a.price)}`
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
+            {!isCatering && (
             <div
               onClick={() => setF('selfTransport', !f.selfTransport)}
               style={cardStyle(f.selfTransport, { display: 'flex', alignItems: 'center', gap: 13, padding: '14px 16px' })}
@@ -647,6 +833,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 ลด {baht(DISCOUNTS.selfTransport)}
               </div>
             </div>
+            )}
             <div>
               <FieldLabel>งบประมาณที่ตั้งไว้ (ไม่บังคับ)</FieldLabel>
               <input

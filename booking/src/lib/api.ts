@@ -24,6 +24,8 @@ export interface BookingPreset {
   guests: number;
   tables: number;
   monks: number;
+  /** catering buffet: savoury dishes 5–8 */
+  dishCount?: number | null;
   selfTransport: boolean;
   addons: string[];
   note?: string | null;
@@ -71,6 +73,8 @@ export async function submitBooking(f: BookingForm, ref?: string | null): Promis
     guests: f.guests,
     tables: f.tables,
     monks: f.monks,
+    // only buffet catering has a dish count; the server ignores it for every other package anyway
+    dishCount: pkgById(f.pkg).unit === 'guest' ? f.dishCount : undefined,
     selfTransport: f.selfTransport,
     addons: f.addons,
     budget: f.budget || undefined,

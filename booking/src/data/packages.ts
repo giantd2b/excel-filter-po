@@ -2,7 +2,18 @@
 // Pricing must stay in sync with apps/api/src/modules/bookings/packages.config.ts
 
 export type FoodMode = 'buffet' | 'table';
-export type PkgKind = 'ceremony' | 'full';
+/** ceremony = monk package only · full = monk package + guest food · catering = food only (no monks) */
+export type PkgKind = 'ceremony' | 'full' | 'catering';
+/** product line = the tab the package lives under */
+export type PkgLine = 'merit' | 'buffet' | 'chinese';
+export type DishCount = 5 | 6 | 7 | 8;
+export const DISH_COUNTS: DishCount[] = [5, 6, 7, 8];
+
+export const LINES: { id: PkgLine; label: string; short: string; sub: string }[] = [
+  { id: 'merit', label: 'งานบุญ', short: 'งานบุญ', sub: 'พิธีสงฆ์ครบวงจร' },
+  { id: 'buffet', label: 'บุฟเฟต์อาหารไทย', short: 'บุฟเฟต์', sub: 'คิดต่อท่าน ตามจำนวนอย่าง' },
+  { id: 'chinese', label: 'โต๊ะจีน', short: 'โต๊ะจีน', sub: 'คิดต่อโต๊ะ 8 ท่าน' },
+];
 
 export interface TierConfig {
   tiers: [number, number][];
@@ -26,6 +37,15 @@ export interface Pkg {
   features: [string, string][];
   /** add-on ids already covered by the package (shown as "รวมในแพ็กเกจแล้ว", never charged) */
   includedAddons?: string[];
+  line: PkgLine;
+  /** catering only */
+  unit?: 'guest' | 'table';
+  minCount?: number;
+  perHead?: Record<DishCount, number>;
+  perTable?: number;
+  courses?: number;
+  /** catering: terms shown on the detail page (ขั้นต่ำ, เครื่องดื่ม, ชั้น 2 …) */
+  notes?: string[];
 }
 
 const IMG = (f: string) => `${import.meta.env.BASE_URL}img/${f}`;
@@ -36,6 +56,7 @@ export const PKGS: Pkg[] = [
     name: 'พิธีสงฆ์ แพ็กเกจงานบุญ (ไม่มีแขก)',
     short: 'มาตรฐาน',
     kind: 'ceremony',
+    line: 'merit',
     base: 14990,
     img: IMG('ceremony.jpg'),
     tagline: 'พิธีสงฆ์ครบชุด พร้อมอาหารถวายพระ 9 รูป เหมาะกับงานบุญที่บ้าน',
@@ -60,6 +81,7 @@ export const PKGS: Pkg[] = [
     name: 'PRIME พิธีสงฆ์ครบวงจร (ไม่มีแขก)',
     short: 'PRIME',
     kind: 'ceremony',
+    line: 'merit',
     base: 19990,
     includedAddons: ['drape'],
     badge: 'ยอดนิยม',
@@ -87,6 +109,7 @@ export const PKGS: Pkg[] = [
     name: 'ครบวงจร',
     short: 'ครบวงจร',
     kind: 'full',
+    line: 'merit',
     img: IMG('full.jpg'),
     tagline: 'พิธีสงฆ์ + อาหารเลี้ยงแขก โต๊ะเก้าอี้และเต็นท์ฟรีในแพ็กเกจ',
     chips: ['เลี้ยงแขกได้', 'ขันโตก', 'เมนูธรรมดา'],
@@ -117,6 +140,7 @@ export const PKGS: Pkg[] = [
     name: 'ครบวงจร พลัส',
     short: 'พลัส',
     kind: 'full',
+    line: 'merit',
     badge: 'ขายดี',
     img: IMG('full-plus.jpg'),
     tagline: 'ยกระดับด้วยเมนูพรีเมี่ยม คอฟฟี่เบรค และดอกไม้ตกแต่งไลน์อาหาร',
@@ -148,6 +172,7 @@ export const PKGS: Pkg[] = [
     name: 'PRIME ครบวงจร',
     short: 'PRIME',
     kind: 'full',
+    line: 'merit',
     includedAddons: ['drape'],
     badge: 'ครบที่สุด',
     img: IMG('prime.jpg'),
@@ -176,12 +201,172 @@ export const PKGS: Pkg[] = [
       ['ที่ปรึกษาจัดงาน', 'VIP'],
     ],
   },
+  // ── IRIS Catering — บุฟเฟต์อาหารไทย (ราคาต่อท่าน ตามจำนวนอย่าง, ขั้นต่ำ 40 ท่าน) ──
+  {
+    id: 'buffet-standard',
+    name: 'บุฟเฟต์อาหารไทย แพคเกจเริ่มต้น',
+    short: 'เริ่มต้น',
+    kind: 'catering',
+    line: 'buffet',
+    unit: 'guest',
+    minCount: 40,
+    perHead: { 5: 250, 6: 280, 7: 310, 8: 340 },
+    img: IMG('buffet-standard.jpg'),
+    tagline: 'อาหารไทยบุฟเฟต์เลือกได้ 5-8 อย่าง พร้อมข้าว น้ำดื่ม ขนมหวาน และทีมบริการ',
+    chips: ['5-8 อย่าง', 'ขั้นต่ำ 40 ท่าน', 'ฟรีโต๊ะ-เก้าอี้'],
+    fit: 'งานเลี้ยงทั่วไป งานบริษัท งานครอบครัว คุมงบต่อหัว',
+    diff: ['เมนูอาหารไทยยอดนิยม 60+ รายการ', 'ฟรี ข้าวหอมมะลิ น้ำดื่ม ขนมหวาน 1 อย่าง', 'ฟรี บริการ อุปกรณ์ โต๊ะ-เก้าอี้ ค่าขนส่งในพื้นที่'],
+    notes: ['ขั้นต่ำ 40 ท่าน เพิ่มจำนวนแขกคิดราคาต่อท่าน × จำนวนที่เพิ่ม', 'ราคายังไม่รวมภาษีมูลค่าเพิ่ม 7%', 'ยืนยันรายการอาหารกับทีมงานหลังจอง'],
+    features: [
+      ['อาหารคาว', 'เลือก 5-8 อย่าง'],
+      ['ข้าวหอมมะลิ + น้ำดื่ม', 'ฟรี'],
+      ['ขนมหวาน', 'ฟรี 1 อย่าง'],
+      ['บริการพร้อมอุปกรณ์จัดเลี้ยง', 'ฟรี'],
+      ['โต๊ะ เก้าอี้ ตามจำนวนแขก', 'ฟรี'],
+      ['ค่าขนส่งในพื้นที่บริการ', 'ฟรี'],
+    ],
+  },
+  {
+    id: 'buffet-premium',
+    name: 'บุฟเฟต์อาหารไทย แพคเกจพรีเมียม',
+    short: 'พรีเมียม',
+    kind: 'catering',
+    line: 'buffet',
+    unit: 'guest',
+    minCount: 40,
+    perHead: { 5: 350, 6: 385, 7: 420, 8: 455 },
+    badge: 'แนะนำ',
+    img: IMG('buffet-premium.jpg'),
+    tagline: 'วัตถุดิบระดับพรีเมียม ทะเล เนื้อ ปลากะพง พร้อมน้ำสมุนไพรและผลไม้ตามฤดูกาล',
+    chips: ['5-8 อย่าง', 'เมนูทะเล-เนื้อ', 'น้ำสมุนไพร + ผลไม้'],
+    fit: 'งานแต่ง งานเลี้ยงรับรอง งานที่อยากให้อาหารเป็นจุดเด่น',
+    diff: ['เมนูพรีเมียม 100+ รายการ มีทะเล เนื้อ ปลากะพง น้ำพริก ยำ', 'พิเศษ น้ำสมุนไพรและผลไม้ตามฤดูกาล', 'ฟรีทุกอย่างเหมือนแพคเกจเริ่มต้น'],
+    notes: ['ขั้นต่ำ 40 ท่าน เพิ่มจำนวนแขกคิดราคาต่อท่าน × จำนวนที่เพิ่ม', 'ราคายังไม่รวมภาษีมูลค่าเพิ่ม 7%', 'ยืนยันรายการอาหารกับทีมงานหลังจอง'],
+    features: [
+      ['อาหารคาว', 'เลือก 5-8 อย่าง (พรีเมียม)'],
+      ['น้ำสมุนไพร + ผลไม้ตามฤดูกาล', 'พิเศษ'],
+      ['ข้าวหอมมะลิ + น้ำดื่ม', 'ฟรี'],
+      ['ขนมหวาน', 'ฟรี 1 อย่าง'],
+      ['บริการพร้อมอุปกรณ์จัดเลี้ยง', 'ฟรี'],
+      ['โต๊ะ เก้าอี้ ตามจำนวนแขก', 'ฟรี'],
+      ['ค่าขนส่งในพื้นที่บริการ', 'ฟรี'],
+    ],
+  },
+  // ── IRIS Catering — โต๊ะจีน (ราคาต่อโต๊ะ 8 ท่าน, ขั้นต่ำ 10 โต๊ะ, ไม่รวมเครื่องดื่ม) ──
+  {
+    id: 'chinese-2000',
+    name: 'โต๊ะจีน 2,000',
+    short: '2,000',
+    kind: 'catering',
+    line: 'chinese',
+    unit: 'table',
+    minCount: 10,
+    perTable: 2000,
+    courses: 8,
+    img: IMG('chinese-2000.jpg'),
+    tagline: 'โต๊ะจีน 8 อย่าง เลือกได้จานละ 1 เมนู พร้อมโต๊ะ เก้าอี้ ผ้าคลุม และทีมบริการ',
+    chips: ['8 อย่าง', 'โต๊ะละ 8 ท่าน', 'ขั้นต่ำ 10 โต๊ะ'],
+    fit: 'งานเลี้ยงคุมงบ งานบวช งานศพ งานชุมชน',
+    diff: ['8 อย่าง: ออเดิร์ฟ กระเพาะปลา ไก่ หมู ปลาทับทิม ต้ม/แกง ข้าวผัด ของหวาน', 'รวมโต๊ะ เก้าอี้ ผ้าคลุมสีขาว', 'บริการ 4 ชั่วโมงนับจากอาหารจานแรก'],
+    notes: [
+      'ขั้นต่ำ 10 โต๊ะ โต๊ะละ 8 ท่าน (โต๊ะ 120 cm)',
+      'ราคาไม่รวมเครื่องดื่ม เพิ่มได้ 250 บาท/โต๊ะ',
+      'ระยะเวลาบริการ 4 ชั่วโมงนับจากอาหารจานแรก',
+      'จัดงานชั้น 2 มีค่าบริการเพิ่มเติม',
+      'ราคายังไม่รวมภาษีมูลค่าเพิ่ม 7%',
+    ],
+    features: [
+      ['อาหาร', '8 อย่าง เลือกจานละ 1 เมนู'],
+      ['โต๊ะ เก้าอี้ ผ้าคลุมสีขาว', 'รวม'],
+      ['ทีมบริการ 4 ชั่วโมง', 'รวม'],
+      ['เครื่องดื่ม', 'ไม่รวม (+250/โต๊ะ)'],
+    ],
+  },
+  {
+    id: 'chinese-2300',
+    name: 'โต๊ะจีน 2,300',
+    short: '2,300',
+    kind: 'catering',
+    line: 'chinese',
+    unit: 'table',
+    minCount: 10,
+    perTable: 2300,
+    courses: 9,
+    badge: 'ยอดนิยม',
+    img: IMG('chinese-2300.jpg'),
+    tagline: 'โต๊ะจีน 9 อย่าง เพิ่มของทานเล่น ปลากะพง และเมนูอบน้ำแดง เลือกได้จานละ 1 เมนู',
+    chips: ['9 อย่าง', 'โต๊ะละ 8 ท่าน', 'ขั้นต่ำ 10 โต๊ะ'],
+    fit: 'งานแต่ง งานเลี้ยงบริษัท งานที่อยากได้เมนูหลากหลาย',
+    diff: ['9 อย่าง: เพิ่มของทานเล่น + ปลากะพง + ขาหมู/เป็ดอบ', 'รวมโต๊ะ เก้าอี้ ผ้าคลุมสีขาว', 'บริการ 4 ชั่วโมงนับจากอาหารจานแรก'],
+    notes: [
+      'ขั้นต่ำ 10 โต๊ะ โต๊ะละ 8 ท่าน (โต๊ะ 120 cm)',
+      'ราคาไม่รวมเครื่องดื่ม เพิ่มได้ 250 บาท/โต๊ะ',
+      'ระยะเวลาบริการ 4 ชั่วโมงนับจากอาหารจานแรก',
+      'จัดงานชั้น 2 มีค่าบริการเพิ่มเติม',
+      'ราคายังไม่รวมภาษีมูลค่าเพิ่ม 7%',
+    ],
+    features: [
+      ['อาหาร', '9 อย่าง เลือกจานละ 1 เมนู'],
+      ['โต๊ะ เก้าอี้ ผ้าคลุมสีขาว', 'รวม'],
+      ['ทีมบริการ 4 ชั่วโมง', 'รวม'],
+      ['เครื่องดื่ม', 'ไม่รวม (+250/โต๊ะ)'],
+    ],
+  },
+  {
+    id: 'chinese-2600',
+    name: 'โต๊ะจีน 2,600',
+    short: '2,600',
+    kind: 'catering',
+    line: 'chinese',
+    unit: 'table',
+    minCount: 10,
+    perTable: 2600,
+    courses: 10,
+    badge: 'ครบที่สุด',
+    img: IMG('chinese-2600.jpg'),
+    tagline: 'โต๊ะจีน 10 อย่าง ออเดิร์ฟทะเล กระเพาะปลาเนื้อปู และจานกุ้งพิเศษ เลือกได้จานละ 1 เมนู',
+    chips: ['10 อย่าง', 'ออเดิร์ฟทะเล', 'จานกุ้งพิเศษ'],
+    fit: 'งานแต่ง งานเลี้ยงรับรองแขกผู้ใหญ่ งานที่อยากได้ความพรีเมียม',
+    diff: ['10 อย่าง: เพิ่มออเดิร์ฟทะเล ฮ่อยจ๊อปู กระเพาะปลาเนื้อปู และจานกุ้ง', 'รวมโต๊ะ เก้าอี้ ผ้าคลุมสีขาว', 'บริการ 4 ชั่วโมงนับจากอาหารจานแรก'],
+    notes: [
+      'ขั้นต่ำ 10 โต๊ะ โต๊ะละ 8 ท่าน (โต๊ะ 120 cm)',
+      'ราคาไม่รวมเครื่องดื่ม เพิ่มได้ 250 บาท/โต๊ะ',
+      'ระยะเวลาบริการ 4 ชั่วโมงนับจากอาหารจานแรก',
+      'จัดงานชั้น 2 มีค่าบริการเพิ่มเติม',
+      'ราคายังไม่รวมภาษีมูลค่าเพิ่ม 7%',
+    ],
+    features: [
+      ['อาหาร', '10 อย่าง เลือกจานละ 1 เมนู'],
+      ['โต๊ะ เก้าอี้ ผ้าคลุมสีขาว', 'รวม'],
+      ['ทีมบริการ 4 ชั่วโมง', 'รวม'],
+      ['เครื่องดื่ม', 'ไม่รวม (+250/โต๊ะ)'],
+    ],
+  },
 ];
 
-export const ADDONS = [
-  { id: 'stage', label: 'เวทีพระ', sub: 'ขนาด 1.2 x 7.2 เมตร', price: 5000 },
-  { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง', sub: 'ขนาด 5x12 เมตร', price: 3000 },
-  { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', sub: 'ตกแต่งฉากหลังพิธี', price: 1000 },
+export interface Addon {
+  id: string;
+  label: string;
+  sub: string;
+  price: number;
+  /** 'table' = price × number of tables (เครื่องดื่มโต๊ะจีน) */
+  perUnit?: 'table';
+  /** package lines that offer this add-on */
+  lines: PkgLine[];
+}
+
+export const ADDONS: Addon[] = [
+  { id: 'stage', label: 'เวทีพระ', sub: 'ขนาด 1.2 x 7.2 เมตร', price: 5000, lines: ['merit'] },
+  { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง', sub: 'ขนาด 5x12 เมตร', price: 3000, lines: ['merit'] },
+  { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', sub: 'ตกแต่งฉากหลังพิธี', price: 1000, lines: ['merit'] },
+  {
+    id: 'drinks',
+    label: 'เครื่องดื่ม',
+    sub: 'ต่อโต๊ะ: น้ำเปล่า 2 น้ำอัดลม 2 โซดา 4 (หรือน้ำอัดลม 3 ไม่มีโซดา) + น้ำแข็งตลอดงาน',
+    price: 250,
+    perUnit: 'table',
+    lines: ['chinese'],
+  },
 ];
 
 export const OCCASIONS = [
@@ -193,6 +378,12 @@ export const OCCASIONS = [
   'งานอื่น ๆ',
 ];
 
+export const CATERING_OCCASIONS = ['งานเลี้ยงบริษัท / สัมมนา', 'งานแต่งงาน', 'งานบวช', 'งานศพ', 'งานเลี้ยงรุ่น / ครอบครัว', 'งานอื่น ๆ'];
+
+export function occasionsFor(line: PkgLine): string[] {
+  return line === 'merit' ? OCCASIONS : CATERING_OCCASIONS;
+}
+
 export const STEPS = [
   { t: 'รายละเอียดงานบุญ', s: 'บอกประเภทงาน วันเวลา และสถานที่จัดงาน' },
   { t: 'เลือกแพ็กเกจ', s: 'เลือกแพ็กเกจที่ตรงกับงานของท่านมากที่สุด' },
@@ -200,6 +391,19 @@ export const STEPS = [
   { t: 'ออปชั่นเสริม', s: 'เพิ่มรายการที่ต้องการ หรือข้ามขั้นตอนนี้ได้' },
   { t: 'ข้อมูลผู้ติดต่อ', s: 'ใช้ออกใบเสนอราคา และทีมงานจะติดต่อกลับตามข้อมูลนี้' },
 ];
+
+const CATERING_STEPS = [
+  { t: 'รายละเอียดงาน', s: 'บอกประเภทงาน วันเวลา และสถานที่จัดงาน' },
+  { t: 'เลือกแพ็กเกจ', s: 'เลือกระดับอาหารที่ตรงกับงานของท่านมากที่สุด' },
+  { t: 'เมนูและจำนวนแขก', s: 'จำนวนอย่าง จำนวนแขกหรือจำนวนโต๊ะ' },
+  { t: 'ออปชั่นเสริม', s: 'เพิ่มรายการที่ต้องการ หรือข้ามขั้นตอนนี้ได้' },
+  { t: 'ข้อมูลผู้ติดต่อ', s: 'ใช้ออกใบเสนอราคา และทีมงานจะติดต่อกลับตามข้อมูลนี้' },
+];
+
+/** wizard step titles per line (same 5 steps everywhere — only the wording changes) */
+export function stepsFor(line: PkgLine) {
+  return line === 'merit' ? STEPS : CATERING_STEPS;
+}
 
 export const FAQS = [
   {
@@ -221,6 +425,14 @@ export const FAQS = [
   {
     q: 'ลูกค้าต้องเตรียมอะไรบ้าง?',
     a: 'เตรียมเพียงซองปัจจัยและพระพุทธรูป ส่วนอุปกรณ์พิธี อาหาร และการจัดสถานที่ทีมงานดูแลให้ทั้งหมด',
+  },
+  {
+    q: 'บุฟเฟต์และโต๊ะจีนมีขั้นต่ำไหม?',
+    a: 'บุฟเฟต์อาหารไทยรับขั้นต่ำ 40 ท่าน คิดราคาต่อท่านตามจำนวนอย่างที่เลือก ส่วนโต๊ะจีนรับขั้นต่ำ 10 โต๊ะ (โต๊ะละ 8 ท่าน) เลือกเมนูได้จานละ 1 อย่าง',
+  },
+  {
+    q: 'ราคาบุฟเฟต์และโต๊ะจีนรวมอะไรบ้าง?',
+    a: 'บุฟเฟต์รวมข้าว น้ำดื่ม ขนมหวาน 1 อย่าง บริการพร้อมอุปกรณ์ โต๊ะเก้าอี้ตามจำนวนแขก และค่าขนส่งในพื้นที่บริการ โต๊ะจีนรวมโต๊ะ เก้าอี้ ผ้าคลุม และบริการ 4 ชั่วโมง แต่ไม่รวมเครื่องดื่ม (เพิ่มได้ 250 บาท/โต๊ะ) ทุกราคายังไม่รวม VAT 7%',
   },
 ];
 
@@ -246,6 +458,15 @@ export const TIME_OPTS = [
   { label: 'ทำบุญเช้า', sub: '07.00 - 07.30 น.', v: 'เช้า 07.00-07.30 น.' },
   { label: 'ถวายเพล', sub: '10.00 - 10.30 น.', v: 'เพล 10.00-10.30 น.' },
 ];
+
+export const CATERING_TIME_OPTS = [
+  { label: 'มื้อเที่ยง', sub: '11.00 - 13.00 น.', v: 'เที่ยง 11.00-13.00 น.' },
+  { label: 'มื้อเย็น', sub: '17.00 - 19.00 น.', v: 'เย็น 17.00-19.00 น.' },
+];
+
+export function timeOptsFor(line: PkgLine) {
+  return line === 'merit' ? TIME_OPTS : CATERING_TIME_OPTS;
+}
 
 export const PROVINCES = ['ชลบุรี', 'ระยอง', 'ฉะเชิงเทรา', 'สมุทรปราการ', 'กรุงเทพฯ'];
 
@@ -299,7 +520,10 @@ export function travelAreaLabel(amphoe: string | null | undefined, province?: st
 
 export interface PricingPayload {
   pricing: {
-    packages: Record<string, { base?: number | null; buffet?: TierConfig | null; table?: TierConfig | null }>;
+    packages: Record<
+      string,
+      { base?: number | null; buffet?: TierConfig | null; table?: TierConfig | null; perHead?: Record<string, number> | null; perTable?: number | null }
+    >;
     addons: Record<string, number>;
     selfTransportDiscount: number;
     fiveMonksDiscount: number;
@@ -318,7 +542,15 @@ export function applyPricing(payload: PricingPayload) {
   for (const pkg of PKGS) {
     const s = p.packages?.[pkg.id];
     if (!s) continue;
-    if (pkg.kind === 'ceremony') {
+    if (pkg.kind === 'catering') {
+      if (pkg.unit === 'table' && typeof s.perTable === 'number' && s.perTable > 0) pkg.perTable = s.perTable;
+      if (pkg.unit === 'guest' && s.perHead && pkg.perHead) {
+        for (const n of DISH_COUNTS) {
+          const v = s.perHead[String(n)];
+          if (typeof v === 'number' && v > 0) pkg.perHead[n] = v;
+        }
+      }
+    } else if (pkg.kind === 'ceremony') {
       if (typeof s.base === 'number') pkg.base = s.base;
     } else {
       if (s.buffet?.tiers?.length) pkg.buffet = { tiers: s.buffet.tiers, extra: s.buffet.extra };
@@ -345,8 +577,14 @@ export function applyPricing(payload: PricingPayload) {
   }
 }
 
+/** package by id, falling back to PRIME พิธีสงฆ์ (form paths always need *a* package) */
 export function pkgById(id: string): Pkg {
   return PKGS.find((p) => p.id === id) || PKGS[1];
+}
+
+/** package by id without the fallback — for links/presets where an unknown id must not become PRIME */
+export function findPkg(id: string | null | undefined): Pkg | undefined {
+  return id ? PKGS.find((p) => p.id === id) : undefined;
 }
 
 /** true when the package already covers this add-on (e.g. PRIME includes the drape) */
@@ -354,9 +592,34 @@ export function addonIncluded(pkgId: string, addonId: string): boolean {
   return (pkgById(pkgId).includedAddons || []).includes(addonId);
 }
 
-/** drop add-ons the package already includes — used when the package changes or a preset arrives */
+/** add-ons the package can be sold with (its line's add-ons, minus the included ones) */
+export function applicableAddons(pkgId: string): Addon[] {
+  const pkg = pkgById(pkgId);
+  return ADDONS.filter((a) => a.lines.includes(pkg.line) && !(pkg.includedAddons || []).includes(a.id));
+}
+
+/** quantity an add-on is charged for (drinks are per table) */
+export function addonQuantity(a: Addon, f: { tables: number }): number {
+  return a.perUnit === 'table' ? Math.max(0, f.tables) : 1;
+}
+
+/** keep only add-ons the package can be sold with — used when the package changes or a preset arrives */
 export function stripIncludedAddons(pkgId: string, addons: string[]): string[] {
-  return addons.filter((a) => !addonIncluded(pkgId, a));
+  const ok = new Set(applicableAddons(pkgId).map((a) => a.id));
+  return addons.filter((a) => ok.has(a));
+}
+
+/** the headline price of a package card ("เริ่มต้น" for tiered, per unit for catering) */
+export function startPrice(p: Pkg): number {
+  if (p.kind === 'catering') return p.unit === 'table' ? p.perTable ?? 0 : p.perHead?.[5] ?? 0;
+  if (p.kind === 'full') return p.buffet!.tiers[0][1];
+  return p.base!;
+}
+
+/** prefix + suffix around startPrice: ["เริ่มต้น", "บาท"] / ["", "บาท/ท่าน"] / ["", "บาท/โต๊ะ"] */
+export function priceUnitLabel(p: Pkg): { prefix: string; suffix: string } {
+  if (p.kind === 'catering') return { prefix: p.unit === 'guest' ? 'เริ่มต้น' : '', suffix: p.unit === 'table' ? 'บาท/โต๊ะ' : 'บาท/ท่าน' };
+  return { prefix: p.kind === 'full' ? 'เริ่มต้น' : '', suffix: 'บาท' };
 }
 
 // Comparison rows for the package-pick step: price rows + every feature
@@ -365,7 +628,9 @@ export function compareRows(kind: PkgKind): { label: string; values: string[] }[
   const pkgs = PKGS.filter((p) => p.kind === kind);
   const rows: { label: string; values: string[] }[] = [];
 
-  if (kind === 'full') {
+  if (kind === 'catering') {
+    rows.push({ label: 'ราคาเริ่มต้น', values: pkgs.map((p) => `${baht(startPrice(p))}.- /${p.unit === 'table' ? 'โต๊ะ' : 'ท่าน'}`) });
+  } else if (kind === 'full') {
     rows.push(
       { label: 'บุฟเฟต์ แขก 20 ท่าน', values: pkgs.map((p) => baht(p.buffet!.tiers[0][1]) + '.-') },
       { label: 'เพิ่มแขก / ท่าน', values: pkgs.map((p) => baht(p.buffet!.extra) + '.-') },

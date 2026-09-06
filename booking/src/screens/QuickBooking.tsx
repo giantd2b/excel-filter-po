@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ADDONS, OCCASIONS, TIME_OPTS, addonIncluded, baht, pkgById, SERVICE_AREA_TEXT, isServiceProvince } from '../data/packages';
+import { addonQuantity, applicableAddons, baht, occasionsFor, pkgById, timeOptsFor, SERVICE_AREA_TEXT, isServiceProvince } from '../data/packages';
 import { calc, finalizeForm, summary, type BookingForm } from '../lib/calc';
 import { submitBooking, type BookingLinkInfo } from '../lib/api';
 import { FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
@@ -45,8 +45,9 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
   // price the venue the customer actually gets: with "same address" the billing district is the venue
   const c = calc(finalizeForm(f, 'billing'), preset && typeof preset.depositAmount === 'number' ? preset.depositAmount : linkInfo.depositAmount ?? undefined);
   const hasFood = pkg.kind === 'full';
+  const isCatering = pkg.kind === 'catering';
 
-  const setF = <K extends keyof BookingForm>(k: K, v: BookingForm[K]) => {
+  const setF =<K extends keyof BookingForm>(k: K, v: BookingForm[K]) => {
     setForm({ ...f, [k]: v });
     setErr('');
   };
@@ -97,12 +98,22 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
     }
   };
 
-  const chosenAddons = ADDONS.filter((a) => f.addons.includes(a.id) && !addonIncluded(f.pkg, a.id));
+  const chosenAddons = applicableAddons(f.pkg).filter((a) => f.addons.includes(a.id) && addonQuantity(a, f) > 0);
+  const addonText = (a: (typeof chosenAddons)[number]) => (a.perUnit ? `${a.label} (${addonQuantity(a, f)} โต๊ะ)` : a.label);
+  const foodText = isCatering
+    ? pkg.unit === 'table'
+      ? `โต๊ะจีน ${f.tables} โต๊ะ (${pkg.courses} อย่าง)`
+      : `บุฟเฟต์อาหารไทย ${f.dishCount} อย่าง · ${f.guests} ท่าน`
+    : hasFood
+      ? f.foodMode === 'table'
+        ? `โต๊ะจีน ${f.tables} โต๊ะ`
+        : `บุฟเฟต์ ${f.guests} ท่าน`
+      : 'อาหารถวายพระ (ไม่รวมเลี้ยงแขก)';
 
   return (
     <div>
       <div style={{ padding: '22px 20px 8px' }}>
-        <div style={{ ...charm, fontSize: 30, lineHeight: 1.2, color: 'var(--color-accent-900)' }}>ขอใบเสนอราคางานบุญ</div>
+        <div style={{ ...charm, fontSize: 30, lineHeight: 1.2, color: 'var(--color-accent-900)' }}>{isCatering ? 'ขอใบเสนอราคาจัดเลี้ยง' : 'ขอใบเสนอราคางานบุญ'}</div>
         <div style={{ fontSize: 14, color: 'var(--color-neutral-600)', marginTop: 6, lineHeight: 1.6 }}>
           ทีมงานจัดแพ็กเกจให้คุณ{linkInfo.customerName}แล้ว กรอกข้อมูลติดต่อ ที่อยู่ และสถานที่จัดงาน ระบบจะออกใบเสนอราคาให้ทันที การจองจะสมบูรณ์เมื่อชำระมัดจำ
         </div>
@@ -141,10 +152,10 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
           )}
           {[
             ['แพ็กเกจ', pkg.name],
-            ['พระสงฆ์', `${f.monks} รูป`],
-            ['อาหาร', hasFood ? (f.foodMode === 'table' ? `โต๊ะจีน ${f.tables} โต๊ะ` : `บุฟเฟต์ ${f.guests} ท่าน`) : 'อาหารถวายพระ (ไม่รวมเลี้ยงแขก)'],
-            ['ออปชั่นเสริม', chosenAddons.length ? chosenAddons.map((a) => a.label).join(', ') : '-'],
-            ['นิมนต์รับ-ส่งพระ', f.selfTransport ? 'ดำเนินการเอง' : 'ทีมงานดำเนินการ'],
+            ...(isCatering ? [] : [['พระสงฆ์', `${f.monks} รูป`]]),
+            ['อาหาร', foodText],
+            ['ออปชั่นเสริม', chosenAddons.length ? chosenAddons.map(addonText).join(', ') : '-'],
+            ...(isCatering ? [] : [['นิมนต์รับ-ส่งพระ', f.selfTransport ? 'ดำเนินการเอง' : 'ทีมงานดำเนินการ']]),
             ...(preset?.occasion ? [['ประเภทงาน', f.occasion]] : []),
             ...(preset?.eventDate ? [['วันเวลา', `${fmtThaiDate(f.date)} · ${f.time}`]] : []),
           ].map(([k, v]) => (
@@ -256,9 +267,9 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
         {(needOccasion || needDate || needTime) && <SectionHead>วันเวลาจัดงาน</SectionHead>}
         {needOccasion && (
           <div>
-            <FieldLabel>ประเภทงานบุญ</FieldLabel>
+            <FieldLabel>{isCatering ? 'ประเภทงาน' : 'ประเภทงานบุญ'}</FieldLabel>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {OCCASIONS.map((o) => (
+              {occasionsFor(pkg.line).map((o) => (
                 <div key={o} onClick={() => setF('occasion', o)} style={chipStyle(f.occasion === o)}>
                   {o}
                 </div>
@@ -275,9 +286,9 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
         )}
         {needTime && (
           <div>
-            <FieldLabel>ช่วงเวลาพิธี</FieldLabel>
+            <FieldLabel>{isCatering ? 'ช่วงเวลาเสิร์ฟ' : 'ช่วงเวลาพิธี'}</FieldLabel>
             <div style={{ display: 'flex', gap: 8 }}>
-              {TIME_OPTS.map((tm) => (
+              {timeOptsFor(pkg.line).map((tm) => (
                 <div key={tm.v} onClick={() => setF('time', tm.v)} style={cardStyle(f.time === tm.v, { flex: 1, padding: 13, textAlign: 'center' })}>
                   <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{tm.label}</div>
                   <div style={{ fontSize: 13, color: 'var(--color-neutral-600)', marginTop: 2 }}>{tm.sub}</div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { LINE_URL, PHONE, pkgById, stripIncludedAddons, type Pkg } from './data/packages';
-import { initialForm, type BookingForm } from './lib/calc';
+import { LINE_URL, PHONE, findPkg, pkgById, type Pkg, type PkgLine } from './data/packages';
+import { formForPackage, initialForm, type BookingForm } from './lib/calc';
 import { getBookingLink, type BookingLinkInfo } from './lib/api';
 import { loadPricing } from './lib/pricing';
 import Home from './screens/Home';
@@ -21,9 +21,13 @@ export interface SavedBooking {
 
 type Screen = 'home' | 'detail' | 'book' | 'quick' | 'done';
 
+/** default package when the wizard is entered from a line tab (same picks the wizard's line toggle makes) */
+const PKGS_FIRST: Record<PkgLine, string> = { merit: 'ceremony-prime', buffet: 'buffet-standard', chinese: 'chinese-2300' };
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [pkgId, setPkgId] = useState('ceremony-prime');
+  const [homeLine, setHomeLine] = useState<PkgLine>('merit');
   const [form, setForm] = useState<BookingForm>(initialForm);
   const [saved, setSaved] = useState<SavedBooking | null>(null);
   const [wizardStep, setWizardStep] = useState(0);
@@ -43,28 +47,37 @@ export default function App() {
       if (!info) return;
       setLinkInfo(info);
       const p = info.preset;
-      setForm((f) => ({
-        ...f,
-        name: f.name || info.customerName || '',
-        phone: f.phone || info.phone || '',
-        pkg: info.packageId && pkgById(info.packageId) ? info.packageId : f.pkg,
-        ...(p
-          ? {
-              foodMode: p.foodMode,
-              guests: p.guests,
-              tables: p.tables,
-              monks: p.monks,
-              selfTransport: p.selfTransport,
-              // PRIME includes the drape — never carry it in from an admin preset
-              addons: stripIncludedAddons(info.packageId && pkgById(info.packageId) ? info.packageId : f.pkg, p.addons || []),
-              occasion: p.occasion || f.occasion,
-              date: p.eventDate || f.date,
-              time: p.timeSlot || f.time,
-              wantVat: p.wantVat ?? f.wantVat,
-            }
-          : {}),
-      }));
-      if (info.packageId && pkgById(info.packageId)) setPkgId(info.packageId);
+      // findPkg (not pkgById): an id this bundle doesn't know must not silently become PRIME
+      const linkPkg = findPkg(info.packageId);
+      setForm((f) => {
+        const base: BookingForm = {
+          ...f,
+          name: f.name || info.customerName || '',
+          phone: f.phone || info.phone || '',
+          ...(p
+            ? {
+                foodMode: p.foodMode,
+                guests: p.guests,
+                tables: p.tables,
+                monks: p.monks,
+                dishCount: p.dishCount ?? f.dishCount,
+                selfTransport: p.selfTransport,
+                addons: p.addons || [],
+                occasion: p.occasion || f.occasion,
+                date: p.eventDate || f.date,
+                time: p.timeSlot || f.time,
+                wantVat: p.wantVat ?? f.wantVat,
+              }
+            : {}),
+        };
+        // formForPackage keeps the preset consistent with the package (drops the included drape,
+        // other lines' add-ons, forces no monks for catering …)
+        return linkPkg ? formForPackage(base, linkPkg.id) : base;
+      });
+      if (linkPkg) {
+        setPkgId(linkPkg.id);
+        setHomeLine(linkPkg.line);
+      }
       // sales fixed the package: skip straight to the short confirmation form
       if (p) setScreen('quick');
     });
@@ -125,9 +138,9 @@ export default function App() {
             บ
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ ...charm, fontSize: 19, lineHeight: 1.4, color: 'var(--color-accent-800)' }}>IRIS เติมบุญ</div>
+            <div style={{ ...charm, fontSize: 19, lineHeight: 1.4, color: 'var(--color-accent-800)' }}>IRIS เติมบุญ · IRIS Catering</div>
             <div style={{ fontSize: 11, color: 'var(--color-neutral-600)', letterSpacing: '.02em' }}>
-              รับจัดงานบุญ พิธีสงฆ์ครบวงจร
+              รับจัดงานบุญ · บุฟเฟต์อาหารไทย · โต๊ะจีน
             </div>
           </div>
         </div>
@@ -153,7 +166,11 @@ export default function App() {
 
       {screen === 'home' && (
         <Home
+          line={homeLine}
+          onLineChange={setHomeLine}
           onStartBooking={() => {
+            // start the wizard on the line the customer was browsing
+            if (pkgById(form.pkg).line !== homeLine) setForm(formForPackage(form, PKGS_FIRST[homeLine]));
             setScreen('book');
             window.scrollTo(0, 0);
           }}
@@ -170,7 +187,7 @@ export default function App() {
           pkg={pkgById(pkgId)}
           onBack={goHome}
           onBook={() => {
-            setForm({ ...form, pkg: pkgId });
+            setForm(formForPackage(form, pkgId));
             setScreen('book');
             window.scrollTo(0, 0);
           }}

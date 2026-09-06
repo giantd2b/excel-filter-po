@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FAQS, PKGS, PROVINCES, REVIEWS, baht, type Pkg } from '../data/packages';
+import { FAQS, LINES, PKGS, PROVINCES, REVIEWS, baht, priceUnitLabel, startPrice, type Pkg, type PkgLine } from '../data/packages';
 import { SectionTitle, charm } from '../ui';
 
 const WORK_SLOTS = [
@@ -41,12 +41,22 @@ function WorkImage({ file, label }: { file: string; label: string }) {
 }
 
 interface Props {
+  /** product line tab (owned by App so the wizard and links can preselect it) */
+  line: PkgLine;
+  onLineChange: (line: PkgLine) => void;
   onStartBooking: () => void;
   onOpenPkg: (p: Pkg) => void;
 }
 
-export default function Home({ onStartBooking, onOpenPkg }: Props) {
+const LINE_INTRO: Record<PkgLine, { title: string; sub: string }> = {
+  merit: { title: 'แพ็กเกจงานบุญ', sub: 'แตะที่การ์ดเพื่อดูสิ่งที่ได้ในแพ็กเกจทั้งหมด' },
+  buffet: { title: 'บุฟเฟต์อาหารไทย', sub: 'คิดราคาต่อท่านตามจำนวนอย่างที่เลือก (5-8 อย่าง) ขั้นต่ำ 40 ท่าน · แตะดูเมนูทั้งหมด' },
+  chinese: { title: 'โต๊ะจีน', sub: 'คิดราคาต่อโต๊ะ 8 ท่าน เลือกได้จานละ 1 เมนู ขั้นต่ำ 10 โต๊ะ · แตะดูเมนูแต่ละจาน' },
+};
+
+export default function Home({ line, onLineChange, onStartBooking, onOpenPkg }: Props) {
   const [openFaq, setOpenFaq] = useState(-1);
+  const shown = PKGS.filter((p) => p.line === line);
 
   const scrollPkgs = () => {
     const el = document.getElementById('pkgs');
@@ -173,20 +183,56 @@ export default function Home({ onStartBooking, onOpenPkg }: Props) {
 
       {/* packages */}
       <div id="pkgs" style={{ padding: '4px 20px 8px' }}>
-        <SectionTitle style={{ margin: '0 0 6px' }}>แพ็กเกจงานบุญ</SectionTitle>
-        <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--color-neutral-600)' }}>
-          แตะที่การ์ดเพื่อดูสิ่งที่ได้ในแพ็กเกจทั้งหมด
-        </p>
+        {/* product line tabs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            padding: 4,
+            marginBottom: 16,
+            background: 'var(--color-neutral-200)',
+            borderRadius: 999,
+          }}
+        >
+          {LINES.map((l) => {
+            const on = l.id === line;
+            return (
+              <div
+                key={l.id}
+                onClick={() => onLineChange(l.id)}
+                style={{
+                  flex: 1,
+                  padding: '9px 6px',
+                  borderRadius: 999,
+                  textAlign: 'center',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: on ? 'var(--color-accent-700)' : 'transparent',
+                  color: on ? '#f5ead8' : 'var(--color-neutral-700)',
+                  transition: 'background .15s',
+                }}
+              >
+                {l.short}
+              </div>
+            );
+          })}
+        </div>
+        <SectionTitle style={{ margin: '0 0 6px' }}>{LINE_INTRO[line].title}</SectionTitle>
+        <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--color-neutral-600)' }}>{LINE_INTRO[line].sub}</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 20px 28px' }}>
-        {PKGS.map((p, i) => {
+        {shown.map((p, i) => {
           const header =
-            i === 0
-              ? 'ไม่มีอาหารเลี้ยงแขก'
-              : p.kind === 'full' && PKGS[i - 1].kind === 'ceremony'
-                ? 'มีอาหารเลี้ยงแขก (ครบวงจร)'
-                : '';
+            line !== 'merit'
+              ? ''
+              : i === 0
+                ? 'ไม่มีอาหารเลี้ยงแขก'
+                : p.kind === 'full' && shown[i - 1].kind === 'ceremony'
+                  ? 'มีอาหารเลี้ยงแขก (ครบวงจร)'
+                  : '';
+          const unit = priceUnitLabel(p);
           return (
             <div key={p.id} style={{ display: 'contents' }}>
               {header && (
@@ -273,13 +319,11 @@ export default function Home({ onStartBooking, onOpenPkg }: Props) {
                       ))}
                     </div>
                     <div style={{ marginTop: 'auto', paddingTop: 10, display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                      <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>
-                        {p.kind === 'full' ? 'เริ่มต้น' : ''}
-                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{unit.prefix}</span>
                       <span style={{ ...charm, fontSize: 25, color: 'var(--color-accent-700)', lineHeight: 1.3 }}>
-                        {baht(p.kind === 'full' ? p.buffet!.tiers[0][1] : p.base!)}
+                        {baht(startPrice(p))}
                       </span>
-                      <span style={{ fontSize: 13, color: 'var(--color-neutral-700)' }}>บาท</span>
+                      <span style={{ fontSize: 13, color: 'var(--color-neutral-700)' }}>{unit.suffix}</span>
                     </div>
                   </div>
                 </div>

@@ -1,10 +1,13 @@
 import {
-  ADDONS,
-  addonIncluded,
   DEPOSIT_RULE,
   DISCOUNTS,
+  addonQuantity,
+  applicableAddons,
   baht,
+  occasionsFor,
   pkgById,
+  stripIncludedAddons,
+  timeOptsFor,
   travelAreaLabel,
   travelFeeFor,
   type FoodMode,
@@ -26,6 +29,8 @@ export interface BookingForm {
   guests: number;
   tables: number;
   monks: number;
+  /** catering buffet: savoury dishes 5–8 (ignored by every other package) */
+  dishCount: number;
   selfTransport: boolean;
   addons: string[];
   budget: string;
@@ -67,6 +72,7 @@ export const initialForm: BookingForm = {
   guests: 30,
   tables: 10,
   monks: 9,
+  dishCount: 6,
   selfTransport: false,
   addons: [],
   budget: '',
@@ -134,7 +140,44 @@ export function addressLine(f: BookingForm): string {
   return composeAddress(f.venue, f.tambon, f.amphoe, f.province, f.zip) || 'ยังไม่ระบุ';
 }
 
+/**
+ * Switch the form to another package and make the rest of it consistent: catering has no monks
+ * and its food mode follows the unit; add-ons/occasion/time that belong to another line are
+ * reset; counts are lifted to the package minimum. Used by the wizard, the detail page and
+ * admin presets so every entry point agrees.
+ */
+export function formForPackage(f: BookingForm, pkgId: string): BookingForm {
+  const pkg = pkgById(pkgId);
+  const out: BookingForm = { ...f, pkg: pkg.id, addons: stripIncludedAddons(pkg.id, f.addons) };
+  if (pkg.kind === 'catering') {
+    out.foodMode = pkg.unit === 'table' ? 'table' : 'buffet';
+    out.monks = 0;
+    out.selfTransport = false;
+    const min = pkg.minCount ?? 1;
+    if (pkg.unit === 'table') out.tables = Math.max(min, f.tables || 0);
+    else out.guests = Math.max(min, f.guests || 0);
+    if (!(out.dishCount >= 5 && out.dishCount <= 8)) out.dishCount = 6;
+  } else if (!out.monks) {
+    out.monks = 9;
+  }
+  if (!occasionsFor(pkg.line).includes(out.occasion)) out.occasion = occasionsFor(pkg.line)[0];
+  if (!timeOptsFor(pkg.line).some((t) => t.v === out.time)) out.time = timeOptsFor(pkg.line)[0].v;
+  return out;
+}
+
+/** catering unit price for the form (per guest at the chosen dish count, or per table) */
+export function cateringUnit(pkg: Pkg, f: { dishCount: number }): number {
+  if (pkg.unit === 'table') return pkg.perTable ?? 0;
+  const d = Math.min(8, Math.max(5, f.dishCount || 6)) as 5 | 6 | 7 | 8;
+  return pkg.perHead?.[d] ?? 0;
+}
+
 export function tierPrice(pkg: Pkg, f: BookingForm): { base: number; label: string } {
+  if (pkg.kind === 'catering') {
+    const unit = cateringUnit(pkg, f);
+    if (pkg.unit === 'table') return { base: unit * f.tables, label: `${pkg.name} × ${f.tables} โต๊ะ` };
+    return { base: unit * f.guests, label: `${f.dishCount} อย่าง × ${f.guests} ท่าน (${baht(unit)}/ท่าน)` };
+  }
   if (pkg.kind === 'ceremony') return { base: pkg.base!, label: 'ราคาแพ็กเกจ' };
   const cfg = f.foodMode === 'table' ? pkg.table! : pkg.buffet!;
   const count = f.foodMode === 'table' ? f.tables : f.guests;
@@ -188,23 +231,29 @@ export function computeDeposit(foodAmount: number): number {
 
 export function calc(f: BookingForm, manualDeposit?: number | null): CalcResult {
   const pkg = pkgById(f.pkg);
+  const isCatering = pkg.kind === 'catering';
   const t = tierPrice(pkg, f);
   const foodCfg = pkg.kind === 'full' ? (f.foodMode === 'table' ? pkg.table : pkg.buffet) : null;
-  const foodAmount = foodCfg ? Math.round(foodCfg.extra * (f.foodMode === 'table' ? f.tables : f.guests)) : 0;
+  let foodAmount = foodCfg ? Math.round(foodCfg.extra * (f.foodMode === 'table' ? f.tables : f.guests)) : 0;
   const rows: { k: string; v: string }[] = [{ k: t.label, v: baht(t.base) }];
   let total = t.base;
-  for (const a of ADDONS) {
-    if (f.addons.includes(a.id) && !addonIncluded(f.pkg, a.id)) {
-      total += a.price;
-      rows.push({ k: a.label, v: '+' + baht(a.price) });
-    }
+  let addonsTotal = 0;
+  for (const a of applicableAddons(f.pkg)) {
+    if (!f.addons.includes(a.id)) continue;
+    const qty = addonQuantity(a, f);
+    if (qty <= 0) continue;
+    addonsTotal += a.price * qty;
+    rows.push({ k: a.perUnit ? `${a.label} × ${qty} โต๊ะ` : a.label, v: '+' + baht(a.price * qty) });
   }
-  if (f.selfTransport) {
+  total += addonsTotal;
+  // catering deposit is based on the food + drinks (owner decision), merit on the guest food only
+  if (isCatering) foodAmount = t.base + addonsTotal;
+  if (!isCatering && f.selfTransport) {
     total -= DISCOUNTS.selfTransport;
     rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: '−' + baht(DISCOUNTS.selfTransport) });
   }
-  // every package: 5 monks instead of 9 (new-package-2025 sheet)
-  if (f.monks === 5) {
+  // every merit package: 5 monks instead of 9 (new-package-2025 sheet)
+  if (!isCatering && f.monks === 5) {
     total -= DISCOUNTS.fiveMonks;
     rows.push({ k: 'พระ 5 รูป', v: '−' + baht(DISCOUNTS.fiveMonks) });
   }
@@ -233,8 +282,15 @@ export function summary(f: BookingForm): { k: string; v: string }[] {
     { k: 'ใบกำกับภาษี', v: f.wantVat ? 'ต้องการ (คิด VAT 7%)' : 'ไม่ต้องการ (ไม่รวม VAT)' },
     { k: 'มัดจำเพื่อยืนยันคิว', v: baht(c.deposit) + ' บาท' },
     { k: 'แพ็กเกจ', v: c.pkg.name },
-    { k: 'พระสงฆ์', v: f.monks + ' รูป' },
   ];
+  if (c.pkg.kind === 'catering') {
+    rows.push({
+      k: 'อาหาร',
+      v: c.pkg.unit === 'table' ? `โต๊ะจีน ${f.tables} โต๊ะ (${c.pkg.courses} อย่าง)` : `บุฟเฟต์อาหารไทย ${f.dishCount} อย่าง · ${f.guests} ท่าน`,
+    });
+    return rows;
+  }
+  rows.push({ k: 'พระสงฆ์', v: f.monks + ' รูป' });
   if (c.pkg.kind === 'full') {
     rows.push({
       k: 'อาหาร',

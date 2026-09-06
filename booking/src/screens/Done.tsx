@@ -14,7 +14,7 @@ export default function Done({ saved, onHome, chatChannel }: Props) {
   const [copied, setCopied] = useState(false);
 
   const copySummary = () => {
-    const txt = ['ขอใบเสนอราคางานบุญ ' + saved.code]
+    const txt = ['ขอใบเสนอราคา ' + saved.code]
       .concat(saved.rows.map((x) => x.k + ': ' + x.v))
       .concat([
         'ราคาประเมิน: ' + baht(saved.total) + ' บาท',
