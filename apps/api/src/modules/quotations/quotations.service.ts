@@ -854,6 +854,38 @@ export class QuotationsService {
   }
 
   /**
+   * An earlier slip (last 6 h) for the same amount that is really the same transfer: same payer
+   * name, or bank references that differ in at most 2 characters (OCR noise like I/1, O/0).
+   */
+  private async findDuplicateSlip(id: string, amount: number): Promise<{ id: string; matchedDocNo: string | null } | null> {
+    const norm = (s?: string | null) => (s || '').replace(/\s+/g, '').toUpperCase();
+    const me = await this.prisma.slip.findUnique({ where: { id }, select: { senderName: true, referenceNumber: true, createdAt: true } }).catch(() => null);
+    if (!me) return null;
+    const since = new Date((me.createdAt?.getTime() || Date.now()) - 6 * 3600 * 1000);
+    const others = await this.prisma.slip
+      .findMany({
+        where: { id: { not: id }, amount, createdAt: { gte: since, lte: me.createdAt || new Date() } },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, senderName: true, referenceNumber: true, matchedDocNo: true },
+      })
+      .catch(() => []);
+    const close = (a: string, b: string) => {
+      if (!a || !b || Math.abs(a.length - b.length) > 2) return false;
+      let diff = 0;
+      const n = Math.max(a.length, b.length);
+      for (let i = 0; i < n; i++) if (a[i] !== b[i] && ++diff > 2) return false;
+      return true;
+    };
+    const mySender = norm(me.senderName);
+    const myRef = norm(me.referenceNumber);
+    for (const o of others) {
+      if (mySender && mySender === norm(o.senderName)) return { id: o.id, matchedDocNo: o.matchedDocNo };
+      if (myRef && close(myRef, norm(o.referenceNumber))) return { id: o.id, matchedDocNo: o.matchedDocNo };
+    }
+    return null;
+  }
+
+  /**
    * A bank-transfer slip arrived in this customer's chat. If exactly one of their open quotations
    * has a deposit equal to the slip amount (or the slip covers the whole document), mark it มัดจำแล้ว,
    * thank the customer in the chat and tell the team. Anything ambiguous only notifies the team.
@@ -871,8 +903,20 @@ export class QuotationsService {
       void pushTeamText(`💰 สลิปจาก ${custName}${amount ? ` ${amount.toLocaleString('th-TH')} บาท` : ' (อ่านยอดไม่ได้)'}\nกรุณาตรวจสอบและจับคู่ใบเสนอราคาเอง${slip.imageUrl ? `\n${slip.imageUrl}` : ''}`);
       return { matched: false, reason: 'no-amount' };
     }
+    // The same transfer often arrives twice (customer forwards the slip on LINE and Facebook, or
+    // sends it again): same amount + same payer name / near-identical reference within a few hours
+    // → treat as one slip: inherit the match, never alert the team twice.
+    const dup = await this.findDuplicateSlip(slip.id, amount);
+    if (dup) {
+      this.logger.log(`slip ${slip.id} duplicates ${dup.id} (${amount} บาท) — no second alert`);
+      if (dup.matchedDocNo) await this.prisma.slip.update({ where: { id: slip.id }, data: { matchedDocNo: dup.matchedDocNo, matchedAt: new Date() } }).catch(() => {});
+      return { matched: !!dup.matchedDocNo, docNo: dup.matchedDocNo || undefined, reason: 'duplicate' };
+    }
+
     const list = await this.flowAccount.listQuotations({ crmCustomerId: slip.customerId, limit: 50 }).catch(() => ({ data: [] as any[] }));
-    const open = (list.data || []).filter((q: any) => ['PENDING', 'APPROVED'].includes(q.status));
+    // Quotations created from /booking start as DRAFT and stay there until sales sends them, so a
+    // deposit can (and usually does) arrive while the document is still a draft.
+    const open = (list.data || []).filter((q: any) => ['DRAFT', 'PENDING', 'APPROVED'].includes(q.status));
     const eq = (a: number, b: number) => Math.abs(a - b) < 0.5;
     const grand = (q: any) => parseFloat(String(q.grandTotal).replace(/,/g, '')) || 0;
     const hits = open.filter((q: any) => eq(Number(q.depositAmount) || 0, amount) || (grand(q) > 0 && eq(grand(q), amount)));
@@ -887,7 +931,14 @@ export class QuotationsService {
     const q = hits[0];
     const full = grand(q) > 0 && eq(grand(q), amount) && !eq(Number(q.depositAmount) || 0, amount);
     const note = `${full ? 'ชำระเต็มจำนวน' : 'มัดจำ'}จากสลิปในแชต ${fmt(amount)} บาท (${slip.id})`;
-    if (q.status === 'PENDING') await this.flowAccount.changeStatus(q.docNo, 'APPROVED', 'IRIS CRM (สลิป)', 'ลูกค้าโอนเงินตามใบเสนอราคา');
+    // walk the document up to DEPOSITED one step at a time (DRAFT → PENDING → APPROVED → DEPOSITED);
+    // intermediate steps are best-effort in case flowaccount-app allows a direct jump
+    const steps = ['PENDING', 'APPROVED'];
+    let idx = steps.indexOf(q.status) + 1; // DRAFT → 0 (needs both), PENDING → 1, APPROVED → 2 (none)
+    if (q.status === 'DRAFT') idx = 0;
+    for (const st of steps.slice(idx)) {
+      await this.flowAccount.changeStatus(q.docNo, st, 'IRIS CRM (สลิป)', 'ลูกค้าโอนเงินตามใบเสนอราคา').catch((e: any) => this.logger.warn(`${q.docNo}: ${q.status}→${st} skipped: ${e?.message || e}`));
+    }
     await this.flowAccount.changeStatus(q.docNo, 'DEPOSITED', 'IRIS CRM (สลิป)', note);
     await this.prisma.slip.update({ where: { id: slip.id }, data: { matchedDocNo: q.docNo, matchedAt: new Date() } }).catch(() => {});
     if (typeof q.externalRef === 'string' && q.externalRef.startsWith('TB-')) {
