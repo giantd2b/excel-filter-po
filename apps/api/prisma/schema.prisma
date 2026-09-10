@@ -458,6 +458,7 @@ model Booking {
   tables         Int
   monks          Int
   dishCount      Int?          @map("dish_count") // catering buffet: savoury dishes 5–8; null otherwise
+  selfInvite     Boolean       @default(false) @map("self_invite") // customer invites the monks; selfTransport = they drive them too
   selfTransport  Boolean       @default(false) @map("self_transport")
   addons         String[]      @default([])
   budget         String?

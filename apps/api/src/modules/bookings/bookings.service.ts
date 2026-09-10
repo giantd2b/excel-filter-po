@@ -10,6 +10,9 @@ import {
   FA_RECIPES_SETTING_KEY,
   BOOKING_PACKAGES,
   BOOKING_ADDONS,
+  MONK_OPTIONS,
+  MONK_TRANSPORT_OPTIONS,
+  monkDiscountFor,
   packageById,
   normalizeBookingInput,
   bookingInputError,
@@ -142,6 +145,9 @@ export class BookingsService {
         smallOrder: p.smallOrder ?? null,
       })),
       addons: BOOKING_ADDONS.map((a) => ({ id: a.id, label: a.label, price: a.price, perUnit: a.perUnit ?? null, lines: a.lines, code: config.addons[a.id] || null })),
+      // monk counts + their live discounts, so no client has to hardcode "5 รูป (ลด 1,500)"
+      monkOptions: MONK_OPTIONS.map((o) => ({ monks: o.monks, note: o.note ?? null, discount: monkDiscountFor(o.monks, pricing) })),
+      monkTransportOptions: MONK_TRANSPORT_OPTIONS,
       source: cat.source,
       fetchedAt: cat.fetchedAt,
       catalogError: cat.error || null,
@@ -264,6 +270,7 @@ export class BookingsService {
         tables: b.tables,
         monks: b.monks,
         dishCount: b.dishCount,
+        selfInvite: b.selfInvite,
         selfTransport: b.selfTransport,
         addons: b.addons,
         travelFee: b.travelFee || 0,
@@ -280,6 +287,16 @@ export class BookingsService {
     // without a `dishes` variable must not receive one).
     const { catalog } = await this.getCatalog();
     for (const item of built.items) {
+      if (!item.productCode) continue;
+      // the mapped product is gone from flowaccount-app (renamed, deleted, or never created):
+      // send the line as plain text where we know the price, instead of failing the whole document
+      if (!catalog[item.productCode] && item.fallback) {
+        Object.assign(item, item.fallback);
+        delete item.productCode;
+        delete item.variables;
+        delete item.exclude;
+      }
+      delete item.fallback;
       if (!item.productCode) continue;
       const product = catalog[item.productCode];
       if (item.variables && product?.variables) {
@@ -430,6 +447,7 @@ export class BookingsService {
       tables: dto.tables,
       monks: dto.monks,
       dishCount: dto.dishCount,
+      selfInvite: dto.selfInvite,
       selfTransport: dto.selfTransport,
       addons: dto.addons,
       travelFee,
@@ -468,6 +486,7 @@ export class BookingsService {
         tables: input.tables,
         monks: input.monks,
         dishCount: input.dishCount ?? null,
+        selfInvite: !!input.selfInvite,
         selfTransport: input.selfTransport,
         addons: input.addons,
         budget: dto.budget || null,
@@ -960,7 +979,7 @@ export class BookingsService {
     const travelFee = travelFeeFor(next.amphoe, await this.getTravelFees());
     const travelArea = travelFee > 0 ? travelAreaLabel(next.amphoe, next.province) : null;
     const calc = calcEstimatedTotal(
-      { packageId: b.packageId, foodMode: b.foodMode, guests: b.guests, tables: b.tables, monks: b.monks, dishCount: b.dishCount, selfTransport: b.selfTransport, addons: b.addons, travelFee, travelArea: travelArea || undefined },
+      { packageId: b.packageId, foodMode: b.foodMode, guests: b.guests, tables: b.tables, monks: b.monks, dishCount: b.dishCount, selfInvite: b.selfInvite, selfTransport: b.selfTransport, addons: b.addons, travelFee, travelArea: travelArea || undefined },
       await this.getPricing(),
     );
     const estimatedTotal = calc?.total ?? b.estimatedTotal;

@@ -414,7 +414,11 @@ export default function BookingsPage() {
                   <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                   <span className="line-clamp-2">{addressLine(b)}</span>
                 </div>
-                {b.selfTransport && <div className="text-xs text-emerald-600">นิมนต์รับ-ส่งพระเอง (ลด 1,000)</div>}
+                {b.selfTransport ? (
+                  <div className="text-xs text-emerald-600">นิมนต์รับ-ส่งพระเอง (ลด 1,000)</div>
+                ) : b.selfInvite ? (
+                  <div className="text-xs text-amber-600">นิมนต์พระเอง (ทีมงานรับ-ส่งพระให้)</div>
+                ) : null}
                 {b.note && <div className="text-xs text-slate-500 bg-slate-50 rounded-lg p-2">หมายเหตุ: {b.note}</div>}
               </div>
 

@@ -63,6 +63,11 @@ export class BookingPresetDto {
   @Max(8)
   dishCount?: number;
 
+  /** customer invites the monks themselves (no discount unless selfTransport too) */
+  @IsOptional()
+  @IsBoolean()
+  selfInvite?: boolean;
+
   @IsBoolean()
   selfTransport: boolean;
 

@@ -371,6 +371,7 @@ export const ADDONS: Addon[] = [
   { id: 'stage', label: 'เวทีพระ', sub: 'ขนาด 1.2 x 7.2 เมตร', price: 5000, lines: ['merit'] },
   { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง', sub: 'ขนาด 5x12 เมตร', price: 3000, lines: ['merit'] },
   { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', sub: 'ตกแต่งฉากหลังพิธี', price: 1000, lines: ['merit'] },
+  { id: 'almsround', label: 'ชุดตักบาตร', sub: 'ชุดใส่บาตรพร้อมของถวาย', price: 500, lines: ['merit'] },
   {
     id: 'drinks',
     label: 'เครื่องดื่ม',
@@ -440,7 +441,7 @@ export const FAQS: { q: string; a: string; site?: 'merit' | 'catering' }[] = [
   },
   {
     q: 'ถ้านิมนต์พระเองจะลดราคาไหม?',
-    a: 'หากท่านนิมนต์และรับ-ส่งพระเองทั้งสองอย่าง ลด 1,000 บาท หากทำอย่างใดอย่างหนึ่งไม่สามารถลดราคาได้ และทุกแพ็กเกจหากใช้พระ 5 รูป ลดเพิ่มอีก 1,500 บาท',
+    a: 'หากท่านนิมนต์และรับ-ส่งพระเองทั้งสองอย่าง ลด 1,000 บาท หากนิมนต์พระเองแต่ให้ทีมงานรับ-ส่งพระให้ ไม่มีส่วนลด (ระยะทางวัด-สถานที่จัดงาน ไป-กลับ ไม่เกิน 20 กม.) ส่วนการลดจำนวนพระ ลดได้ทุกแพ็กเกจ: พระ 7 รูป ลด 750 บาท · พระ 5 รูป หรือ 3 รูป ลด 1,500 บาท',
     site: 'merit',
   },
   {
@@ -504,7 +505,46 @@ export const PHONE = '0805838383';
 export const PHONE_LABEL = '080-583-8383 ต่อ 2';
 
 // Discounts — defaults only; live values arrive from GET /api/bookings/pricing (see applyPricing)
-export const DISCOUNTS = { selfTransport: 1000, fiveMonks: 1500 };
+export const DISCOUNTS = { selfTransport: 1000 };
+
+// ── จำนวนพระ ──────────────────────────────────────────────────────────
+// Order = the order the cards appear: 9 is the default, 5 the runner-up.
+// (mirror of apps/api packages.config.ts MONK_OPTIONS)
+export interface MonkOption {
+  monks: number;
+  discount: number;
+  /** badge under the card (only the default option has one) */
+  note?: string;
+}
+
+export const MONK_OPTIONS: MonkOption[] = [
+  { monks: 9, discount: 0, note: 'นิยมที่สุด' },
+  { monks: 5, discount: 1500 },
+  { monks: 7, discount: 750 },
+  { monks: 3, discount: 1500 },
+];
+
+export const DEFAULT_MONK_COUNT = 9;
+
+export function monkDiscount(monks: number): number {
+  return MONK_OPTIONS.find((o) => o.monks === monks)?.discount ?? 0;
+}
+
+// ── ใครนิมนต์ / ใครรับ-ส่งพระ ─────────────────────────────────────────
+// Two independent facts; the discount needs BOTH done by the customer.
+// (mirror of apps/api packages.config.ts MONK_TRANSPORT_OPTIONS)
+export type MonkArrangement = 'team' | 'invite' | 'self';
+
+export const MONK_TRANSPORT_OPTIONS: { id: MonkArrangement; label: string; sub: string; selfInvite: boolean; selfTransport: boolean }[] = [
+  { id: 'team', label: 'ทีมงานนิมนต์และรับ-ส่งพระให้', sub: 'รวมในแพ็กเกจแล้ว', selfInvite: false, selfTransport: false },
+  { id: 'invite', label: 'นิมนต์พระเอง ทีมงานรับ-ส่งพระให้', sub: 'ระยะทางวัด-สถานที่จัดงาน ไป-กลับ ไม่เกิน 20 กม.', selfInvite: true, selfTransport: false },
+  { id: 'self', label: 'นิมนต์และรับ-ส่งพระเอง', sub: 'ต้องดำเนินการเองทั้งสองอย่าง', selfInvite: true, selfTransport: true },
+];
+
+export function monkArrangementOf(f: { selfInvite?: boolean; selfTransport?: boolean }): MonkArrangement {
+  if (f.selfTransport) return 'self';
+  return f.selfInvite ? 'invite' : 'team';
+}
 
 /** Deposit rule (mirror of flowaccount-app); overwritten by applyPricing. */
 export const DEPOSIT_RULE: { tiers: { upTo: number; amount: number }[]; abovePercent: number } = {
@@ -555,8 +595,9 @@ export interface PricingPayload {
     >;
     addons: Record<string, number>;
     selfTransportDiscount: number;
-    fiveMonksDiscount: number;
+    monkDiscounts?: Record<string, number>;
   };
+  monkOptions?: { monks: number; discount: number; note?: string | null }[];
   depositRule?: { tiers: { upTo: number; amount: number }[]; abovePercent: number };
   travelFees?: Record<string, number>;
 }
@@ -591,7 +632,18 @@ export function applyPricing(payload: PricingPayload) {
     if (typeof v === 'number') a.price = v;
   }
   if (typeof p.selfTransportDiscount === 'number') DISCOUNTS.selfTransport = p.selfTransportDiscount;
-  if (typeof p.fiveMonksDiscount === 'number') DISCOUNTS.fiveMonks = p.fiveMonksDiscount;
+  // monk discounts: prefer the full list (it also fixes the order/badges), else the id→amount map
+  if (payload.monkOptions?.length) {
+    MONK_OPTIONS.length = 0;
+    for (const o of payload.monkOptions) {
+      MONK_OPTIONS.push({ monks: Number(o.monks), discount: Number(o.discount) || 0, ...(o.note ? { note: o.note } : {}) });
+    }
+  } else if (p.monkDiscounts) {
+    for (const o of MONK_OPTIONS) {
+      const v = p.monkDiscounts[String(o.monks)];
+      if (typeof v === 'number' && v >= 0) o.discount = v;
+    }
+  }
   const r = payload.depositRule;
   if (r?.tiers?.length) {
     DEPOSIT_RULE.tiers = r.tiers.map((t) => ({ upTo: Number(t.upTo), amount: Number(t.amount) }));

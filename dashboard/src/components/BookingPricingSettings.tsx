@@ -203,10 +203,14 @@ export default function BookingPricingSettings({ onClose }: { onClose?: () => vo
                 <td className="py-1 text-slate-600">นิมนต์และรับ-ส่งพระเอง (รายการ "ลดเมื่อไม่รับ")</td>
                 <td className="py-1 text-right font-semibold tabular-nums">−{fmt(p.selfTransportDiscount)}</td>
               </tr>
-              <tr className="border-t border-slate-100">
-                <td className="py-1 text-slate-600">พระ 5 รูป (ราคาฐาน 9 รูป − 5 รูป)</td>
-                <td className="py-1 text-right font-semibold tabular-nums">−{fmt(p.fiveMonksDiscount)}</td>
-              </tr>
+              {(data.monkOptions || [])
+                .filter((o) => o.discount > 0)
+                .map((o) => (
+                  <tr key={o.monks} className="border-t border-slate-100">
+                    <td className="py-1 text-slate-600">พระ {o.monks} รูป (ราคาฐาน 9 รูป − {o.monks} รูป)</td>
+                    <td className="py-1 text-right font-semibold tabular-nums">−{fmt(p.monkDiscounts?.[String(o.monks)] ?? o.discount)}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
           <p className="text-[11px] text-slate-400 mt-2">ตัวเลขที่หน้า /booking แสดง ใช้ค่านี้ ส่วนใบเสนอราคาจริงใช้ส่วนลดของสินค้าแต่ละตัวโดยตรง</p>

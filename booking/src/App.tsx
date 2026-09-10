@@ -77,6 +77,7 @@ export default function App() {
                 tables: p.tables,
                 monks: p.monks,
                 dishCount: p.dishCount ?? f.dishCount,
+                selfInvite: p.selfInvite ?? p.selfTransport,
                 selfTransport: p.selfTransport,
                 addons: p.addons || [],
                 occasion: p.occasion || f.occasion,

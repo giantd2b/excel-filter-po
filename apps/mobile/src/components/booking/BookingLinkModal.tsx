@@ -27,6 +27,8 @@ import {
   type BookingEstimate,
   type BookingLink,
   type BookingPreset,
+  type MonkOption,
+  type MonkTransportOption,
   type PricingAddon,
   type PricingPackage,
 } from '../../services/bookings';
@@ -34,10 +36,13 @@ import {
   DEFAULT_PRESET,
   DISH_COUNTS,
   FALLBACK_ADDONS,
+  FALLBACK_MONK_OPTIONS,
+  FALLBACK_MONK_TRANSPORT,
   FALLBACK_PACKAGES,
   LINES,
   buildLinkChatText,
   fmtThaiDate,
+  monkArrangementOf,
   normalizePresetFor,
   occasionsFor,
   smallOrderFor,
@@ -77,6 +82,8 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
   const [mode, setMode] = useState<Mode>('preset');
   const [packages, setPackages] = useState<PricingPackage[]>(FALLBACK_PACKAGES);
   const [addons, setAddons] = useState<PricingAddon[]>(FALLBACK_ADDONS);
+  const [monkOptions, setMonkOptions] = useState<MonkOption[]>(FALLBACK_MONK_OPTIONS);
+  const [monkTransport, setMonkTransport] = useState<MonkTransportOption[]>(FALLBACK_MONK_TRANSPORT);
   const [travelFees, setTravelFees] = useState<Record<string, number>>({});
   const [preset, setPreset] = useState<BookingPreset>(DEFAULT_PRESET);
   const [estimate, setEstimate] = useState<BookingEstimate | null>(null);
@@ -143,6 +150,8 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
       .then((d) => {
         if (d.packages.length) setPackages(d.packages);
         if (d.addons.length) setAddons(d.addons);
+        if (d.monkOptions?.length) setMonkOptions(d.monkOptions);
+        if (d.monkTransportOptions?.length) setMonkTransport(d.monkTransportOptions);
         if (d.travelFees) setTravelFees(d.travelFees);
       })
       .catch(() => {});
@@ -423,21 +432,25 @@ export default function BookingLinkModal({ visible, customer, onClose, onSend, o
                 <>
                   <Field label="พระสงฆ์">
                     <Chips
-                      options={[{ value: '9', label: '9 รูป' }, { value: '5', label: '5 รูป (ลด 1,500)' }]}
+                      options={monkOptions.map((o) => ({
+                        value: String(o.monks),
+                        label: o.discount > 0 ? `${o.monks} รูป (ลด ${o.discount.toLocaleString('th-TH')})` : `${o.monks} รูป`,
+                      }))}
                       value={String(preset.monks)}
                       onChange={(v) => set('monks', parseInt(v, 10))}
                     />
                   </Field>
 
-                  <View style={styles.switchRow}>
-                    <Text style={styles.switchLabel}>ลูกค้านิมนต์รับ-ส่งพระเอง</Text>
-                    <Switch
-                      value={preset.selfTransport}
-                      onValueChange={(v) => set('selfTransport', v)}
-                      trackColor={{ true: '#a5b4fc', false: '#e2e8f0' }}
-                      thumbColor={preset.selfTransport ? '#6366f1' : '#fff'}
+                  <Field label="นิมนต์ / รับ-ส่งพระ">
+                    <Chips
+                      options={monkTransport.map((o) => ({ value: o.id, label: o.label }))}
+                      value={monkArrangementOf(preset)}
+                      onChange={(v) => {
+                        const o = monkTransport.find((x) => x.id === v);
+                        if (o) setPreset((p) => ({ ...p, selfInvite: o.selfInvite, selfTransport: o.selfTransport }));
+                      }}
                     />
-                  </View>
+                  </Field>
                 </>
               ) : null}
 

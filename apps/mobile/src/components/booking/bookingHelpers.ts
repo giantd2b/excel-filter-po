@@ -1,4 +1,13 @@
-import type { BookingLink, BookingPreset, MeritBooking, PricingAddon, PricingPackage } from '../../services/bookings';
+import type {
+  BookingLink,
+  BookingPreset,
+  MeritBooking,
+  MonkArrangement,
+  MonkOption,
+  MonkTransportOption,
+  PricingAddon,
+  PricingPackage,
+} from '../../services/bookings';
 
 // ─── Status ────────────────────────────────────────────────────────────
 
@@ -154,8 +163,28 @@ export const FALLBACK_ADDONS: PricingAddon[] = [
   { id: 'stage', label: 'เวทีพระ', price: 5000, lines: ['merit'] },
   { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง', price: 3000, lines: ['merit'] },
   { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', price: 1000, lines: ['merit'] },
+  { id: 'almsround', label: 'ชุดตักบาตร', price: 500, lines: ['merit'] },
   { id: 'drinks', label: 'เครื่องดื่ม', price: 250, perUnit: 'table', lines: ['chinese'] },
 ];
+
+/** Fallbacks only — the live list (with the current discounts) comes from /bookings/pricing. */
+export const FALLBACK_MONK_OPTIONS: MonkOption[] = [
+  { monks: 9, discount: 0, note: 'นิยมที่สุด' },
+  { monks: 5, discount: 1500 },
+  { monks: 7, discount: 750 },
+  { monks: 3, discount: 1500 },
+];
+
+export const FALLBACK_MONK_TRANSPORT: MonkTransportOption[] = [
+  { id: 'team', label: 'ทีมงานนิมนต์และรับ-ส่งพระให้', sub: 'รวมในแพ็กเกจแล้ว', selfInvite: false, selfTransport: false },
+  { id: 'invite', label: 'นิมนต์พระเอง ทีมงานรับ-ส่ง', sub: 'ไป-กลับ ไม่เกิน 20 กม.', selfInvite: true, selfTransport: false },
+  { id: 'self', label: 'นิมนต์และรับ-ส่งพระเอง', sub: 'ลด 1,000', selfInvite: true, selfTransport: true },
+];
+
+export function monkArrangementOf(p: { selfInvite?: boolean; selfTransport?: boolean }): MonkArrangement {
+  if (p.selfTransport) return 'self';
+  return p.selfInvite ? 'invite' : 'team';
+}
 
 export const LINES: { id: string; label: string }[] = [
   { id: 'merit', label: 'งานบุญ' },
@@ -201,6 +230,7 @@ export const DEFAULT_PRESET: BookingPreset = {
   tables: 10,
   monks: 9,
   dishCount: 6,
+  selfInvite: false,
   selfTransport: false,
   addons: [],
   note: '',
@@ -222,12 +252,15 @@ export function normalizePresetFor(p: BookingPreset, pkg: PricingPackage | undef
     next.foodMode = pkg.unit === 'table' ? 'table' : 'buffet';
     next.monks = 0;
     next.selfTransport = false;
+    next.selfInvite = false;
     const min = pkg.minCount ?? 1;
     if (pkg.unit === 'table') next.tables = Math.max(min, p.tables || 0);
     else next.guests = Math.max(min, p.guests || 0);
     if (!(next.dishCount && next.dishCount >= 5 && next.dishCount <= 8)) next.dishCount = 6;
-  } else if (!p.monks) {
-    next.monks = 9;
+  } else {
+    if (!p.monks) next.monks = 9;
+    // doing both yourself implies inviting the monks yourself
+    if (p.selfTransport) next.selfInvite = true;
   }
   const occ = occasionsFor(line);
   if (next.occasion && !occ.includes(next.occasion) && (OCCASIONS.includes(next.occasion) || CATERING_OCCASIONS.includes(next.occasion))) next.occasion = occ[0];

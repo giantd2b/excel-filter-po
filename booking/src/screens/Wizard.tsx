@@ -3,10 +3,13 @@ import {
   DISCOUNTS,
   DISH_COUNTS,
   LINES,
+  MONK_OPTIONS,
+  MONK_TRANSPORT_OPTIONS,
   PKGS,
   addonQuantity,
   applicableAddons,
   baht,
+  monkArrangementOf,
   occasionsFor,
   pkgById,
   priceUnitLabel,
@@ -629,16 +632,16 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
               <FieldLabel>จำนวนพระสงฆ์</FieldLabel>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[5, 9].map((m) => (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {MONK_OPTIONS.map((o) => (
                   <div
-                    key={m}
-                    onClick={() => setF('monks', m)}
-                    style={cardStyle(f.monks === m, { flex: 1, padding: 13, textAlign: 'center' })}
+                    key={o.monks}
+                    onClick={() => setF('monks', o.monks)}
+                    style={cardStyle(f.monks === o.monks, { padding: 13, textAlign: 'center' })}
                   >
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>พระ {m} รูป</div>
+                    <div style={{ fontSize: 16, fontWeight: 600 }}>พระ {o.monks} รูป</div>
                     <div style={{ fontSize: 12, color: 'var(--color-neutral-600)', marginTop: 2 }}>
-                      {m === 9 ? 'นิยมที่สุด' : 'ลด ' + baht(DISCOUNTS.fiveMonks)}
+                      {o.discount > 0 ? 'ลด ' + baht(o.discount) : o.note || ' '}
                     </div>
                   </div>
                 ))}
@@ -826,19 +829,30 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
               </div>
             </div>
             {!isCatering && (
-            <div
-              onClick={() => setF('selfTransport', !f.selfTransport)}
-              style={cardStyle(f.selfTransport, { display: 'flex', alignItems: 'center', gap: 13, padding: '14px 16px' })}
-            >
-              <div style={checkStyle(f.selfTransport, 'var(--color-accent-2-600)')}>{f.selfTransport ? '✓' : ''}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>นิมนต์และรับ-ส่งพระเอง</div>
-                <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>ต้องดำเนินการเองทั้งสองอย่าง</div>
+              <div>
+                <FieldLabel>การนิมนต์และรับ-ส่งพระ</FieldLabel>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {MONK_TRANSPORT_OPTIONS.map((o) => {
+                    const on = monkArrangementOf(f) === o.id;
+                    return (
+                      <div
+                        key={o.id}
+                        onClick={() => setForm({ ...f, selfInvite: o.selfInvite, selfTransport: o.selfTransport })}
+                        style={cardStyle(on, { display: 'flex', alignItems: 'center', gap: 13, padding: '14px 16px' })}
+                      >
+                        <div style={{ ...checkStyle(on, 'var(--color-accent-2-600)'), borderRadius: 999 }}>{on ? '✓' : ''}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{o.label}</div>
+                          <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>{o.sub}</div>
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-accent-2-700)', whiteSpace: 'nowrap' }}>
+                          {o.selfTransport ? `ลด ${baht(DISCOUNTS.selfTransport)}` : ''}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-accent-2-700)', whiteSpace: 'nowrap' }}>
-                ลด {baht(DISCOUNTS.selfTransport)}
-              </div>
-            </div>
             )}
             <div>
               <FieldLabel>งบประมาณที่ตั้งไว้ (ไม่บังคับ)</FieldLabel>

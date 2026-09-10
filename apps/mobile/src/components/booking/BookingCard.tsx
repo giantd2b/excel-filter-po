@@ -129,7 +129,11 @@ export default function BookingCard({
         ) : null}
         <Text style={styles.line}>📅 {b.eventDate || '-'} · {b.timeSlot || '-'} · {b.occasion || '-'}</Text>
         <Text style={styles.line} numberOfLines={2}>📍 {addressLine(b)}</Text>
-        {b.selfTransport ? <Text style={styles.green}>นิมนต์รับ-ส่งพระเอง (ลด 1,000)</Text> : null}
+        {b.selfTransport ? (
+          <Text style={styles.green}>นิมนต์รับ-ส่งพระเอง (ลด 1,000)</Text>
+        ) : b.selfInvite ? (
+          <Text style={styles.green}>นิมนต์พระเอง (ทีมงานรับ-ส่งพระให้)</Text>
+        ) : null}
         {b.note ? (
           <View style={styles.noteBox}>
             <Text style={styles.muted}>หมายเหตุ: {b.note}</Text>

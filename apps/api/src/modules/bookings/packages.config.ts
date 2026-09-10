@@ -98,6 +98,7 @@ export const BOOKING_ADDONS: BookingAddon[] = [
   { id: 'stage', label: 'เวทีพระ', price: 5000, lines: ['merit'] },
   { id: 'tent', label: 'เต็นท์เพิ่ม 1 หลัง', price: 3000, lines: ['merit'] },
   { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', price: 1000, lines: ['merit'] },
+  { id: 'almsround', label: 'ชุดตักบาตร', price: 500, lines: ['merit'] },
   { id: 'drinks', label: 'เครื่องดื่ม', price: 250, perUnit: 'table', lines: ['chinese'] },
 ];
 
@@ -140,6 +141,8 @@ export interface BookingCalcInput {
   monks: number;
   /** catering buffet: savoury dishes 5–8; null for everything else */
   dishCount?: number | null;
+  /** customer invites the monks themselves (no discount on its own — see MONK_TRANSPORT_OPTIONS) */
+  selfInvite?: boolean;
   selfTransport: boolean;
   addons: string[];
   /** travel fee of the event venue's district (already resolved) — becomes its own line */
@@ -159,9 +162,12 @@ export function normalizeBookingInput<T extends BookingCalcInput>(input: T): T {
     out.foodMode = pkg.unit === 'table' ? 'table' : 'buffet';
     out.monks = 0;
     out.selfTransport = false;
+    out.selfInvite = false;
     out.dishCount = pkg.unit === 'guest' ? Math.min(8, Math.max(5, Math.round(Number(input.dishCount) || DEFAULT_DISH_COUNT))) : null;
   } else {
     out.dishCount = null;
+    // doing both yourself implies inviting the monks yourself (old rows only carry selfTransport)
+    out.selfInvite = !!input.selfInvite || !!input.selfTransport;
   }
   return out;
 }
@@ -204,6 +210,31 @@ export function cateringLineLabel(pkg: BookingPackage, input: BookingCalcInput, 
 }
 
 export const SELF_TRANSPORT_DISCOUNT = 1000;
+
+// ── Who invites the monks and who drives them ─────────────────────────
+// Two independent facts (selfInvite / selfTransport) with one policy: the 1,000 discount
+// needs BOTH done by the customer. `selfTransport` alone implies selfInvite, so rows saved
+// before selfInvite existed still read correctly.
+export type MonkArrangement = 'team' | 'invite' | 'self';
+
+export const MONK_TRANSPORT_OPTIONS: { id: MonkArrangement; label: string; sub: string; selfInvite: boolean; selfTransport: boolean }[] = [
+  { id: 'team', label: 'ทีมงานนิมนต์และรับ-ส่งพระให้', sub: 'รวมในแพ็กเกจแล้ว', selfInvite: false, selfTransport: false },
+  { id: 'invite', label: 'นิมนต์พระเอง ทีมงานรับ-ส่งพระให้', sub: 'ระยะทางวัด-สถานที่จัดงาน ไป-กลับ ไม่เกิน 20 กม.', selfInvite: true, selfTransport: false },
+  { id: 'self', label: 'นิมนต์และรับ-ส่งพระเอง', sub: 'ต้องดำเนินการเองทั้งสองอย่าง', selfInvite: true, selfTransport: true },
+];
+
+export function monkArrangementOf(b: { selfInvite?: boolean | null; selfTransport?: boolean | null }): MonkArrangement {
+  if (b.selfTransport) return 'self';
+  return b.selfInvite ? 'invite' : 'team';
+}
+
+/** Label for a booking's monk arrangement ('team' → null: it is what the package already includes). */
+export function monkArrangementLabel(b: { selfInvite?: boolean | null; selfTransport?: boolean | null }, discount = SELF_TRANSPORT_DISCOUNT): string | null {
+  const id = monkArrangementOf(b);
+  if (id === 'team') return null;
+  if (id === 'invite') return 'นิมนต์พระเอง (ทีมงานรับ-ส่งพระให้)';
+  return `นิมนต์รับ-ส่งพระเอง (ลด ${discount.toLocaleString('th-TH')})`;
+}
 
 // ── Travel fee by อำเภอ of the EVENT VENUE (not the billing address) ─────
 // Editable in the dashboard (จองงานบุญ → ตั้งค่า → ค่าเดินทาง), stored in SystemSetting
@@ -264,7 +295,33 @@ export function mergeTravelFees(saved: Partial<TravelFeeConfig> | null | undefin
   }
   return { fees };
 }
-export const FIVE_MONKS_DISCOUNT = 1500; // every package (new-package-2025 sheet)
+// ── จำนวนพระ ──────────────────────────────────────────────────────────
+// Order here is the order the booking page and the admin picker show: 9 is the default,
+// 5 the runner-up. Discounts apply to every merit package (new-package-2025 sheet + owner
+// rule 2026-09-10 adding 7 and 3 monks).
+export interface MonkOption {
+  monks: number;
+  discount: number;
+  /** badge under the card (only the default option has one) */
+  note?: string;
+}
+
+export const MONK_OPTIONS: MonkOption[] = [
+  { monks: 9, discount: 0, note: 'นิยมที่สุด' },
+  { monks: 5, discount: 1500 },
+  { monks: 7, discount: 750 },
+  { monks: 3, discount: 1500 },
+];
+
+export const DEFAULT_MONK_COUNT = 9;
+export const DEFAULT_MONK_DISCOUNTS: Record<string, number> = Object.fromEntries(MONK_OPTIONS.map((o) => [String(o.monks), o.discount]));
+
+/** Discount for a monk count; unknown counts (sales typed something else) simply get none. */
+export function monkDiscountFor(monks: number, pricing: PricingConfig): number {
+  const key = String(monks);
+  const v = pricing.monkDiscounts?.[key];
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : DEFAULT_MONK_DISCOUNTS[key] ?? 0;
+}
 
 // ── Editable pricing ──────────────────────────────────────────────────
 // The numbers above are only DEFAULTS. The live prices are edited in the
@@ -283,7 +340,8 @@ export interface PricingConfig {
   packages: Record<string, PackagePricing>;
   addons: Record<string, number>;
   selfTransportDiscount: number;
-  fiveMonksDiscount: number;
+  /** monk count (as a string key) → discount off the 9-monk price */
+  monkDiscounts: Record<string, number>;
 }
 
 export const PRICING_SETTING_KEY = 'booking_pricing';
@@ -297,7 +355,7 @@ export const DEFAULT_PRICING: PricingConfig = {
   ),
   addons: Object.fromEntries(BOOKING_ADDONS.map((a) => [a.id, a.price])),
   selfTransportDiscount: SELF_TRANSPORT_DISCOUNT,
-  fiveMonksDiscount: FIVE_MONKS_DISCOUNT,
+  monkDiscounts: { ...DEFAULT_MONK_DISCOUNTS },
 };
 
 /** Merge a saved pricing config over the defaults, dropping anything malformed. */
@@ -339,7 +397,13 @@ export function mergePricing(saved: Partial<PricingConfig> | null | undefined): 
     packages,
     addons,
     selfTransportDiscount: num(saved?.selfTransportDiscount, SELF_TRANSPORT_DISCOUNT),
-    fiveMonksDiscount: num(saved?.fiveMonksDiscount, FIVE_MONKS_DISCOUNT),
+    // configs saved before the table existed only carry the 5-monk discount
+    monkDiscounts: Object.fromEntries(
+      MONK_OPTIONS.map((o) => [
+        String(o.monks),
+        num(saved?.monkDiscounts?.[String(o.monks)] ?? (o.monks === 5 ? (saved as any)?.fiveMonksDiscount : undefined), o.discount),
+      ]),
+    ),
   };
 }
 
@@ -478,7 +542,7 @@ export interface DerivedPricing extends PricingConfig {
  * Derive the booking-page price tiers from the catalog:
  *   tier total = ceremony product (per monkTiers) at 9 monks + food (buffet formula at that guest count,
  *   or Chinese-table product × tables); extra per unit = food(count + 1) − food(count).
- * Discounts come from the products too (transport component price, 9-monk vs 5-monk price).
+ * Discounts come from the products too (transport component price, 9-monk vs fewer-monk prices).
  */
 export function derivePricing(config: FaRecipeConfig, catalog: FaCatalog): DerivedPricing {
   const missing = new Set<string>();
@@ -491,7 +555,7 @@ export function derivePricing(config: FaRecipeConfig, catalog: FaCatalog): Deriv
   const packages: Record<string, PackagePricing> = {};
   const usedCodes: DerivedPricing['usedCodes'] = {};
   let transportDiscount: number | null = null;
-  let monksDiscount: number | null = null;
+  const derivedMonkDiscounts: Record<string, number> = {};
 
   for (const pkg of BOOKING_PACKAGES) {
     const r = config.packages[pkg.id];
@@ -508,9 +572,16 @@ export function derivePricing(config: FaRecipeConfig, catalog: FaCatalog): Deriv
     if (main) {
       const tc = (main.components || []).find((c) => c.code === r.transportCode);
       if (transportDiscount === null && tc && tc.price) transportDiscount = Number(tc.price);
-      const p9 = productPrice(main, { monks: 9 });
-      const p5 = productPrice(main, { monks: 5 });
-      if (monksDiscount === null && p9 !== null && p5 !== null && p9 > p5) monksDiscount = p9 - p5;
+      // one discount per offered monk count. productPrice matches the price table exactly, so a
+      // product with no row for that count falls back to its unitPrice — only trust a value that
+      // is genuinely cheaper than the 9-monk price, otherwise keep the sheet default.
+      const p9 = productPrice(main, { monks: DEFAULT_MONK_COUNT });
+      for (const o of MONK_OPTIONS) {
+        const key = String(o.monks);
+        if (o.monks === DEFAULT_MONK_COUNT || derivedMonkDiscounts[key] !== undefined) continue;
+        const pn = productPrice(main, { monks: o.monks });
+        if (p9 !== null && pn !== null && p9 > pn) derivedMonkDiscounts[key] = p9 - pn;
+      }
     }
 
     if (pkg.kind === 'catering') {
@@ -582,7 +653,7 @@ export function derivePricing(config: FaRecipeConfig, catalog: FaCatalog): Deriv
     packages,
     addons,
     selfTransportDiscount: transportDiscount ?? SELF_TRANSPORT_DISCOUNT,
-    fiveMonksDiscount: monksDiscount ?? FIVE_MONKS_DISCOUNT,
+    monkDiscounts: Object.fromEntries(MONK_OPTIONS.map((o) => [String(o.monks), derivedMonkDiscounts[String(o.monks)] ?? o.discount])),
     missingCodes: [...missing].sort(),
     usedCodes,
   };
@@ -709,7 +780,7 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
     'chinese-2300': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
     'chinese-2600': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
   },
-  addons: { stage: 'STAGE', tent: 'TENT512', drape: 'DRAPE' },
+  addons: { stage: 'STAGE', tent: 'TENT512', drape: 'DRAPE', almsround: 'ALMS_SET' },
 };
 
 /** Merge a saved (possibly partial / older) config over the defaults and normalise codes. */
@@ -794,6 +865,13 @@ export interface FaItem {
   variables?: Record<string, number | string>;
   exclude?: string[];
   detail?: string[];
+  /**
+   * Plain-text stand-in for a line that references a catalog product, used when that product is
+   * missing from flowaccount-app (renamed/deleted, or not created yet). Only set where we know the
+   * price ourselves — a package line has no safe fallback, so it must fail loudly instead.
+   * Stripped before the item is sent (see bookings.service createQuotation).
+   */
+  fallback?: { description: string; unit: string; unitPrice: number };
 }
 
 /** Ceremony product for a food mode + size: matching mode (or 'any'), largest `from` ≤ count; else monkCode. */
@@ -829,9 +907,15 @@ export function buildFaItems(
 
   const items: FaItem[] = [];
   const exclude = input.selfTransport ? [recipe.transportCode] : [];
-  // 5 monks instead of 9 = discount on every package; self-transport becomes a line discount in flowaccount-app
+  // the customer invites the monks but we still drive them: no price change, but the document
+  // has to say so — flowaccount-app appends caller detail under the package's own detail lines
+  const arrangementDetail =
+    input.selfInvite && !input.selfTransport
+      ? ['ลูกค้านิมนต์พระเอง — ทีมงานรับ-ส่งพระให้ (ระยะทางวัด-สถานที่จัดงาน ไป-กลับ ไม่เกิน 20 กม.)']
+      : undefined;
+  // fewer monks than 9 = discount on every package; self-transport becomes a line discount in flowaccount-app
   // (the flowaccount-app product must carry the same amount as pricing.selfTransportDiscount)
-  const monksDiscount = input.monks === 5 ? pricing.fiveMonksDiscount : 0;
+  const monksDiscount = monkDiscountFor(input.monks, pricing);
 
   // Lines that reference a catalog product carry NO unitPrice: flowaccount-app prices them
   // (price table by monks, priceFormula by guests, transport/5-monk discounts). Only the
@@ -865,6 +949,7 @@ export function buildFaItems(
       quantity: 1,
       variables: { monks: input.monks },
       exclude,
+      ...(arrangementDetail ? { detail: arrangementDetail } : {}),
     });
   } else {
     const isTable = input.foodMode === 'table';
@@ -876,11 +961,12 @@ export function buildFaItems(
     const monkPriceFallback = Math.max(0, tierTotal - foodTotal - monksDiscount);
 
     const monkCode = pickMonkCode(recipe, isTable ? 'table' : 'buffet', count);
-    items.push(
-      monkCode
+    items.push({
+      ...(monkCode
         ? { productCode: monkCode, quantity: 1, variables: { monks: input.monks }, exclude }
-        : { description: `${pkg.name} — พิธีสงฆ์ ${input.monks} รูป`, quantity: 1, unit: 'ชุด', unitPrice: monkPriceFallback },
-    );
+        : { description: `${pkg.name} — พิธีสงฆ์ ${input.monks} รูป`, quantity: 1, unit: 'ชุด', unitPrice: monkPriceFallback }),
+      ...(arrangementDetail ? { detail: arrangementDetail } : {}),
+    });
 
     if (isTable) {
       items.push(
@@ -902,10 +988,11 @@ export function buildFaItems(
     const qty = addonQuantity(a, input);
     if (qty <= 0) continue;
     const code = config.addons[a.id];
+    const plain = { description: a.label, unit: a.perUnit ? 'โต๊ะ' : 'ชุด', unitPrice: pricing.addons[a.id] ?? a.price };
     items.push(
       code
-        ? { productCode: code, quantity: qty, ...(a.perUnit ? { unit: 'โต๊ะ' } : {}) }
-        : { description: a.label, quantity: qty, unit: a.perUnit ? 'โต๊ะ' : 'ชุด', unitPrice: pricing.addons[a.id] ?? a.price },
+        ? { productCode: code, quantity: qty, ...(a.perUnit ? { unit: 'โต๊ะ' } : {}), fallback: plain }
+        : { ...plain, quantity: qty },
     );
   }
 
@@ -949,7 +1036,7 @@ export function calcEstimatedTotal(
   total += addonsTotal(input, pricing);
   if (pkg.kind !== 'catering') {
     if (input.selfTransport) total -= pricing.selfTransportDiscount;
-    if (input.monks === 5) total -= pricing.fiveMonksDiscount;
+    total -= monkDiscountFor(input.monks, pricing);
   }
   if (input.travelFee && input.travelFee > 0) total += input.travelFee;
 
@@ -1021,7 +1108,10 @@ export function estimateBooking(
     rows.push({ k: a.perUnit ? `${a.label} × ${qty} โต๊ะ` : a.label, v: `+${fmt(price * qty)}` });
   }
   if (!isCatering && input.selfTransport) rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: `−${fmt(pricing.selfTransportDiscount)}` });
-  if (!isCatering && input.monks === 5) rows.push({ k: 'พระ 5 รูป', v: `−${fmt(pricing.fiveMonksDiscount)}` });
+  if (!isCatering) {
+    const monkDiscount = monkDiscountFor(input.monks, pricing);
+    if (monkDiscount > 0) rows.push({ k: `พระ ${input.monks} รูป`, v: `−${fmt(monkDiscount)}` });
+  }
   if (input.travelFee && input.travelFee > 0) rows.push({ k: `ค่าเดินทาง${input.travelArea ? ` (${input.travelArea})` : ''}`, v: `+${fmt(input.travelFee)}` });
   const vatAmount = input.wantVat ? Math.round(calc.total * VAT_RATE) : 0;
   if (input.wantVat) rows.push({ k: 'ภาษีมูลค่าเพิ่ม 7%', v: `+${fmt(vatAmount)}` });

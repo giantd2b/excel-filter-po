@@ -1,9 +1,13 @@
 import {
+  DEFAULT_MONK_COUNT,
   DEPOSIT_RULE,
   DISCOUNTS,
+  MONK_TRANSPORT_OPTIONS,
   addonQuantity,
   applicableAddons,
   baht,
+  monkArrangementOf,
+  monkDiscount,
   occasionsFor,
   pkgById,
   stripIncludedAddons,
@@ -31,6 +35,8 @@ export interface BookingForm {
   monks: number;
   /** catering buffet: savoury dishes 5–8 (ignored by every other package) */
   dishCount: number;
+  /** customer invites the monks themselves; with selfTransport too it earns the discount */
+  selfInvite: boolean;
   selfTransport: boolean;
   addons: string[];
   budget: string;
@@ -73,6 +79,7 @@ export const initialForm: BookingForm = {
   tables: 10,
   monks: 9,
   dishCount: 6,
+  selfInvite: false,
   selfTransport: false,
   addons: [],
   budget: '',
@@ -153,12 +160,15 @@ export function formForPackage(f: BookingForm, pkgId: string): BookingForm {
     out.foodMode = pkg.unit === 'table' ? 'table' : 'buffet';
     out.monks = 0;
     out.selfTransport = false;
+    out.selfInvite = false;
     const min = pkg.minCount ?? 1;
     if (pkg.unit === 'table') out.tables = Math.max(min, f.tables || 0);
     else out.guests = Math.max(min, f.guests || 0);
     if (!(out.dishCount >= 5 && out.dishCount <= 8)) out.dishCount = 6;
-  } else if (!out.monks) {
-    out.monks = 9;
+  } else {
+    if (!out.monks) out.monks = DEFAULT_MONK_COUNT;
+    // doing both yourself implies inviting the monks yourself
+    if (out.selfTransport) out.selfInvite = true;
   }
   if (!occasionsFor(pkg.line).includes(out.occasion)) out.occasion = occasionsFor(pkg.line)[0];
   if (!timeOptsFor(pkg.line).some((t) => t.v === out.time)) out.time = timeOptsFor(pkg.line)[0].v;
@@ -265,10 +275,11 @@ export function calc(f: BookingForm, manualDeposit?: number | null): CalcResult 
     total -= DISCOUNTS.selfTransport;
     rows.push({ k: 'นิมนต์รับ-ส่งพระเอง', v: '−' + baht(DISCOUNTS.selfTransport) });
   }
-  // every merit package: 5 monks instead of 9 (new-package-2025 sheet)
-  if (!isCatering && f.monks === 5) {
-    total -= DISCOUNTS.fiveMonks;
-    rows.push({ k: 'พระ 5 รูป', v: '−' + baht(DISCOUNTS.fiveMonks) });
+  // every merit package: fewer monks than 9 (new-package-2025 sheet + owner rule 2026-09-10)
+  const monkOff = isCatering ? 0 : monkDiscount(f.monks);
+  if (monkOff > 0) {
+    total -= monkOff;
+    rows.push({ k: `พระ ${f.monks} รูป`, v: '−' + baht(monkOff) });
   }
   // travel fee follows the EVENT VENUE district (f.amphoe) — callers on the quick screen pass
   // finalizeForm(f, 'billing') so the billing address is copied onto the venue first
@@ -308,6 +319,7 @@ export function summary(f: BookingForm): { k: string; v: string }[] {
     return rows;
   }
   rows.push({ k: 'พระสงฆ์', v: f.monks + ' รูป' });
+  rows.push({ k: 'นิมนต์ / รับ-ส่งพระ', v: MONK_TRANSPORT_OPTIONS.find((o) => o.id === monkArrangementOf(f))!.label });
   if (c.pkg.kind === 'full') {
     rows.push({
       k: 'อาหาร',

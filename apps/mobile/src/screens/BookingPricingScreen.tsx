@@ -231,10 +231,14 @@ export default function BookingPricingScreen() {
           <Text style={styles.lineKey}>นิมนต์และรับ-ส่งพระเอง</Text>
           <Text style={styles.lineVal}>−{fmt(p.selfTransportDiscount)}</Text>
         </View>
-        <View style={styles.line}>
-          <Text style={styles.lineKey}>พระ 5 รูป (ราคาฐาน 9 รูป − 5 รูป)</Text>
-          <Text style={styles.lineVal}>−{fmt(p.fiveMonksDiscount)}</Text>
-        </View>
+        {(data.monkOptions || [])
+          .filter((o) => o.discount > 0)
+          .map((o) => (
+            <View key={o.monks} style={styles.line}>
+              <Text style={styles.lineKey}>พระ {o.monks} รูป (ราคาฐาน 9 รูป − {o.monks} รูป)</Text>
+              <Text style={styles.lineVal}>−{fmt(p.monkDiscounts?.[String(o.monks)] ?? o.discount)}</Text>
+            </View>
+          ))}
         <Text style={styles.hint}>ตัวเลขที่หน้า /booking แสดง ใช้ค่านี้ ส่วนใบเสนอราคาจริงใช้ส่วนลดของสินค้าแต่ละตัวโดยตรง</Text>
       </View>
     </ScrollView>

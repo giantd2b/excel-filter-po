@@ -661,6 +661,8 @@ export interface MeritBooking {
   monks: number;
   /** catering buffet: savoury dishes 5–8 */
   dishCount?: number | null;
+  /** customer invites the monks themselves (selfTransport = they drive them too) */
+  selfInvite?: boolean | null;
   selfTransport: boolean;
   addons: string[];
   /** computed by the API from packageId (rows only store the id) */
@@ -784,7 +786,25 @@ export interface PricingConfig {
   packages: Record<string, PackagePricing>;
   addons: Record<string, number>;
   selfTransportDiscount: number;
-  fiveMonksDiscount: number;
+  /** monk count (as a string key) → discount off the 9-monk price */
+  monkDiscounts: Record<string, number>;
+}
+
+export interface BookingMonkOption {
+  monks: number;
+  discount: number;
+  /** badge shown under the option (only the default one has it) */
+  note?: string | null;
+}
+
+export type MonkArrangement = "team" | "invite" | "self";
+
+export interface BookingMonkTransportOption {
+  id: MonkArrangement;
+  label: string;
+  sub: string;
+  selfInvite: boolean;
+  selfTransport: boolean;
 }
 
 export interface BookingPricingSettings {
@@ -792,6 +812,8 @@ export interface BookingPricingSettings {
   defaults: PricingConfig;
   packages: BookingPackageInfo[];
   addons: BookingAddonInfo[];
+  monkOptions?: BookingMonkOption[];
+  monkTransportOptions?: BookingMonkTransportOption[];
   source: "flowaccount" | "cache";
   fetchedAt: string;
   catalogError: string | null;
@@ -852,6 +874,8 @@ export interface BookingPreset {
   monks: number;
   /** catering buffet: savoury dishes 5–8 (omit for other packages) */
   dishCount?: number | null;
+  /** customer invites the monks themselves (selfTransport = they drive them too) */
+  selfInvite?: boolean;
   selfTransport: boolean;
   addons: string[];
   note?: string;

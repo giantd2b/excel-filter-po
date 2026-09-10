@@ -26,6 +26,8 @@ export interface MeritBooking {
   monks?: number;
   /** catering buffet: savoury dishes 5–8 */
   dishCount?: number | null;
+  /** customer invites the monks themselves (selfTransport = they drive them too) */
+  selfInvite?: boolean;
   selfTransport?: boolean;
   addons?: string[];
   /** computed by the API from packageId — 'catering' = บุฟเฟต์/โต๊ะจีน (no monks) */
@@ -76,6 +78,8 @@ export interface BookingPreset {
   monks: number;
   /** catering buffet: savoury dishes 5–8 (omit for other packages) */
   dishCount?: number | null;
+  /** customer invites the monks themselves (selfTransport = they drive them too) */
+  selfInvite?: boolean;
   selfTransport: boolean;
   addons: string[];
   note?: string;
@@ -157,9 +161,27 @@ export interface PricingAddon {
   lines?: string[];
 }
 
+export interface MonkOption {
+  monks: number;
+  discount: number;
+  note?: string | null;
+}
+
+export type MonkArrangement = 'team' | 'invite' | 'self';
+
+export interface MonkTransportOption {
+  id: MonkArrangement;
+  label: string;
+  sub: string;
+  selfInvite: boolean;
+  selfTransport: boolean;
+}
+
 export interface PricingResponse {
   packages: PricingPackage[];
   addons: PricingAddon[];
+  monkOptions: MonkOption[];
+  monkTransportOptions: MonkTransportOption[];
   /** travel fee by อำเภอ/เขต of the event venue (from the travel-fee settings) */
   travelFees: Record<string, number>;
 }
@@ -183,10 +205,12 @@ export interface PricingSettings {
     packages: Record<string, PackagePricing>;
     addons: Record<string, number>;
     selfTransportDiscount: number;
-    fiveMonksDiscount: number;
+    /** monk count (as a string key) → discount off the 9-monk price */
+    monkDiscounts: Record<string, number>;
   };
   packages: PricingPackage[];
   addons: (PricingAddon & { code?: string | null })[];
+  monkOptions: MonkOption[];
   source?: 'flowaccount' | 'cache' | string;
   fetchedAt?: string;
   catalogError?: string | null;
@@ -315,7 +339,13 @@ const feeMap = (v: unknown): Record<string, number> =>
 
 export async function getBookingPricing(): Promise<PricingResponse> {
   const { data } = await api.get('/bookings/pricing');
-  return { packages: arr(data?.packages), addons: arr(data?.addons), travelFees: feeMap(data?.travelFees) };
+  return {
+    packages: arr(data?.packages),
+    addons: arr(data?.addons),
+    monkOptions: arr(data?.monkOptions),
+    monkTransportOptions: arr(data?.monkTransportOptions),
+    travelFees: feeMap(data?.travelFees),
+  };
 }
 
 function shapePricingSettings(data: any): PricingSettings {
@@ -324,10 +354,11 @@ function shapePricingSettings(data: any): PricingSettings {
       packages: data?.pricing?.packages || {},
       addons: data?.pricing?.addons || {},
       selfTransportDiscount: Number(data?.pricing?.selfTransportDiscount ?? 0),
-      fiveMonksDiscount: Number(data?.pricing?.fiveMonksDiscount ?? 0),
+      monkDiscounts: data?.pricing?.monkDiscounts || {},
     },
     packages: arr(data?.packages),
     addons: arr(data?.addons),
+    monkOptions: arr(data?.monkOptions),
     source: data?.source,
     fetchedAt: data?.fetchedAt,
     catalogError: data?.catalogError ?? null,

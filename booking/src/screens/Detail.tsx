@@ -1,4 +1,4 @@
-import { DISCOUNTS, DISH_COUNTS, baht, priceUnitLabel, startPrice, type Pkg } from '../data/packages';
+import { DISCOUNTS, DISH_COUNTS, MONK_OPTIONS, baht, priceUnitLabel, startPrice, type Pkg } from '../data/packages';
 import { MENUS, MENU_IMAGES, MENU_INTRO, MERIT_MENU_IMAGES } from '../data/menus';
 import { BackLink, charm } from '../ui';
 import SmallOrderNotice from '../components/SmallOrderNotice';
@@ -303,9 +303,11 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
             <div style={{ background: 'var(--color-accent-200)', borderRadius: 'var(--radius-md)', padding: '15px 16px' }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-accent-800)', marginBottom: 7 }}>ส่วนลด</div>
               <div style={{ fontSize: 13.5, lineHeight: 1.75, color: 'var(--color-accent-800)' }}>
-                {pkg.kind === 'full'
-                  ? `นิมนต์รับ-ส่งพระเอง ลด ${baht(DISCOUNTS.selfTransport)} บาท`
-                  : `นิมนต์รับ-ส่งพระเอง ลด ${baht(DISCOUNTS.selfTransport)} บาท / พระ 5 รูป ลด ${baht(DISCOUNTS.fiveMonks)} บาท`}
+                นิมนต์รับ-ส่งพระเอง ลด {baht(DISCOUNTS.selfTransport)} บาท
+                <br />
+                {MONK_OPTIONS.filter((o) => o.discount > 0)
+                  .map((o) => `พระ ${o.monks} รูป ลด ${baht(o.discount)} บาท`)
+                  .join(' / ')}
               </div>
             </div>
           </div>

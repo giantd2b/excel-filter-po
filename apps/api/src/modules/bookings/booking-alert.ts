@@ -1,5 +1,5 @@
 import { pushLineMessages } from '../../common/utils/line-notify.utils';
-import { BOOKING_ADDONS, packageById } from './packages.config';
+import { BOOKING_ADDONS, monkArrangementLabel, packageById } from './packages.config';
 
 /**
  * "จองงานบุญใหม่" team alert → the IRIS BOT LINE group (the same bot/group iris-job
@@ -32,6 +32,7 @@ export interface BookingAlertInput {
   tables?: number | null;
   monks?: number | null;
   dishCount?: number | null;
+  selfInvite?: boolean | null;
   selfTransport?: boolean | null;
   addons?: string[] | null;
   customerName?: string | null;
@@ -145,7 +146,8 @@ export function buildNewBookingFlex(b: BookingAlertInput, opts: { crmUrl: string
   );
 
   const extras = (b.addons || []).map((a) => addonLabel(a, b));
-  if (b.selfTransport) extras.push('นิมนต์รับ-ส่งพระเอง (ลด 1,000)');
+  const arrangement = monkArrangementLabel(b);
+  if (arrangement) extras.push(arrangement);
   if (extras.length) rows.push(row('➕ เสริม', extras.join(', ')));
 
   const addr = bookingAddress(b);

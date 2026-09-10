@@ -13,6 +13,8 @@ import {
   type BookingPackageInfo,
   type BookingAddonInfo,
   type BookingPackageLine,
+  type BookingMonkOption,
+  type BookingMonkTransportOption,
 } from "@/lib/api-service";
 
 /** Fallbacks when /bookings/pricing is unreachable (ids match booking/src/data/packages.ts). */
@@ -32,6 +34,7 @@ const FALLBACK_ADDONS: BookingAddonInfo[] = [
   { id: "stage", label: "เวทีพระ", price: 5000, lines: ["merit"] },
   { id: "tent", label: "เต็นท์เพิ่ม 1 หลัง", price: 3000, lines: ["merit"] },
   { id: "drape", label: "โยงผ้าประดับเพิ่ม", price: 1000, lines: ["merit"] },
+  { id: "almsround", label: "ชุดตักบาตร", price: 500, lines: ["merit"] },
   { id: "drinks", label: "เครื่องดื่ม", price: 250, perUnit: "table", lines: ["chinese"] },
 ];
 const LINE_LABELS: Record<BookingPackageLine, string> = { merit: "งานบุญ", buffet: "บุฟเฟต์อาหารไทย", chinese: "โต๊ะจีน" };
@@ -58,6 +61,18 @@ const CATERING_TIME_SLOTS = [
   { v: "เย็น 17.00-19.00 น.", label: "มื้อเย็น 17.00-19.00 น." },
 ];
 const DISH_COUNTS = [5, 6, 7, 8];
+/** Fallbacks only — the live list (with the current discounts) comes from /bookings/pricing. */
+const FALLBACK_MONK_OPTIONS: BookingMonkOption[] = [
+  { monks: 9, discount: 0, note: "นิยมที่สุด" },
+  { monks: 5, discount: 1500 },
+  { monks: 7, discount: 750 },
+  { monks: 3, discount: 1500 },
+];
+const FALLBACK_MONK_TRANSPORT: BookingMonkTransportOption[] = [
+  { id: "team", label: "ทีมงานนิมนต์และรับ-ส่งพระให้", sub: "รวมในแพ็กเกจแล้ว", selfInvite: false, selfTransport: false },
+  { id: "invite", label: "นิมนต์พระเอง ทีมงานรับ-ส่งพระให้", sub: "ไป-กลับ ไม่เกิน 20 กม.", selfInvite: true, selfTransport: false },
+  { id: "self", label: "นิมนต์และรับ-ส่งพระเอง", sub: "ลด 1,000", selfInvite: true, selfTransport: true },
+];
 
 const DEFAULT_PRESET: BookingPreset = {
   occasion: "ทำบุญขึ้นบ้านใหม่",
@@ -69,6 +84,7 @@ const DEFAULT_PRESET: BookingPreset = {
   tables: 10,
   monks: 9,
   dishCount: 6,
+  selfInvite: false,
   selfTransport: false,
   addons: [],
   note: "",
@@ -92,6 +108,8 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
   const [mode, setMode] = useState<"preset" | "free">("preset");
   const [packages, setPackages] = useState<BookingPackageInfo[]>(FALLBACK_PACKAGES);
   const [addons, setAddons] = useState<BookingAddonInfo[]>(FALLBACK_ADDONS);
+  const [monkOptions, setMonkOptions] = useState<BookingMonkOption[]>(FALLBACK_MONK_OPTIONS);
+  const [monkTransport, setMonkTransport] = useState<BookingMonkTransportOption[]>(FALLBACK_MONK_TRANSPORT);
   const [estimateError, setEstimateError] = useState<string | null>(null);
   const [travelFees, setTravelFees] = useState<Record<string, number>>({});
   const [preset, setPreset] = useState<BookingPreset>(DEFAULT_PRESET);
@@ -110,6 +128,8 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
   const pkg = packages.find((p) => p.id === preset.packageId);
   const hasFood = pkg?.kind === "full";
   const isCatering = pkg?.kind === "catering";
+  // 3-state: who invites the monks and who drives them (selfTransport alone implies selfInvite)
+  const arrangement = preset.selfTransport ? "self" : preset.selfInvite ? "invite" : "team";
   const line: BookingPackageLine = pkg?.line || "merit";
   // the package whose menu would be attached: the preset package, or the fixed package in free mode
   const menuPkg = mode === "preset" ? pkg : packages.find((p) => p.id === freePackageId);
@@ -142,12 +162,15 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
         next.foodMode = pkg.unit === "table" ? "table" : "buffet";
         next.monks = 0;
         next.selfTransport = false;
+        next.selfInvite = false;
         const min = pkg.minCount ?? 1;
         if (pkg.unit === "table") next.tables = Math.max(min, p.tables || 0);
         else next.guests = Math.max(min, p.guests || 0);
         if (!(next.dishCount && next.dishCount >= 5 && next.dishCount <= 8)) next.dishCount = 6;
-      } else if (!p.monks) {
-        next.monks = 9;
+      } else {
+        if (!p.monks) next.monks = 9;
+        // doing both yourself implies inviting the monks yourself
+        if (p.selfTransport) next.selfInvite = true;
       }
       const occ = line === "merit" ? OCCASIONS : CATERING_OCCASIONS;
       if (next.occasion && !occ.includes(next.occasion) && (OCCASIONS.includes(next.occasion) || CATERING_OCCASIONS.includes(next.occasion))) next.occasion = occ[0];
@@ -163,6 +186,8 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
       .then((d) => {
         if (d.packages?.length) setPackages(d.packages);
         if (d.addons?.length) setAddons(d.addons);
+        if (d.monkOptions?.length) setMonkOptions(d.monkOptions);
+        if (d.monkTransportOptions?.length) setMonkTransport(d.monkTransportOptions);
         if (d.travelFees) setTravelFees(d.travelFees);
       })
       .catch(() => {});
@@ -419,13 +444,29 @@ export default function BookingLinkModal({ customer, onClose, onSent }: Props) {
                   <label className="block">
                     <span className={lbl}>พระสงฆ์</span>
                     <select value={preset.monks} onChange={(e) => set("monks", parseInt(e.target.value, 10))} className={field}>
-                      <option value={9}>9 รูป</option>
-                      <option value={5}>5 รูป (ลด 1,500)</option>
+                      {monkOptions.map((o) => (
+                        <option key={o.monks} value={o.monks}>
+                          {o.monks} รูป{o.discount > 0 ? ` (ลด ${o.discount.toLocaleString("th-TH")})` : ""}
+                        </option>
+                      ))}
                     </select>
                   </label>
-                  <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
-                    <input type="checkbox" checked={preset.selfTransport} onChange={(e) => set("selfTransport", e.target.checked)} className="w-4 h-4" />
-                    ลูกค้านิมนต์รับ-ส่งพระเอง
+                  <label className="block">
+                    <span className={lbl}>นิมนต์ / รับ-ส่งพระ</span>
+                    <select
+                      value={arrangement}
+                      onChange={(e) => {
+                        const o = monkTransport.find((x) => x.id === e.target.value);
+                        if (o) setPreset((p) => ({ ...p, selfInvite: o.selfInvite, selfTransport: o.selfTransport }));
+                      }}
+                      className={field}
+                    >
+                      {monkTransport.map((o) => (
+                        <option key={o.id} value={o.id} title={o.sub}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 </>
               )}

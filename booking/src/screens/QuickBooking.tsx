@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { addonQuantity, applicableAddons, baht, occasionsFor, pkgById, timeOptsFor, SERVICE_AREA_TEXT, isServiceProvince } from '../data/packages';
+import { MONK_TRANSPORT_OPTIONS, addonQuantity, applicableAddons, baht, monkArrangementOf, occasionsFor, pkgById, timeOptsFor, SERVICE_AREA_TEXT, isServiceProvince } from '../data/packages';
 import { calc, finalizeForm, summary, type BookingForm } from '../lib/calc';
 import { submitBooking, type BookingLinkInfo } from '../lib/api';
 import { FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
@@ -156,7 +156,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
             ...(isCatering ? [] : [['พระสงฆ์', `${f.monks} รูป`]]),
             ['อาหาร', foodText],
             ['ออปชั่นเสริม', chosenAddons.length ? chosenAddons.map(addonText).join(', ') : '-'],
-            ...(isCatering ? [] : [['นิมนต์รับ-ส่งพระ', f.selfTransport ? 'ดำเนินการเอง' : 'ทีมงานดำเนินการ']]),
+            ...(isCatering ? [] : [['นิมนต์ / รับ-ส่งพระ', MONK_TRANSPORT_OPTIONS.find((o) => o.id === monkArrangementOf(f))!.label]]),
             ...(preset?.occasion ? [['ประเภทงาน', f.occasion]] : []),
             ...(preset?.eventDate ? [['วันเวลา', `${fmtThaiDate(f.date)} · ${f.time}`]] : []),
           ].map(([k, v]) => (
