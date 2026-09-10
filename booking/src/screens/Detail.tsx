@@ -1,4 +1,4 @@
-import { DISCOUNTS, DISH_COUNTS, MONK_OPTIONS, baht, priceUnitLabel, startPrice, type Pkg } from '../data/packages';
+import { DISCOUNTS, DISH_COUNTS, MONK_OPTIONS, baht, featuresFor, priceUnitLabel, startPrice, type Pkg } from '../data/packages';
 import { MENUS, MENU_IMAGES, MENU_INTRO, MERIT_MENU_IMAGES } from '../data/menus';
 import { BackLink, charm } from '../ui';
 import SmallOrderNotice from '../components/SmallOrderNotice';
@@ -199,7 +199,7 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
       <div style={{ padding: '0 20px 24px' }}>
         <h2 style={{ ...charm, fontSize: 25, margin: '0 0 12px', color: 'var(--color-accent-900)' }}>สิ่งที่ได้ในแพ็กเกจ</h2>
         <div style={{ ...cardBox, padding: '6px 18px' }}>
-          {pkg.features.map((ft) => (
+          {featuresFor(pkg).map((ft) => (
             <div
               key={ft[0]}
               style={{

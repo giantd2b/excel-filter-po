@@ -74,11 +74,11 @@ export const PKGS: Pkg[] = [
       ['อาสนะ / พรมรองนั่ง', 'สีครีม-ทอง'],
       ['ขันน้ำมนต์ ที่กรวดน้ำ เทียนชนวน สายสิญจน์', 'ครบชุด'],
       ['ชุดแป้งเจิม', 'แป้งเจิม แผ่นทอง น้ำมันจันทน์'],
-      ['ดอกไม้ + ธูปเทียน', 'หน้าโต๊ะบูชา และพระ 9 รูป'],
-      ['ภัตตาหารถวายพระ 9 รูป', 'แบบขันโตก'],
+      ['ดอกไม้ + ธูปเทียน', 'หน้าโต๊ะบูชา และพระ {monks} รูป'],
+      ['ภัตตาหารถวายพระ {monks} รูป', 'แบบขันโตก'],
       ['อาหารพระพุทธ / เจ้าที่', 'อย่างละ 1 ชุด'],
       ['ผลไม้ถวายเจ้าที่', '1 โตก'],
-      ['ชุดสังฆทาน 9 ชุด', 'แบบชะลอม'],
+      ['ชุดสังฆทาน {monks} ชุด', 'แบบชะลอม'],
       ['นิมนต์ และรับ-ส่งพระ', 'รวมในแพ็กเกจ'],
     ],
   },
@@ -101,11 +101,11 @@ export const PKGS: Pkg[] = [
       ['อาสนะ / พรมรองนั่ง', 'สีครีม-ทอง'],
       ['ขันน้ำมนต์ ที่กรวดน้ำ เทียนชนวน สายสิญจน์', 'ครบชุด'],
       ['ชุดแป้งเจิม', 'แป้งเจิม แผ่นทอง น้ำมันจันทน์'],
-      ['ดอกไม้ + ธูปเทียน', 'หน้าโต๊ะบูชา และพระ 9 รูป'],
-      ['ภัตตาหารถวายพระ 9 รูป', 'แบบขันโตกลายคราม'],
+      ['ดอกไม้ + ธูปเทียน', 'หน้าโต๊ะบูชา และพระ {monks} รูป'],
+      ['ภัตตาหารถวายพระ {monks} รูป', 'แบบขันโตกลายคราม'],
       ['อาหารพระพุทธ / เจ้าที่', 'อย่างละ 1 ชุด'],
       ['ผลไม้ถวายเจ้าที่', '1 โตก'],
-      ['ชุดสังฆทาน 9 ชุด', 'แบบพรีเมี่ยม'],
+      ['ชุดสังฆทาน {monks} ชุด', 'แบบพรีเมี่ยม'],
       ['นิมนต์ และรับ-ส่งพระ', 'รวมในแพ็กเกจ'],
       ['ม่าน - ฉากโยงผ้า', 'ระดับสวยงาม'],
     ],
@@ -658,6 +658,16 @@ export function applyPricing(payload: PricingPayload) {
   }
 }
 
+/** "ชุดสังฆทาน {monks} ชุด" → "ชุดสังฆทาน 7 ชุด". Pages with no monk choice yet pass nothing and get 9. */
+export function withMonks(text: string, monks?: number): string {
+  return text.replace(/\{monks\}/g, String(monks && monks > 0 ? monks : DEFAULT_MONK_COUNT));
+}
+
+/** Feature rows of a package with {monks} filled in — use everywhere features are rendered. */
+export function featuresFor(pkg: Pkg, monks?: number): [string, string][] {
+  return pkg.features.map(([k, v]) => [withMonks(k, monks), withMonks(v, monks)]);
+}
+
 /** package by id, falling back to PRIME พิธีสงฆ์ (form paths always need *a* package) */
 export function pkgById(id: string): Pkg {
   return PKGS.find((p) => p.id === id) || PKGS[1];
@@ -723,10 +733,11 @@ export function compareRows(kind: PkgKind): { label: string; values: string[] }[
   }
 
   const keys: string[] = [];
-  for (const p of pkgs) for (const [k] of p.features) if (!keys.includes(k)) keys.push(k);
+  const featureRows = new Map(pkgs.map((p) => [p.id, featuresFor(p)]));
+  for (const p of pkgs) for (const [k] of featureRows.get(p.id)!) if (!keys.includes(k)) keys.push(k);
   for (const label of keys) {
     const values = pkgs.map((p) => {
-      const f = p.features.find((x) => x[0] === label);
+      const f = featureRows.get(p.id)!.find((x) => x[0] === label);
       return f ? f[1] : '—';
     });
     if (new Set(values).size > 1) rows.push({ label, values });

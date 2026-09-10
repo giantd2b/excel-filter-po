@@ -9,6 +9,7 @@ import {
   addonQuantity,
   applicableAddons,
   baht,
+  featuresFor,
   monkArrangementOf,
   occasionsFor,
   pkgById,
@@ -342,7 +343,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 </div>
                 {expandedPkg === p.id && (
                   <div style={{ marginTop: 4 }}>
-                    {p.features.map((ft) => (
+                    {featuresFor(p, f.monks).map((ft) => (
                       <div
                         key={ft[0]}
                         style={{
@@ -420,10 +421,12 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                     const deltas: { added: boolean; label: string; value: string }[] = [];
                     if (prev) {
                       const keys: string[] = [];
-                      for (const src of [prev, p]) for (const [k] of src.features) if (!keys.includes(k)) keys.push(k);
+                      const prevRows = featuresFor(prev, f.monks);
+                      const curRows = featuresFor(p, f.monks);
+                      for (const src of [prevRows, curRows]) for (const [k] of src) if (!keys.includes(k)) keys.push(k);
                       for (const k of keys) {
-                        const pv = prev.features.find((x) => x[0] === k)?.[1];
-                        const cv = p.features.find((x) => x[0] === k)?.[1];
+                        const pv = prevRows.find((x) => x[0] === k)?.[1];
+                        const cv = curRows.find((x) => x[0] === k)?.[1];
                         if (cv && cv !== pv) {
                           const wasNone = !pv || pv === 'ไม่รวม' || pv === '—';
                           deltas.push({ added: wasNone, label: k, value: cv });
@@ -1047,7 +1050,7 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
             >
               <div style={{ ...charm, fontSize: 23, color: 'var(--color-accent-900)', marginBottom: 4 }}>สิ่งที่จะได้รับ</div>
               <div style={{ fontSize: 13, color: 'var(--color-neutral-600)', marginBottom: 8 }}>{c.pkg.name}</div>
-              {c.pkg.features.map((ft) => (
+              {featuresFor(c.pkg, f.monks).map((ft) => (
                 <div
                   key={ft[0]}
                   style={{
