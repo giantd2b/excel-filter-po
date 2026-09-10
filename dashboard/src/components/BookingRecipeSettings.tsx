@@ -50,6 +50,8 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
   const setPkg = (id: string, patch: Partial<FaRecipe>) =>
     setConfig((c) => c && { ...c, packages: { ...c.packages, [id]: { ...c.packages[id], ...patch } } });
   const setAddon = (id: string, code: string) => setConfig((c) => c && { ...c, addons: { ...c.addons, [id]: code } });
+  const setAddonRemark = (id: string, pattern: string) =>
+    setConfig((c) => c && { ...c, addonRemarkPatterns: { ...(c.addonRemarkPatterns || {}), [id]: pattern } });
 
   const save = async () => {
     if (!config) return;
@@ -381,6 +383,29 @@ export default function BookingRecipeSettings({ onClose }: { onClose?: () => voi
               <ProductSelect value={config.addons[a.id]} onChange={(v) => setAddon(a.id, v)} options={allProducts} allowEmpty />
             </div>
           ))}
+        </div>
+        <div className="px-4 pb-4">
+          <div className="text-xs font-semibold text-slate-700 mb-1">ตัดบรรทัดหมายเหตุเมื่อขายออปชั่นนี้</div>
+          <p className="text-[11px] text-slate-500 mb-2">
+            ใส่คำที่ใช้ค้นหาในหมายเหตุ (คั่นหลายคำด้วย <span className="font-mono">|</span>) — บรรทัดที่มีคำนี้
+            <b>และ</b>มีคำว่า &quot;ไม่รวม&quot; จะถูกตัดออกจากใบเสนอราคาเมื่อลูกค้าได้ออปชั่นนั้น
+            เว้นว่าง = ไม่ตัดบรรทัดไหนเลย
+          </p>
+          <div className="grid gap-3 md:grid-cols-3">
+            {data.addons.map((a) => (
+              <div key={a.id}>
+                <label className={labelCls}>
+                  {a.label} <span className="font-mono text-slate-400">({a.id})</span>
+                </label>
+                <input
+                  value={config.addonRemarkPatterns?.[a.id] ?? ""}
+                  onChange={(e) => setAddonRemark(a.id, e.target.value)}
+                  placeholder="เช่น ชุดตักบาตร|ใส่บาตร"
+                  className={selectCls + " font-mono"}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </div>

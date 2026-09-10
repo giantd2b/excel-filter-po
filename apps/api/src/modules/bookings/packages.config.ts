@@ -719,6 +719,12 @@ export interface FaRecipeConfig {
   packages: Record<string, FaRecipe>;
   /** add-on id → catalog product code (price is still sent from BOOKING_ADDONS) */
   addons: Record<string, string>;
+  /**
+   * add-on id → regular expression (as a string) matching the "ราคานี้ไม่รวม…" line of the
+   * remark template that this add-on makes untrue. Empty = never drop a line for that add-on.
+   * Editable in the dashboard (จองงานบุญ → ตั้งค่าใบเสนอราคา). See resolveRemarkText.
+   */
+  addonRemarkPatterns: Record<string, string>;
 }
 
 export const FA_RECIPES_SETTING_KEY = 'fa_booking_recipes';
@@ -781,7 +787,47 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
     'chinese-2600': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
   },
   addons: { stage: 'STAGE', tent: 'TENT512', drape: 'DRAPE', almsround: 'ALMS_SET' },
+  // wording as it appears in the shop's remark templates — the tent line is spelled both
+  // "เต็นท์" and "เต้นท์" across templates, so both are matched
+  addonRemarkPatterns: {
+    stage: 'เวที',
+    tent: 'เต็นท์|เต้นท์',
+    drape: 'โยงผ้า|ม่าน|ฉากหลัง',
+    almsround: 'ชุดตักบาตร|ใส่บาตร',
+    drinks: 'เครื่องดื่ม',
+  },
 };
+
+/** A remark line is only dropped when it says the item is NOT included. */
+const NOT_INCLUDED_RE = /ไม่รวม/;
+
+/**
+ * Remove the "ราคานี้ไม่รวม…" lines that the booking contradicts, so a document that sells
+ * ชุดตักบาตร stops printing "ราคานี้ไม่รวม…ชุดตักบาตร".
+ *
+ * A line is dropped only when it BOTH says ไม่รวม and matches the pattern of an add-on the
+ * customer actually gets — a positive line ("เพิ่มเต็นท์ ขาวทรงโดม …") is never touched.
+ * `provided` must include the package's includedAddons, not just the ones ticked.
+ */
+export function resolveRemarkText(text: string, provided: string[], patterns: Record<string, string>): string {
+  const raw = String(text || '');
+  if (!raw.trim() || !provided.length) return raw;
+  const regexes: RegExp[] = [];
+  for (const id of new Set(provided)) {
+    const src = String(patterns?.[id] || '').trim();
+    if (!src) continue;
+    try {
+      regexes.push(new RegExp(src));
+    } catch {
+      /* a pattern typed in the settings UI that does not compile is ignored */
+    }
+  }
+  if (!regexes.length) return raw;
+  // keep the original line endings so the printed block stays byte-identical apart from the cuts
+  const lines = raw.split(/\r?\n/);
+  const kept = lines.filter((line) => !(NOT_INCLUDED_RE.test(line) && regexes.some((re) => re.test(line))));
+  return kept.length === lines.length ? raw : kept.join('\n');
+}
 
 /** Merge a saved (possibly partial / older) config over the defaults and normalise codes. */
 /** Product codes that were removed from the catalog → their replacement (keeps saved settings valid). */
@@ -850,10 +896,19 @@ export function mergeFaRecipes(saved: Partial<FaRecipeConfig> | null | undefined
     };
   }
   const addons: Record<string, string> = {};
+  const addonRemarkPatterns: Record<string, string> = {};
   for (const a of BOOKING_ADDONS) {
     addons[a.id] = optionalCode(saved?.addons?.[a.id], DEFAULT_FA_RECIPES.addons[a.id]) || '';
+    const savedPattern = saved?.addonRemarkPatterns?.[a.id];
+    const pattern = (savedPattern === undefined ? DEFAULT_FA_RECIPES.addonRemarkPatterns[a.id] : savedPattern) || '';
+    try {
+      if (pattern) new RegExp(pattern);
+      addonRemarkPatterns[a.id] = String(pattern);
+    } catch {
+      addonRemarkPatterns[a.id] = '';
+    }
   }
-  return { packages, addons };
+  return { packages, addons, addonRemarkPatterns };
 }
 
 export interface FaItem {

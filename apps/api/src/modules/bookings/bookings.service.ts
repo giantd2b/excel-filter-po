@@ -16,6 +16,7 @@ import {
   packageById,
   normalizeBookingInput,
   bookingInputError,
+  resolveRemarkText,
   derivePricing,
   estimateBooking,
   VAT_RATE,
@@ -328,6 +329,31 @@ export class BookingsService {
         : '',
     ].filter(Boolean);
 
+    // The remark template is static text that does not know what the document sells, so a booking
+    // with ชุดตักบาตร used to print "ไม่รวม...ชุดตักบาตร" right under the line that sells it.
+    // Resolve it here (the add-ons are known) and send the finished text as `notes`, which wins
+    // over remarkCode in flowaccount-app. Any failure falls back to the previous behaviour.
+    const recipe = config.packages[b.packageId];
+    const remarkCode = recipe
+      ? pickRemarkCode(
+          recipe,
+          b.foodMode === 'table' ? 'table' : b.foodMode === 'buffet' ? 'buffet' : 'any',
+          b.foodMode === 'table' ? b.tables : b.guests,
+        )
+      : null;
+    // an add-on the package already includes makes its "ไม่รวม" line just as untrue as a bought one
+    const providedAddons = [...b.addons, ...(packageById(b.packageId)?.includedAddons || [])];
+    let remarkText = '';
+    try {
+      const templates = await this.flowAccount.listRemarkTemplates();
+      const tpl = remarkCode
+        ? templates.find((t: any) => String(t.code || '').toUpperCase() === remarkCode)
+        : templates.find((t: any) => t.isDefault);
+      remarkText = tpl?.text ? resolveRemarkText(tpl.text, providedAddons, config.addonRemarkPatterns) : '';
+    } catch (e: any) {
+      console.warn(`[Bookings] remark templates unavailable, falling back to remarkCode: ${e?.message || e}`);
+    }
+
     const res = await this.flowAccount.createQuotation({
       externalRef: b.code,
       customer: {
@@ -363,13 +389,10 @@ export class BookingsService {
       // the customer's tax-invoice choice wins over the recipe default
       vatRate: typeof b.wantVat === 'boolean' ? (b.wantVat ? 7 : 0) : built.vatRate,
       // printed หมายเหตุ: the matched tier's remark template, else the package's (FA falls back to its default)
-      remarkCode:
-        (config.packages[b.packageId] &&
-          pickRemarkCode(
-            config.packages[b.packageId],
-            b.foodMode === 'table' ? 'table' : b.foodMode === 'buffet' ? 'buffet' : 'any',
-            b.foodMode === 'table' ? b.tables : b.guests,
-          )) || undefined,
+      remarkCode: remarkCode || undefined,
+      // the same template with the "ไม่รวม..." lines this booking contradicts removed; omitted when
+      // the template could not be read, so flowaccount-app resolves remarkCode itself as before
+      ...(remarkText ? { notes: remarkText } : {}),
       internalNotes: notes.join('\n'),
       items: built.items,
     });

@@ -1,4 +1,4 @@
-import { DISCOUNTS, DISH_COUNTS, MONK_OPTIONS, baht, featuresFor, priceUnitLabel, startPrice, type Pkg } from '../data/packages';
+import { DISCOUNTS, DISH_COUNTS, MONK_OPTIONS, baht, featuresFor, priceUnitLabel, startPrice, withMonks, type Pkg } from '../data/packages';
 import { MENUS, MENU_IMAGES, MENU_INTRO, MERIT_MENU_IMAGES } from '../data/menus';
 import { BackLink, charm } from '../ui';
 import SmallOrderNotice from '../components/SmallOrderNotice';
@@ -55,6 +55,8 @@ interface Props {
   pkg: Pkg;
   onBack: () => void;
   onBook: () => void;
+  /** monk count the customer picked in the wizard (absent = the package default) */
+  monks?: number;
 }
 
 const cardBox = {
@@ -64,7 +66,7 @@ const cardBox = {
   boxShadow: 'var(--shadow-sm)',
 } as const;
 
-export default function Detail({ pkg, onBack, onBook }: Props) {
+export default function Detail({ pkg, onBack, onBook, monks }: Props) {
   const isCatering = pkg.kind === 'catering';
   const unit = priceUnitLabel(pkg);
 
@@ -134,7 +136,7 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
         <h1 style={{ ...charm, fontSize: 33, lineHeight: 1.45, margin: '4px 0 8px', color: 'var(--color-accent-900)' }}>
           {pkg.name}
         </h1>
-        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: 'var(--color-neutral-700)' }}>{pkg.tagline}</p>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: 'var(--color-neutral-700)' }}>{withMonks(pkg.tagline, monks)}</p>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginTop: 14 }}>
           <span style={{ fontSize: 13, color: 'var(--color-neutral-600)' }}>{unit.prefix}</span>
           <span style={{ ...charm, fontSize: 36, color: 'var(--color-accent-700)', lineHeight: 1.25 }}>{baht(startPrice(pkg))}</span>
@@ -199,7 +201,7 @@ export default function Detail({ pkg, onBack, onBook }: Props) {
       <div style={{ padding: '0 20px 24px' }}>
         <h2 style={{ ...charm, fontSize: 25, margin: '0 0 12px', color: 'var(--color-accent-900)' }}>สิ่งที่ได้ในแพ็กเกจ</h2>
         <div style={{ ...cardBox, padding: '6px 18px' }}>
-          {featuresFor(pkg).map((ft) => (
+          {featuresFor(pkg, monks).map((ft) => (
             <div
               key={ft[0]}
               style={{

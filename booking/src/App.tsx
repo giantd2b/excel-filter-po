@@ -184,6 +184,7 @@ export default function App() {
       {screen === 'home' && (
         <Home
           line={homeLine}
+          monks={form.monks || undefined}
           onLineChange={setHomeLine}
           onStartBooking={() => {
             // start the wizard on the line the customer was browsing
@@ -208,6 +209,7 @@ export default function App() {
       {screen === 'detail' && (
         <Detail
           pkg={pkgById(pkgId)}
+          monks={form.monks || undefined}
           onBack={goHome}
           onBook={() => {
             setForm(formForPackage(form, pkgId));

@@ -743,6 +743,8 @@ export interface FaRecipe {
 export interface FaRecipeConfig {
   packages: Record<string, FaRecipe>;
   addons: Record<string, string>;
+  /** add-on id -> regex matching the "ราคานี้ไม่รวม…" remark line that this add-on makes untrue */
+  addonRemarkPatterns: Record<string, string>;
 }
 
 export interface FaCatalogProduct {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FAQS, LINES, PKGS, PROVINCES, baht, priceUnitLabel, startPrice, type Pkg, type PkgLine } from '../data/packages';
+import { FAQS, LINES, PKGS, PROVINCES, baht, priceUnitLabel, startPrice, withMonks, type Pkg, type PkgLine } from '../data/packages';
 import { BRAND, SITE_FAMILY, SITE_LINES } from '../lib/site';
 import { SectionTitle, charm } from '../ui';
 
@@ -46,6 +46,8 @@ interface Props {
   onOpenPkg: (p: Pkg) => void;
   /** start the wizard with this package already chosen */
   onBookPkg: (p: Pkg) => void;
+  /** monk count the customer picked in the wizard, so the cards keep saying the same number */
+  monks?: number;
 }
 
 /** card button label — the detail page is where the menu lives for catering */
@@ -61,7 +63,7 @@ const LINE_INTRO: Record<PkgLine, { title: string; sub: string }> = {
   chinese: { title: 'โต๊ะจีน', sub: 'คิดราคาต่อโต๊ะ 8 ท่าน เลือกได้จานละ 1 เมนู ขั้นต่ำ 10 โต๊ะ · จัดต่ำกว่า 15 โต๊ะ มีค่าบริการจัดเลี้ยงเพิ่ม 200 บาท/โต๊ะ · แตะดูเมนูแต่ละจาน' },
 };
 
-export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, onBookPkg }: Props) {
+export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, onBookPkg, monks }: Props) {
   const [openFaq, setOpenFaq] = useState(-1);
   const shown = PKGS.filter((p) => p.line === line);
 
@@ -305,10 +307,10 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, on
                       )}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--color-neutral-600)', lineHeight: 1.55, marginTop: 4 }}>
-                      {p.tagline}
+                      {withMonks(p.tagline, monks)}
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 9 }}>
-                      {p.chips.map((c) => (
+                      {p.chips.map((raw) => withMonks(raw, monks)).map((c) => (
                         <div
                           key={c}
                           style={{
