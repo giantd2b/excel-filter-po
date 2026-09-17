@@ -2,6 +2,8 @@ import { DISCOUNTS, DISH_COUNTS, MONK_OPTIONS, baht, featuresFor, priceUnitLabel
 import { MENUS, MENU_IMAGES, MENU_INTRO, MERIT_MENU_IMAGES } from '../data/menus';
 import { BackLink, charm } from '../ui';
 import SmallOrderNotice from '../components/SmallOrderNotice';
+import VideoCard from '../components/VideoCard';
+import { PKG_VIDEOS } from '../data/videos';
 
 /** menu poster pages: swipe sideways, tap to open full size */
 function MenuGallery({ images, title }: { images: string[]; title?: string }) {
@@ -118,6 +120,8 @@ export default function Detail({ pkg, onBack, onBook, monks }: Props) {
   const menu = MENUS[pkg.id] || [];
   const menuImages = MENU_IMAGES[pkg.id] || [];
   const meritMenus = pkg.kind === 'full' ? MERIT_MENU_IMAGES[pkg.id] : undefined;
+  // review clip — only the merit full packages have one (see data/videos.ts)
+  const video = PKG_VIDEOS[pkg.id];
   const eyebrow = isCatering
     ? pkg.unit === 'table'
       ? 'IRIS Catering · โต๊ะจีน'
@@ -159,6 +163,18 @@ export default function Detail({ pkg, onBack, onBook, monks }: Props) {
           ></div>
         </div>
       </div>
+
+      {video && (
+        <div style={{ padding: '0 20px 24px' }}>
+          <h2 style={{ ...charm, fontSize: 25, margin: '0 0 6px', color: 'var(--color-accent-900)' }}>วิดีโอรีวิวแพ็กเกจ</h2>
+          <p style={{ margin: '0 0 12px', fontSize: 13.5, lineHeight: 1.6, color: 'var(--color-neutral-600)' }}>
+            ดูบรรยากาศงานจริงของแพ็กเกจนี้ แตะเพื่อเล่นวิดีโอ
+          </p>
+          <div style={{ maxWidth: 280, margin: '0 auto' }}>
+            <VideoCard video={video} />
+          </div>
+        </div>
+      )}
 
       {pkg.smallOrder && (
         <div style={{ padding: '0 20px 20px' }}>

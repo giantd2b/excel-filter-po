@@ -2,10 +2,14 @@ import { useState } from 'react';
 import { FAQS, LINES, PKGS, PROVINCES, baht, priceUnitLabel, startPrice, withMonks, type Pkg, type PkgLine } from '../data/packages';
 import { BRAND, SITE_FAMILY, SITE_LINES } from '../lib/site';
 import { SectionTitle, charm } from '../ui';
+import VideoCard from '../components/VideoCard';
+import { PKG_VIDEOS } from '../data/videos';
 
 const WORK_SLOTS = BRAND.work;
 const SITE_TABS = LINES.filter((l) => SITE_LINES.includes(l.id));
 const SITE_FAQS = FAQS.filter((q) => !q.site || q.site === SITE_FAMILY);
+/** merit packages that have a review clip, in catalog order */
+const VIDEO_PKGS = PKGS.filter((p) => PKG_VIDEOS[p.id]);
 
 function WorkImage({ file, label }: { file: string; label: string }) {
   const [missing, setMissing] = useState(false);
@@ -383,6 +387,49 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, on
           );
         })}
       </div>
+
+      {/* review clips — merit storefront only; catering lines have no videos */}
+      {line === 'merit' && VIDEO_PKGS.length > 0 && (
+        <div style={{ padding: '0 20px 28px' }}>
+          <SectionTitle style={{ margin: '0 0 6px' }}>วิดีโอรีวิวแต่ละแพ็กเกจ</SectionTitle>
+          <p style={{ margin: '0 0 14px', fontSize: 14, color: 'var(--color-neutral-600)' }}>
+            แตะเพื่อดูบรรยากาศงานจริงของแต่ละแพ็กเกจ
+          </p>
+          <div
+            style={{
+              display: 'flex',
+              gap: 12,
+              overflowX: 'auto',
+              margin: '0 -20px',
+              padding: '2px 20px 8px',
+              scrollSnapType: 'x mandatory',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            {VIDEO_PKGS.map((p) => {
+              const unit = priceUnitLabel(p);
+              return (
+                <div key={p.id} style={{ flex: '0 0 56%', scrollSnapAlign: 'center' }}>
+                  <VideoCard
+                    video={PKG_VIDEOS[p.id]}
+                    onCaptionClick={() => onOpenPkg(p)}
+                    caption={
+                      <div>
+                        <div style={{ ...charm, fontSize: 20, lineHeight: 1.35, color: 'var(--color-accent-900)' }}>{p.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginTop: 2 }}>
+                          <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>{unit.prefix}</span>
+                          <span style={{ ...charm, fontSize: 21, color: 'var(--color-accent-700)', lineHeight: 1.3 }}>{baht(startPrice(p))}</span>
+                          <span style={{ fontSize: 12.5, color: 'var(--color-neutral-700)' }}>{unit.suffix}</span>
+                        </div>
+                      </div>
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 3 steps */}
       <div
