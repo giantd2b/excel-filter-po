@@ -10,6 +10,8 @@ export default function DashboardLayout() {
   const { pathname } = useLocation();
 
   const isInbox = pathname.startsWith("/dashboard/inbox");
+  // Wide data pages get the whole viewport width instead of the 7xl column
+  const isWide = pathname.startsWith("/dashboard/quotations");
 
   // Global notification listener — works on ALL pages
   useGlobalNotifications();
@@ -45,7 +47,7 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       ) : (
-        <main className="flex-1 overflow-auto max-w-7xl w-full mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <main className={`flex-1 overflow-auto w-full mx-auto py-6 px-4 sm:px-6 lg:px-8 ${isWide ? "" : "max-w-7xl"}`}>
           <Outlet />
         </main>
       )}

@@ -34,8 +34,32 @@ const ORIGIN_STYLE: Record<string, string> = {
   manual: "bg-slate-100 text-slate-500",
 };
 
+// top-level tabs: summary (stats + close-rate) vs. the document list; remembered per browser
+type PageView = "summary" | "list";
+const VIEW_KEY = "quotations.view";
+const VIEW_TABS: { key: PageView; label: string }[] = [
+  { key: "summary", label: "สรุปข้อมูล" },
+  { key: "list", label: "รายการใบเสนอราคา" },
+];
+const readView = (): PageView => {
+  try { return localStorage.getItem(VIEW_KEY) === "summary" ? "summary" : "list"; } catch { return "list"; }
+};
+
+const DATE_OPTIONS = [
+  { value: "", label: "ทั้งหมด" },
+  { value: "2025-01-01", label: "2025" },
+  { value: "2026-01-01", label: "2026" },
+  { value: new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0], label: "90 วัน" },
+  { value: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0], label: "30 วัน" },
+];
+
 export default function QuotationsPage() {
   const navigate = useNavigate();
+  const [view, setViewState] = useState<PageView>(readView);
+  const setView = (v: PageView) => {
+    setViewState(v);
+    try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ }
+  };
   const [quotations, setQuotations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -147,10 +171,30 @@ export default function QuotationsPage() {
     return "text-red-400";
   };
 
+  // "ตั้งแต่" chips — shared by both tabs since the summary follows the same date range
+  const dateFilter = (
+    <div className="flex items-center gap-1">
+      <span className="text-[11px] text-slate-400 font-medium">ตั้งแต่:</span>
+      {DATE_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => { setDateFrom(opt.value); setPage(1); }}
+          className={`px-2 py-1 text-[11px] font-medium rounded-md transition-all ${
+            dateFrom === opt.value
+              ? "bg-blue-500 text-white"
+              : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="w-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-[11px] font-semibold text-brand-500 uppercase tracking-[0.08em] mb-1">
             Sales Pipeline
@@ -169,6 +213,38 @@ export default function QuotationsPage() {
           />
           {syncing ? "กำลัง Sync..." : "Sync ข้อมูล"}
         </button>
+      </div>
+
+      {/* View tabs */}
+      <div className="flex items-center gap-1 border-b border-slate-200 mb-6">
+        {VIEW_TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setView(t.key)}
+            className={`px-4 py-2.5 text-[13px] font-semibold -mb-px border-b-2 transition-colors ${
+              view === t.key
+                ? "border-brand-500 text-brand-600"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {t.label}
+            {t.key === "list" && total > 0 && (
+              <span className="ml-1.5 text-[11px] font-medium text-slate-400 tabular-nums">({total})</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {view === "summary" && (
+      <>
+      {/* Date range for the summary tab */}
+      <div className="flex items-center justify-between mb-4">
+        {dateFilter}
+        {updatedAt > 0 && (
+          <p className="text-[10px] text-slate-300">
+            อัปเดตล่าสุด: {new Date(updatedAt).toLocaleString("th-TH")}
+          </p>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -257,7 +333,11 @@ export default function QuotationsPage() {
           <SummaryTable rows={summary[summaryTab]} labelOf={summaryTab === "byOrigin" ? (k) => ORIGIN_LABEL[k] || k : (k) => k} />
         </div>
       )}
+      </>
+      )}
 
+      {view === "list" && (
+      <>
       {/* Search + Status Tabs */}
       <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm">
         <div className="px-5 py-4 border-b border-slate-100/80">
@@ -349,28 +429,7 @@ export default function QuotationsPage() {
             <div className="w-px h-4 bg-slate-200" />
 
             {/* Date filter */}
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] text-slate-400 font-medium">ตั้งแต่:</span>
-              {[
-                { value: "", label: "ทั้งหมด" },
-                { value: "2025-01-01", label: "2025" },
-                { value: "2026-01-01", label: "2026" },
-                { value: new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0], label: "90 วัน" },
-                { value: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0], label: "30 วัน" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => { setDateFrom(opt.value); setPage(1); }}
-                  className={`px-2 py-1 text-[11px] font-medium rounded-md transition-all ${
-                    dateFrom === opt.value
-                      ? "bg-blue-500 text-white"
-                      : "bg-slate-50 text-slate-500 hover:bg-slate-100"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+            {dateFilter}
           </div>
 
           {/* Last updated */}
@@ -466,7 +525,7 @@ export default function QuotationsPage() {
                           {q.customer}
                         </p>
                         {q.project && (
-                          <p className="text-[11px] text-slate-400 mt-0.5 truncate max-w-[300px]">
+                          <p className="text-[11px] text-slate-400 mt-0.5 truncate max-w-[520px]">
                             {q.project}
                           </p>
                         )}
@@ -594,6 +653,8 @@ export default function QuotationsPage() {
           </>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
