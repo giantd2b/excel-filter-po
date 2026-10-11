@@ -12,6 +12,7 @@ import { InboxStatsService } from '../inbox-gateway/inbox-stats.service';
 import { QuotationsService } from '../quotations/quotations.service';
 import { findThaiPhones, formatThaiPhone } from '../../common/utils/phone.utils';
 import { SlipDetectionService } from '../slips/slip-detection.service';
+import { FaqFollowupService } from './faq-followup';
 
 @Injectable()
 export class WebhookService {
@@ -24,6 +25,7 @@ export class WebhookService {
     private readonly inboxGateway: InboxGateway,
     private readonly inboxStats: InboxStatsService,
     private readonly quotations: QuotationsService,
+    private readonly faqFollowup: FaqFollowupService,
   ) {}
 
   async saveMarkAsReadToken(customerId: string, token: string) {
@@ -497,6 +499,9 @@ export class WebhookService {
       this.inboxStats.refreshAndBroadcast();
 
       this.logger.log(`Saved message for Facebook user ${senderID} on ${fbbot}`);
+
+      // FAQ button taps get a booking-link follow-up after Business Suite's own answer
+      this.faqFollowup.maybeFollowUp(fbbot, proFile.id, customerId, messageText);
     } catch (error: any) {
       this.logger.error(`Failed to process Facebook text: ${error.message}`);
     }
