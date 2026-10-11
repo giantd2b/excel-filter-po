@@ -1,4 +1,4 @@
-import { DISCOUNTS, DISH_COUNTS, MONK_OPTIONS, baht, featuresFor, priceUnitLabel, startPrice, withMonks, type Pkg } from '../data/packages';
+import { DISCOUNTS, DISH_COUNTS, MERIT_PROCESS, MERIT_SCHEDULE, MONK_OPTIONS, baht, featuresFor, priceUnitLabel, startPrice, withMonks, type Pkg } from '../data/packages';
 import { MENUS, MENU_IMAGES, MENU_INTRO, MERIT_MENU_IMAGES } from '../data/menus';
 import { BackLink, charm } from '../ui';
 import SmallOrderNotice from '../components/SmallOrderNotice';
@@ -295,6 +295,78 @@ export default function Detail({ pkg, onBack, onBook, monks }: Props) {
           </p>
           <MenuGallery images={meritMenus.buffet} title="เมนูบุฟเฟต์" />
           <MenuGallery images={meritMenus.table} title="เมนูโต๊ะจีน" />
+        </div>
+      )}
+
+      {/* งานบุญ: how the job runs from deposit to the ceremony, and the ceremony running order */}
+      {!isCatering && (
+        <div style={{ padding: '0 20px 24px' }}>
+          <h2 style={{ ...charm, fontSize: 25, margin: '0 0 12px', color: 'var(--color-accent-900)' }}>ขั้นตอนการดำเนินงาน</h2>
+          <div style={{ ...cardBox, padding: '6px 18px' }}>
+            {MERIT_PROCESS.map((st, i) => (
+              <div
+                key={st.title}
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  padding: '12px 0',
+                  borderBottom: i < MERIT_PROCESS.length - 1 ? '1px solid var(--color-divider)' : 'none',
+                }}
+              >
+                <div
+                  style={{
+                    flex: '0 0 26px',
+                    height: 26,
+                    borderRadius: 999,
+                    background: 'var(--color-accent-700)',
+                    color: 'var(--color-neutral-100)',
+                    fontSize: 13.5,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {i + 1}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-accent-800)' }}>{st.title}</div>
+                  <div style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--color-neutral-700)', margin: '3px 0 6px' }}>{st.detail}</div>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '3px 10px',
+                      borderRadius: 999,
+                      background: 'var(--color-accent-2-200)',
+                      color: 'var(--color-accent-2-800)',
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {st.when}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <h2 style={{ ...charm, fontSize: 25, margin: '24px 0 12px', color: 'var(--color-accent-900)' }}>ลำดับพิธีวันงาน</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+            {MERIT_SCHEDULE.map((sc) => (
+              <div key={sc.title} style={cardBox}>
+                <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--color-accent-800)', marginBottom: 4 }}>{sc.title}</div>
+                {sc.rows.map(([time, what]) => (
+                  <div key={time} style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--color-divider)' }}>
+                    <div style={{ flex: '0 0 96px', fontSize: 13.5, fontWeight: 600, color: 'var(--color-accent-700)', whiteSpace: 'nowrap' }}>{time}</div>
+                    <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--color-neutral-800)' }}>{what}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '12px 0 0', fontSize: 13, lineHeight: 1.6, color: 'var(--color-neutral-600)' }}>
+            เวลาเริ่มทานอาหาร: ลูกค้าส่วนใหญ่เริ่มทานหลังจากพระกลับแล้ว ทั้งนี้ขึ้นอยู่กับลูกค้ากำหนด
+          </p>
         </div>
       )}
 
