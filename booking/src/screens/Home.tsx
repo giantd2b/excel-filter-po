@@ -545,7 +545,7 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, on
                     textWrap: 'pretty',
                   }}
                 >
-                  {q.a}
+                  {typeof q.a === 'function' ? q.a() : q.a}
                 </div>
               )}
             </div>
