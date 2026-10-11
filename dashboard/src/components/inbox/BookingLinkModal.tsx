@@ -32,7 +32,8 @@ const FALLBACK_PACKAGES: BookingPackageInfo[] = [
 ];
 const FALLBACK_ADDONS: BookingAddonInfo[] = [
   { id: "stage", label: "เวทีพระ", price: 5000, lines: ["merit"] },
-  { id: "tent", label: "เต็นท์เพิ่ม 1 หลัง", price: 3000, lines: ["merit"] },
+  { id: "tent", label: "เต็นท์ใหญ่เพิ่ม 1 หลัง (5x12)", price: 3000, lines: ["merit"] },
+  { id: "tentSmall", label: "เต็นท์เล็กเพิ่ม 1 หลัง (3x3)", price: 500, lines: ["merit"] },
   { id: "drape", label: "โยงผ้าประดับเพิ่ม", price: 1000, lines: ["merit"] },
   { id: "almsround", label: "ชุดตักบาตร", price: 500, lines: ["merit"] },
   { id: "drinks", label: "เครื่องดื่ม", price: 250, perUnit: "table", lines: ["chinese"] },
