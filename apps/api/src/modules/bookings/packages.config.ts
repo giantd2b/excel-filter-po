@@ -787,7 +787,7 @@ export const DEFAULT_FA_RECIPES: FaRecipeConfig = {
     'chinese-2300': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
     'chinese-2600': { monkCode: '', transportCode: '', cateringCode: null, vatRate: 7 },
   },
-  addons: { stage: 'STAGE', tent: 'TENT512', drape: 'DRAPE', almsround: 'ALMS_SET' },
+  addons: { stage: 'STAGE', tent: 'TENT512', tentSmall: 'TENTSMALL3X3', drape: 'DRAPE', almsround: 'ALMS_SET' },
   // wording as it appears in the shop's remark templates — the tent line is spelled both
   // "เต็นท์" and "เต้นท์" across templates, so both are matched
   addonRemarkPatterns: {
