@@ -269,17 +269,23 @@ export class AiShadowService {
       const anthropic = new Anthropic();
       const res = await anthropic.messages.create({
         model: settings.model,
-        max_tokens: 1024,
+        max_tokens: 2500,
         system: [
           { type: 'text', text: RULES },
           { type: 'text', text: knowledge, cache_control: { type: 'ephemeral' } },
         ] as any,
         tools: [RESPOND_TOOL],
-        tool_choice: { type: 'tool', name: 'respond' },
+        // newer models reject a forced tool_choice; the rules require the tool and we fall back to plain text below
+        tool_choice: { type: 'auto' },
         messages: [{ role: 'user', content: userContent }],
       });
       const tool = res.content.find((c) => c.type === 'tool_use') as Anthropic.ToolUseBlock | undefined;
-      const out = (tool?.input || {}) as any;
+      const plain = res.content
+        .filter((c) => c.type === 'text')
+        .map((c) => (c as Anthropic.TextBlock).text)
+        .join('\n')
+        .trim();
+      const out = (tool?.input || { action: 'reply', reply: plain, intent: 'อื่นๆ', confidence: null, sources: ['(ไม่ได้ใช้เครื่องมือ respond)'] }) as any;
       const usage = res.usage as any;
       await this.prisma.aiShadowReply.create({
         data: {
@@ -294,6 +300,7 @@ export class AiShadowService {
           outputTokens: usage?.output_tokens ?? null,
           cacheReadTokens: usage?.cache_read_input_tokens ?? null,
           latencyMs: Date.now() - started,
+          error: res.stop_reason === 'max_tokens' ? 'คำตอบยาวเกินขีดจำกัด (max_tokens)' : null,
         },
       });
     } catch (e: any) {
