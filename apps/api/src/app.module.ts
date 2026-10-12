@@ -18,6 +18,7 @@ import { ExternalModule } from './modules/external/external.module';
 import { AgendaModule } from './modules/agenda/agenda.module';
 import { QuotationsModule } from './modules/quotations/quotations.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
+import { AiShadowModule } from './modules/ai-shadow/ai-shadow.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { BookingsModule } from './modules/bookings/bookings.module';
     AgendaModule,
     QuotationsModule,
     BookingsModule,
+    AiShadowModule,
   ],
 })
 export class AppModule {}

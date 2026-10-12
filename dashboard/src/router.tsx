@@ -21,6 +21,7 @@ const AgendaGeneratorPage = lazy(() => import("@/pages/AgendaGeneratorPage"));
 const QuotationsPage = lazy(() => import("@/pages/QuotationsPage"));
 const BookingsPage = lazy(() => import("@/pages/BookingsPage"));
 const QuoteMatchPage = lazy(() => import("@/pages/QuoteMatchPage"));
+const AiShadowPage = lazy(() => import("@/pages/AiShadowPage"));
 
 function PageLoader() {
   return (
@@ -56,6 +57,10 @@ export const router = createBrowserRouter([
             element: <SuspenseWrapper><InboxPage /></SuspenseWrapper>,
           },
         ],
+      },
+      {
+        path: "ai-shadow",
+        element: <SuspenseWrapper><AiShadowPage /></SuspenseWrapper>,
       },
       {
         path: "new-customers",

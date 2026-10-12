@@ -541,3 +541,35 @@ model BookingLink {
   @@index([customerId])
   @@map("booking_links")
 }
+
+// ─── AI shadow mode: what the AI WOULD have replied, next to what the admin actually replied ───
+model AiShadowReply {
+  id               String    @id @default(uuid())
+  customerId       String    @map("customer_id")
+  channel          String
+  triggerMessageId String    @map("trigger_message_id") // last customer message of the turn
+  triggerAt        BigInt    @map("trigger_at") // its timestamp (ms) — admin replies after this are the comparison
+  question         String // customer messages of this turn, oldest first
+  action           String // reply | handoff | no_reply
+  aiReply          String?   @map("ai_reply")
+  handoffReason    String?   @map("handoff_reason")
+  intent           String?
+  confidence       Float?
+  sources          String[]  @default([])
+  model            String
+  inputTokens      Int?      @map("input_tokens")
+  outputTokens     Int?      @map("output_tokens")
+  cacheReadTokens  Int?      @map("cache_read_tokens")
+  latencyMs        Int?      @map("latency_ms")
+  error            String?
+  rating           String? // good | partial | bad
+  ratingNote       String?   @map("rating_note")
+  ratedBy          String?   @map("rated_by")
+  ratedAt          DateTime? @map("rated_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([customerId, triggerAt])
+  @@index([createdAt])
+  @@index([channel, createdAt])
+  @@map("ai_shadow_replies")
+}

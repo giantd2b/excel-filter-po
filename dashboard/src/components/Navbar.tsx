@@ -33,6 +33,7 @@ export default function Navbar() {
           { href: "/dashboard/analytics", label: "วิเคราะห์" },
           { href: "/dashboard/templates", label: "เทมเพลต" },
           { href: "/dashboard/knowledge", label: "ฐานความรู้" },
+          { href: "/dashboard/ai-shadow", label: "AI ทดสอบ" },
           { href: "/dashboard/admins", label: "ผู้ดูแลระบบ" },
           { href: "/dashboard/agenda", label: "สร้างการ์ด" },
           { href: "/dashboard/api-keys", label: "API Keys" },

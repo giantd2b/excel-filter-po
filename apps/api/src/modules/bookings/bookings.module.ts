@@ -8,5 +8,6 @@ import { MessagesModule } from '../messages/messages.module';
   imports: [QuotationsModule, MessagesModule],
   controllers: [BookingsController],
   providers: [BookingsService],
+  exports: [BookingsService],
 })
 export class BookingsModule {}
