@@ -550,6 +550,7 @@ model AiShadowReply {
   triggerMessageId String    @map("trigger_message_id") // last customer message of the turn
   triggerAt        BigInt    @map("trigger_at") // its timestamp (ms) — admin replies after this are the comparison
   question         String // customer messages of this turn, oldest first
+  mode             String    @default("live") // live = drafted as the chat happened · replay = past question re-answered for the experiment
   action           String // reply | handoff | no_reply
   aiReply          String?   @map("ai_reply")
   handoffReason    String?   @map("handoff_reason")
@@ -571,5 +572,6 @@ model AiShadowReply {
   @@index([customerId, triggerAt])
   @@index([createdAt])
   @@index([channel, createdAt])
+  @@index([mode, createdAt])
   @@map("ai_shadow_replies")
 }

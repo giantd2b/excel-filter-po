@@ -14,15 +14,28 @@ export class AiShadowController {
     @Query('channel') channel?: string,
     @Query('action') action?: string,
     @Query('rating') rating?: string,
+    @Query('mode') mode?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
-    return this.shadow.list({ channel, action, rating, page: Number(page) || 1, pageSize: Number(pageSize) || 30 });
+    return this.shadow.list({ channel, action, rating, mode, page: Number(page) || 1, pageSize: Number(pageSize) || 30 });
   }
 
   @Get('stats')
-  stats(@Query('channel') channel?: string) {
-    return this.shadow.stats(channel);
+  stats(@Query('channel') channel?: string, @Query('mode') mode?: string) {
+    return this.shadow.stats(channel, mode);
+  }
+
+  /** experiment: re-answer past real questions and compare with the admin's answer */
+  @Post('replay')
+  replay(@Body() body: { channels: string[]; count?: number; days?: number }, @Req() req: any) {
+    if (!canManage(req)) throw new ForbiddenException('เฉพาะ ADMIN / SUPER_ADMIN');
+    return this.shadow.startReplay({ channels: body?.channels || [], count: Number(body?.count) || 100, days: Number(body?.days) || 90 });
+  }
+
+  @Get('replay')
+  replayStatus() {
+    return this.shadow.getReplayJob();
   }
 
   /** exactly what the AI is allowed to answer from (live prices + confirmed facts + KB) */

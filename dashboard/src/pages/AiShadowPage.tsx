@@ -49,6 +49,17 @@ interface Stats {
   avgConfidence: number | null;
   tokens: { input: number; output: number; cacheRead: number };
 }
+interface ReplayJob {
+  running: boolean;
+  startedAt: number | null;
+  finishedAt: number | null;
+  channels: string[];
+  target: number;
+  found: number;
+  done: number;
+  errors: number;
+  message: string | null;
+}
 interface Settings {
   enabled: boolean;
   channels: string[];
@@ -82,6 +93,12 @@ export default function AiShadowPage() {
   const [action, setAction] = useState("");
   const [rating, setRating] = useState("");
   const [page, setPage] = useState(1);
+  /** live = drafted as chats happen · replay = past questions re-answered for the experiment */
+  const [mode, setMode] = useState<"replay" | "live">("replay");
+  const [job, setJob] = useState<ReplayJob | null>(null);
+  const [replayChannels, setReplayChannels] = useState<string[]>(["FB_เติมบุญ", "Line_เติมบุญ"]);
+  const [replayCount, setReplayCount] = useState(100);
+  const [replayDays, setReplayDays] = useState(90);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [allChannels, setAllChannels] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
@@ -94,18 +111,18 @@ export default function AiShadowPage() {
     if (channel) qs.set("channel", channel);
     if (action) qs.set("action", action);
     if (rating) qs.set("rating", rating);
+    qs.set("mode", mode);
     qs.set("page", String(page));
+    const sq = new URLSearchParams({ mode });
+    if (channel) sq.set("channel", channel);
     try {
-      const [l, s] = await Promise.all([
-        api.get<ListRes>(`/ai-shadow?${qs}`),
-        api.get<Stats>(`/ai-shadow/stats${channel ? `?channel=${encodeURIComponent(channel)}` : ""}`),
-      ]);
+      const [l, s] = await Promise.all([api.get<ListRes>(`/ai-shadow?${qs}`), api.get<Stats>(`/ai-shadow/stats?${sq}`)]);
       setData(l);
       setStats(s);
     } finally {
       setLoading(false);
     }
-  }, [channel, action, rating, page]);
+  }, [channel, action, rating, mode, page]);
 
   useEffect(() => {
     load();
@@ -115,7 +132,25 @@ export default function AiShadowPage() {
       setSettings(r.settings);
       setAllChannels(r.channels);
     });
+    api.get<ReplayJob>("/ai-shadow/replay").then(setJob);
   }, []);
+  // follow a running replay; refresh the list as answers come in
+  useEffect(() => {
+    if (!job?.running) return;
+    const t = setInterval(async () => {
+      const j = await api.get<ReplayJob>("/ai-shadow/replay");
+      setJob(j);
+      if (mode === "replay") load();
+    }, 5000);
+    return () => clearInterval(t);
+  }, [job?.running, mode, load]);
+
+  const startReplay = async () => {
+    const j = await api.post<ReplayJob>("/ai-shadow/replay", { channels: replayChannels, count: replayCount, days: replayDays });
+    setJob(j);
+    setMode("replay");
+    setPage(1);
+  };
 
   const saveSettings = async (patch: Partial<Settings>) => {
     const next = await api.put<Settings>("/ai-shadow/settings", patch);
@@ -128,7 +163,9 @@ export default function AiShadowPage() {
       { rating: r, note: note ?? item.ratingNote },
     );
     setData((d) => (d ? { ...d, items: d.items.map((x) => (x.id === item.id ? { ...x, ...res } : x)) } : d));
-    api.get<Stats>(`/ai-shadow/stats${channel ? `?channel=${encodeURIComponent(channel)}` : ""}`).then(setStats);
+    const sq = new URLSearchParams({ mode });
+    if (channel) sq.set("channel", channel);
+    api.get<Stats>(`/ai-shadow/stats?${sq}`).then(setStats);
   };
 
   const openContext = async () => {
@@ -209,6 +246,75 @@ export default function AiShadowPage() {
             </label>
             <span className="text-slate-500">โมเดล: {settings.model}</span>
           </div>
+        </div>
+      )}
+
+      {/* mode tabs */}
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit text-sm">
+        {([
+          ["replay", "ทดลองย้อนหลัง (คำถามจริงในอดีต)"],
+          ["live", "ใช้งานจริง (แชทที่เข้ามาตอนนี้)"],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => { setMode(id); setPage(1); }}
+            className={`px-3 py-1.5 rounded-lg ${mode === id ? "bg-white shadow-sm font-medium text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "replay" && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+          <div className="text-sm text-slate-600">
+            ดึงคำถามที่ลูกค้าพิมพ์เองจากแชทจริง (ตัดปุ่มคำถามอัตโนมัติของเพจ สติกเกอร์ รูป และคำตอบรับสั้น ๆ ออก) เฉพาะข้อที่แอดมินตอบแล้ว
+            ให้ AI ตอบโดยเห็นแชทแค่ถึงตอนนั้น แล้ววางเทียบกับคำตอบแอดมินจริง · ราคาที่ AI ใช้เป็นราคาปัจจุบัน ซึ่งอาจต่างจากตอนที่ลูกค้าถาม
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            {(allChannels.length ? allChannels : ["FB_เติมบุญ", "Line_เติมบุญ"]).map((c) => {
+              const on = replayChannels.includes(c);
+              return (
+                <button
+                  key={c}
+                  onClick={() => setReplayChannels(on ? replayChannels.filter((x) => x !== c) : [...replayChannels, c])}
+                  className={`text-xs px-2.5 py-1 rounded-full border ${on ? "bg-violet-600 text-white border-violet-600" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <label className="flex items-center gap-2">
+              จำนวนคำถาม
+              <input type="number" min={1} max={500} value={replayCount} onChange={(e) => setReplayCount(Number(e.target.value))} className="w-20 px-2 py-1 border border-slate-200 rounded-md" />
+            </label>
+            <label className="flex items-center gap-2">
+              ย้อนหลัง
+              <input type="number" min={1} max={365} value={replayDays} onChange={(e) => setReplayDays(Number(e.target.value))} className="w-20 px-2 py-1 border border-slate-200 rounded-md" />
+              วัน
+            </label>
+            <button
+              onClick={startReplay}
+              disabled={!!job?.running || replayChannels.length === 0}
+              className="px-4 py-2 rounded-lg bg-violet-600 text-white font-medium disabled:opacity-50"
+            >
+              {job?.running ? "กำลังทดลอง…" : "เริ่มทดลอง"}
+            </button>
+            <span className="text-xs text-slate-500">ค่า AI ประมาณ 1 บาท/คำถาม</span>
+          </div>
+          {job && (job.running || job.finishedAt) && (
+            <div className="text-sm">
+              <div className="flex justify-between text-slate-600 mb-1">
+                <span>{job.message}</span>
+                <span>{job.done} / {job.found || job.target}</span>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-violet-500 transition-all" style={{ width: `${job.found ? Math.round((job.done / job.found) * 100) : job.running ? 5 : 100}%` }} />
+              </div>
+            </div>
+          )}
         </div>
       )}
 

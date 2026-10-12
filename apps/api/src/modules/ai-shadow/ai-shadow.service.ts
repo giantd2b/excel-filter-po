@@ -38,6 +38,38 @@ const DEBOUNCE_MS = 30_000;
 const HISTORY = 30;
 /** admin messages that are not a human answer */
 export const NON_HUMAN_ADMINS = ['ตอบอัตโนมัติ'];
+/** a Business Suite message this soon after the customer is Meta's automated FAQ answer, not an admin */
+const META_AUTO_MS = 15_000;
+
+/** texts sent by the Facebook FAQ buttons / product cards — not typed by the customer */
+export const AUTO_QUESTION_TEXTS = [
+  'แพคเกจเริ่มต้นราคาเท่าไหร่ครับ',
+  'รับจัดงานบุญที่ไหนบ้างครับ',
+  'ขอทราบข้อมูลเพิ่มเติมเกี่ยวกับสินค้าชิ้นนี้',
+  'can i make a reservation?',
+  'บุฟเฟ่ต์เริ่มต้นเท่าไหร่',
+  'โต๊ะจีนขั้นต่ำกี่โต๊ะ',
+  'ค่าเดินทางโต๊ะจีนคือเท่าไร',
+  'มีบริการด้านใดบ้าง',
+  'เริ่มต้น',
+  'get started',
+];
+const isAutoQuestion = (t: string) => AUTO_QUESTION_TEXTS.includes(t.trim().replace(/\s+/g, ' ').toLowerCase()) || AUTO_QUESTION_TEXTS.includes(t.trim());
+const isPlaceholder = (t: string) => /^\[(รูปภาพ|สติกเกอร์|ไฟล์|วิดีโอ|เสียง)\]$/.test(t.trim());
+/** looks like the customer is asking something (Thai question words / ?) */
+const QUESTION_RE = /\?|ไหม|มั้ย|มั๊ย|ไหน|เท่าไ|กี่|อะไร|ยังไง|อย่างไร|หรือเปล่า|รึเปล่า|ป่าว|บ้าง|สอบถาม|ขอ(ทราบ|ดู|ราคา|รายละเอียด|ใบเสนอ)|คิด(ยังไง|เท่า|ราคา)|ราคา|ได้(ไหม|มั้ย|ป่าว|หรือ)|รวม|ต้อง/;
+
+export interface ReplayJob {
+  running: boolean;
+  startedAt: number | null;
+  finishedAt: number | null;
+  channels: string[];
+  target: number;
+  found: number;
+  done: number;
+  errors: number;
+  message: string | null;
+}
 
 const RULES = `คุณคือแอดมินแชทของธุรกิจจัดงานบุญและจัดเลี้ยงในชลบุรี/ระยอง ชื่อ "เติมบุญ บาย ไอริส" (งานบุญ พิธีสงฆ์) และ "IRIS Catering" (บุฟเฟต์ โต๊ะจีน จัดเลี้ยง)
 หน้าที่: ร่างข้อความตอบลูกค้า 1 ข้อความ สำหรับเทิร์นล่าสุดของลูกค้าในบทสนทนา
@@ -48,7 +80,9 @@ const RULES = `คุณคือแอดมินแชทของธุร�
 3. ห้ามยืนยันว่าวันไหนคิวว่าง ห้ามรับจองแทน ห้ามให้ส่วนลดหรือของแถมนอกเหนือจากที่ระบุ
 4. ต้องส่งต่อแอดมิน (action = handoff) เมื่อ: ถามคิว/ยืนยันวันงาน, ต่อรองราคา/ขอส่วนลดพิเศษ, ส่งสลิปหรือเรื่องชำระเงิน, ขอเลื่อน/ยกเลิกงาน, ร้องเรียน, ขอแพ็กเกจหรือเมนูพิเศษที่ไม่มีในข้อมูล, นอกพื้นที่บริการ, คำถามที่ข้อมูลไม่พอ — ในกรณีนี้ให้ reply เป็นข้อความสั้นที่สุภาพบอกว่าแอดมินจะตรวจสอบให้ และถามข้อมูลที่ยังขาด (เช่น วันที่ สถานที่ จำนวนแขก) ถ้ามี
 5. ถ้าลูกค้าแค่ขอบคุณ/ส่งสติกเกอร์/ตอบรับ และไม่ต้องตอบอะไร ให้ action = no_reply
-6. เขียนแบบแอดมินจริงในแชท: ภาษาไทยสุภาพ ลงท้าย "ค่ะ/นะคะ" กระชับ ไม่เกินประมาณ 6 บรรทัด ไม่ใช้ markdown (ไม่มี ** หรือ #) ใช้อีโมจิได้เล็กน้อย
+6. เขียนแบบแอดมินจริงในแชท: ภาษาไทยสุภาพ ลงท้าย "ค่ะ/นะคะ" สั้นกระชับ (ส่วนใหญ่ 1–3 บรรทัด) ตอบเฉพาะที่ลูกค้าถาม ถามข้อมูลเพิ่มทีละ 1–2 เรื่อง ไม่สรุปราคายาวถ้าลูกค้าไม่ได้ถาม ไม่ใช้ markdown (ไม่มี ** หรือ #) ใช้อีโมจิได้เล็กน้อย
+6.1 ห้ามรับปาก "ได้ค่ะ" กับคำขอที่ไม่มีในข้อมูล (เช่น เช่าอุปกรณ์แยกชิ้น เพิ่มบริการพิเศษ) ให้ส่งต่อแอดมินแทน
+6.2 AI มองไม่เห็นรูปภาพ ถ้าคำถามอ้างถึงรูปที่ลูกค้าส่ง (เช่น "อันนี้ใช่ไหม" "ราคานี้ได้ไหม") และเดาจากบทสนทนาไม่ได้ ให้ส่งต่อแอดมิน
 7. ถ้าเหมาะสม แนบลิงก์หน้าจองที่ตรงกับงาน เพื่อให้ลูกค้าดูราคาและขอใบเสนอราคาเองได้ และถามข้อมูลที่ต้องใช้คำนวณราคา (วันที่ ช่วงเวลา อำเภอ จำนวนแขก/โต๊ะ)
 8. ถ้าลูกค้ามีการจองหรือใบเสนอราคาอยู่แล้ว (ดู "ข้อมูลลูกค้า") ให้ตอบโดยอ้างอิงงานนั้น
 ตอบผ่านเครื่องมือ respond เท่านั้น`;
@@ -81,6 +115,7 @@ export class AiShadowService {
   private readonly timers = new Map<string, NodeJS.Timeout>();
   private settingsCache: { at: number; value: AiShadowSettings } | null = null;
   private knowledgeCache: { at: number; text: string } | null = null;
+  private replayJob: ReplayJob = { running: false, startedAt: null, finishedAt: null, channels: [], target: 0, found: 0, done: 0, errors: 0, message: null };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -144,7 +179,7 @@ export class AiShadowService {
     // midnight Asia/Bangkok (UTC+7)
     const bkk = new Date(Date.now() + 7 * 3600_000);
     const start = new Date(Date.UTC(bkk.getUTCFullYear(), bkk.getUTCMonth(), bkk.getUTCDate()) - 7 * 3600_000);
-    return this.prisma.aiShadowReply.count({ where: { createdAt: { gte: start } } });
+    return this.prisma.aiShadowReply.count({ where: { createdAt: { gte: start }, mode: 'live' } });
   }
 
   // ── knowledge ──
@@ -222,14 +257,22 @@ export class AiShadowService {
       this.logger.warn(`AI shadow daily cap ${settings.dailyCap} reached — skipping ${customerId}`);
       return;
     }
-    const recent = await this.prisma.message.findMany({ where: { customerId }, orderBy: { timestamp: 'desc' }, take: HISTORY });
-    if (!recent.length) return;
     // the turn ends at the newest customer message (an admin may already have answered — ignore that)
-    const lastIn = recent.find((m) => m.type === 'INCOMING');
+    const lastIn = await this.prisma.message.findFirst({ where: { customerId, type: 'INCOMING' }, orderBy: { timestamp: 'desc' } });
     if (!lastIn) return;
+    await this.generate(customerId, channel, lastIn, 'live', settings.model);
+  }
+
+  /**
+   * Draft the answer to the customer turn that ends with `lastIn`, seeing the chat only up to that
+   * moment (live: now; replay: a past turn). Skips a turn that already has a draft.
+   */
+  private async generate(customerId: string, channel: string, lastIn: { id: string; timestamp: bigint }, mode: 'live' | 'replay', model: string) {
     const exists = await this.prisma.aiShadowReply.findFirst({ where: { customerId, triggerMessageId: lastIn.id }, select: { id: true } });
     if (exists) return;
-    const history = recent.filter((m) => m.timestamp <= lastIn.timestamp).reverse();
+    const history = (
+      await this.prisma.message.findMany({ where: { customerId, timestamp: { lte: lastIn.timestamp } }, orderBy: { timestamp: 'desc' }, take: HISTORY })
+    ).reverse();
     const turn: string[] = [];
     for (let i = history.length - 1; i >= 0 && history[i].type === 'INCOMING'; i--) {
       turn.unshift(this.render(history[i]));
@@ -237,7 +280,8 @@ export class AiShadowService {
 
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
     const bookings = await this.prisma.booking.findMany({
-      where: { customerId },
+      // only what existed at the time of the question (matters for replays)
+      where: { customerId, createdAt: { lte: new Date(Number(lastIn.timestamp)) } },
       orderBy: { createdAt: 'desc' },
       take: 3,
       select: { code: true, packageName: true, eventDate: true, timeSlot: true, guests: true, tables: true, foodMode: true, estimatedTotal: true, quotationDocNo: true, quotationPublicUrl: true, status: true },
@@ -263,12 +307,13 @@ export class AiShadowService {
       triggerMessageId: lastIn.id,
       triggerAt: lastIn.timestamp,
       question: turn.join('\n').slice(0, 4000),
-      model: settings.model,
+      model,
+      mode,
     };
     try {
       const anthropic = new Anthropic();
       const res = await anthropic.messages.create({
-        model: settings.model,
+        model,
         max_tokens: 2500,
         system: [
           { type: 'text', text: RULES },
@@ -318,8 +363,9 @@ export class AiShadowService {
 
   // ── dashboard ──
 
-  async list(q: { channel?: string; action?: string; rating?: string; page?: number; pageSize?: number }) {
+  async list(q: { channel?: string; action?: string; rating?: string; mode?: string; page?: number; pageSize?: number }) {
     const where: any = {};
+    if (q.mode) where.mode = q.mode;
     if (q.channel) where.channel = q.channel;
     if (q.action) where.action = q.action;
     if (q.rating === 'unrated') where.rating = null;
@@ -337,19 +383,7 @@ export class AiShadowService {
     const byId = new Map(customers.map((c) => [c.id, c]));
     const items = await Promise.all(
       rows.map(async (r) => {
-        // admin's real answer = outgoing messages after the trigger, until the customer's next shadowed turn (max 12h)
-        const next = await this.prisma.aiShadowReply.findFirst({
-          where: { customerId: r.customerId, triggerAt: { gt: r.triggerAt } },
-          orderBy: { triggerAt: 'asc' },
-          select: { triggerAt: true },
-        });
-        const end = next ? next.triggerAt : r.triggerAt + BigInt(12 * 3600_000);
-        const admin = await this.prisma.message.findMany({
-          where: { customerId: r.customerId, type: 'OUTGOING', timestamp: { gt: r.triggerAt, lte: end }, NOT: { adminName: { in: NON_HUMAN_ADMINS } } },
-          orderBy: { timestamp: 'asc' },
-          take: 6,
-          select: { text: true, adminName: true, timestamp: true, mediaType: true },
-        });
+        const admin = await this.adminAnswer(r.customerId, r.triggerAt);
         const c = byId.get(r.customerId);
         return {
           ...r,
@@ -364,8 +398,121 @@ export class AiShadowService {
     return { total, page, pageSize, items };
   }
 
-  async stats(channel?: string) {
+  /**
+   * The admin's real answer to a turn: outgoing messages after it until the customer writes again
+   * (max 24h), minus our own auto follow-ups and Meta's instant FAQ answers.
+   */
+  private async adminAnswer(customerId: string, triggerAt: bigint) {
+    const nextIn = await this.prisma.message.findFirst({
+      where: { customerId, type: 'INCOMING', timestamp: { gt: triggerAt } },
+      orderBy: { timestamp: 'asc' },
+      select: { timestamp: true },
+    });
+    const cap = triggerAt + BigInt(24 * 3600_000);
+    const end = nextIn && nextIn.timestamp < cap ? nextIn.timestamp : cap;
+    const rows = await this.prisma.message.findMany({
+      where: { customerId, type: 'OUTGOING', timestamp: { gt: triggerAt, lte: end }, NOT: { adminName: { in: NON_HUMAN_ADMINS } } },
+      orderBy: { timestamp: 'asc' },
+      take: 8,
+      select: { text: true, adminName: true, timestamp: true, mediaType: true },
+    });
+    return rows.filter((m) => !(m.adminName === 'Business Suite' && Number(m.timestamp - triggerAt) < META_AUTO_MS)).slice(0, 6);
+  }
+
+  // ── replay: past questions from real chats ──
+
+  getReplayJob(): ReplayJob {
+    return this.replayJob;
+  }
+
+  /**
+   * Pick past customer questions on `channels` (typed questions only: FB FAQ-button texts,
+   * stickers/images and one-word acknowledgements are skipped) that an admin answered, and draft
+   * the AI answer for each as if it were that moment. Runs in the background; one job at a time.
+   */
+  startReplay(opts: { channels: string[]; count: number; days: number }): ReplayJob {
+    if (this.replayJob.running) return this.replayJob;
+    const channels = (opts.channels || []).filter(Boolean);
+    const count = Math.min(500, Math.max(1, Math.round(opts.count || 100)));
+    const days = Math.min(365, Math.max(1, Math.round(opts.days || 90)));
+    this.replayJob = { running: true, startedAt: Date.now(), finishedAt: null, channels, target: count, found: 0, done: 0, errors: 0, message: 'กำลังค้นหาคำถาม…' };
+    this.runReplay(channels, count, days)
+      .catch((e: any) => {
+        this.replayJob.message = `หยุดเพราะผิดพลาด: ${e?.message || e}`;
+        this.logger.error(`replay failed: ${e?.message || e}`);
+      })
+      .finally(() => {
+        this.replayJob.running = false;
+        this.replayJob.finishedAt = Date.now();
+      });
+    return this.replayJob;
+  }
+
+  private async runReplay(channels: string[], count: number, days: number) {
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not set');
+    const settings = await this.getSettings(true);
+    const since = new Date(Date.now() - days * 86400_000);
+    // candidate customer messages that look like typed questions, newest customers spread out
+    const candidates = await this.prisma.$queryRawUnsafe<{ id: string; customer_id: string; channel: string; timestamp: bigint; text: string }[]>(
+      `select m.id, m.customer_id, cu.channel, m.timestamp, m.text
+         from messages m join customers cu on cu.id = m.customer_id
+        where cu.channel = any($1) and m.type = 'INCOMING' and m.created_at >= $2
+          and m.text is not null and length(m.text) >= 6 and not (m.text = any($3))
+        order by random() limit $4`,
+      channels,
+      since,
+      AUTO_QUESTION_TEXTS,
+      count * 6,
+    );
+    const usedTurns = new Set<string>();
+    const perCustomer = new Map<string, number>();
+    const picked: { customerId: string; channel: string; lastIn: { id: string; timestamp: bigint } }[] = [];
+    for (const c of candidates) {
+      if (picked.length >= count) break;
+      if (!QUESTION_RE.test(c.text) || isAutoQuestion(c.text) || isPlaceholder(c.text)) continue;
+      // at most 2 questions per customer so one long chat doesn't dominate
+      if ((perCustomer.get(c.customer_id) || 0) >= 2) continue;
+      // the turn continues while the customer keeps typing; it ends at their last message before the admin
+      const after = await this.prisma.message.findMany({
+        where: { customerId: c.customer_id, timestamp: { gt: c.timestamp } },
+        orderBy: { timestamp: 'asc' },
+        take: 10,
+        select: { id: true, type: true, timestamp: true },
+      });
+      let lastIn = { id: c.id, timestamp: c.timestamp };
+      for (const m of after) {
+        if (m.type !== 'INCOMING') break;
+        lastIn = { id: m.id, timestamp: m.timestamp };
+      }
+      if (usedTurns.has(lastIn.id)) continue;
+      const admin = await this.adminAnswer(c.customer_id, lastIn.timestamp);
+      if (!admin.some((m) => (m.text || '').trim().length > 0)) continue; // need a human answer to compare with
+      usedTurns.add(lastIn.id);
+      perCustomer.set(c.customer_id, (perCustomer.get(c.customer_id) || 0) + 1);
+      picked.push({ customerId: c.customer_id, channel: c.channel, lastIn });
+    }
+    this.replayJob.found = picked.length;
+    this.replayJob.message = picked.length ? 'AI กำลังตอบ…' : 'ไม่พบคำถามที่เข้าเงื่อนไข';
+    // 3 at a time
+    let i = 0;
+    const worker = async () => {
+      while (i < picked.length) {
+        const job = picked[i++];
+        try {
+          await this.generate(job.customerId, job.channel, job.lastIn, 'replay', settings.model);
+        } catch {
+          this.replayJob.errors++;
+        }
+        this.replayJob.done++;
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    this.replayJob.message = `เสร็จแล้ว ${this.replayJob.done - this.replayJob.errors} คำถาม${this.replayJob.errors ? ` (ผิดพลาด ${this.replayJob.errors})` : ''}`;
+  }
+
+  async stats(channel?: string, mode?: string) {
     const where: any = channel ? { channel } : {};
+    if (mode) where.mode = mode;
     const [byAction, byRating, agg] = await Promise.all([
       this.prisma.aiShadowReply.groupBy({ by: ['action'], where, _count: { _all: true } }),
       this.prisma.aiShadowReply.groupBy({ by: ['rating'], where, _count: { _all: true } }),
