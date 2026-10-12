@@ -30,6 +30,20 @@ export const SITE_LINES: PkgLine[] = SITE === 'merit' ? ['merit'] : SITE === 'bu
 
 export const isSiteLine = (line: PkgLine) => SITE_LINES.includes(line);
 
+const WEB = 'https://iristermboon.com';
+const IMG = 'https://pub-ecd6581f672741a9a8ca94b35f64aae6.r2.dev/legacy';
+/** portfolio page on the main website — every job with all its photos */
+export const WORK_URL = `${WEB}/ผลงานที่ผ่านมา/`;
+/** privacy policy on the main website (linked from the contact step) */
+export const PRIVACY_URL = `${WEB}/นโยบายความเป็นส่วนตัว/`;
+
+export interface Work {
+  title: string;
+  href: string;
+  img: string;
+}
+const work = (title: string, slug: string, img: string): Work => ({ title, href: `${WEB}/${slug}/`, img: `${IMG}/${img}.webp` });
+
 export interface Brand {
   name: string;
   tagline: string;
@@ -43,10 +57,12 @@ export interface Brand {
   heroTitle: [string, string];
   heroSub: string;
   stats: [string, string][];
-  work: { file: string; label: string }[];
+  /** jobs from the portfolio on iristermboon.com (image + link to the job page) */
+  work: Work[];
+  /** Facebook page whose reviews tab holds the real customer reviews */
+  reviewsUrl: string;
   /** "ขอใบเสนอราคาง่าย ๆ 3 ขั้นตอน" — [title, detail] */
   steps: [string, string][];
-  reviews: { stars: string; text: string; who: string }[];
   /** default package when the wizard is entered without picking one */
   defaultPkg: string;
   defaultLine: PkgLine;
@@ -61,16 +77,6 @@ const CATERING_STEPS: [string, string][] = [
   ['เลือกแพ็กเกจและกรอกรายละเอียด', 'วันจัดงาน จำนวนแขกหรือโต๊ะ และสถานที่'],
   ['ทีมงานยืนยันทาง LINE', 'ตรวจสอบคิววันงาน ยืนยันรายการอาหาร สรุปราคาสุทธิ และมัดจำ'],
   ['ทีมงานจัดเตรียมและดูแลหน้างาน', 'เข้าจัดโต๊ะ-ไลน์อาหารก่อนเวลา เสิร์ฟตรงเวลา ดูแลจนจบงาน'],
-];
-const MERIT_REVIEWS = [
-  { stars: '★★★★★', text: 'จัดงานทำบุญขึ้นบ้านใหม่ ทีมงานมาเซ็ตให้ตั้งแต่เย็นวันก่อนงาน เช้ามาทุกอย่างเรียบร้อยมาก ไม่ต้องห่วงอะไรเลย', who: 'คุณอรพรรณ · ชลบุรี' },
-  { stars: '★★★★★', text: 'ทำบุญบริษัท 10 โต๊ะจีน อาหารอร่อย พนักงานสุภาพ พระมาตรงเวลา ประทับใจการดูแลมากค่ะ', who: 'คุณธนกฤต · ระยอง' },
-  { stars: '★★★★★', text: 'ปรึกษาทาง LINE ตอบไว บอกงบมาให้เลือกแพ็กเกจได้เหมาะสม ไม่มีบวกเพิ่มทีหลัง', who: 'คุณสุนีย์ · สมุทรปราการ' },
-];
-const CATERING_REVIEWS = [
-  { stars: '★★★★★', text: 'งานเลี้ยงบริษัท 80 ท่าน บุฟเฟต์ 7 อย่าง อาหารมาเติมตลอด ไลน์อาหารสวย พนักงานเก็บโต๊ะเรียบร้อย', who: 'คุณธนกฤต · ระยอง' },
-  { stars: '★★★★★', text: 'โต๊ะจีน 15 โต๊ะ งานแต่งที่บ้าน เสิร์ฟทันเวลาทุกจาน ปลากะพงสด แขกชมทุกโต๊ะ', who: 'คุณอรพรรณ · ชลบุรี' },
-  { stars: '★★★★★', text: 'ปรึกษาทาง LINE ตอบไว บอกงบมาให้เลือกจำนวนอย่างได้เหมาะสม ไม่มีบวกเพิ่มทีหลัง', who: 'คุณสุนีย์ · สมุทรปราการ' },
 ];
 
 const MERIT: Brand = {
@@ -90,13 +96,13 @@ const MERIT: Brand = {
     ['ครบชุด', 'พระ · อาหาร · อุปกรณ์'],
   ],
   work: [
-    { file: 'work1.jpg', label: 'รูปพิธีสงฆ์' },
-    { file: 'work2.jpg', label: 'รูปโต๊ะหมู่บูชา' },
-    { file: 'work3.jpg', label: 'รูปอาหารเลี้ยงพระ' },
-    { file: 'work4.jpg', label: 'รูปไลน์อาหาร' },
+    work('PRIME งานพิธีสงฆ์บางปะกง', 'primeงานพิธีสงฆ์บางปะกง', '9a82c26d60c180c72018'),
+    work('PRIME งานบุญสัตหีบ', 'prime-งานบุญสัตหีบ', 'e57b101e616eba27394e'),
+    work('งานพิธีสงฆ์พัทยาเหนือ', 'งานพิธีสงฆ์พัทยาเหนือ', 'a048e2bf2d02cda8476f'),
+    work('PRIME งานแกลงระยอง', 'prime-งานแกลงระยอง', '0a85688e28da3ca8ac6b'),
   ],
+  reviewsUrl: 'https://www.facebook.com/temboon2020/reviews',
   steps: MERIT_STEPS,
-  reviews: MERIT_REVIEWS,
   defaultPkg: 'ceremony-prime',
   defaultLine: 'merit',
 };
@@ -105,17 +111,17 @@ const MERIT: Brand = {
 const CATERING_BASE = {
   name: 'IRIS Catering',
   steps: CATERING_STEPS,
-  reviews: CATERING_REVIEWS,
+  reviewsUrl: 'https://www.facebook.com/iriscateringpattaya/reviews',
   mark: 'IR',
   lineUrl: 'https://line.me/R/ti/p/@iriscatering',
   lineLabel: 'LINE @Iriscatering',
   phone: '0805838383',
   phoneLabel: '080-583-8383 กด 1',
   work: [
-    { file: 'catering1.jpg', label: 'รูปไลน์บุฟเฟต์' },
-    { file: 'catering2.jpg', label: 'รูปโต๊ะจีน' },
-    { file: 'catering3.jpg', label: 'รูปอาหารหน้างาน' },
-    { file: 'catering4.jpg', label: 'รูปทีมบริการ' },
+    work('โต๊ะจีน 70 โต๊ะ', 'โต๊ะจีน-70-โต๊ะ', '286b971d06cdafa22aa9'),
+    work('โต๊ะจีน 35 โต๊ะ โรงโป๊ะ', 'โต๊ะจีน-โรงโป๊ะ', '7d4caa85c1bccec981f9'),
+    work('งานโคมัตสุ', 'งานโคมัตสุ', '6662a77fb5b95dcf1837'),
+    work('งานแต่งนอกสถานที่ ระยอง', 'งานแต่งนอกสถานที่-ระยอง', 'd35ad50627bae6a7414e'),
   ],
 };
 
@@ -146,10 +152,10 @@ const BUFFET: Brand = {
     ['250.-', 'เริ่มต้นต่อท่าน (5 อย่าง)'],
   ],
   work: [
-    { file: 'catering1.jpg', label: 'รูปไลน์บุฟเฟต์' },
-    { file: 'catering3.jpg', label: 'รูปอาหารหน้างาน' },
-    { file: 'buffet3.jpg', label: 'รูปโต๊ะ-เก้าอี้แขก' },
-    { file: 'catering4.jpg', label: 'รูปทีมบริการ' },
+    work('งานโคมัตสุ', 'งานโคมัตสุ', '6662a77fb5b95dcf1837'),
+    work('งานไทยหมิง', 'งานไทยหมิง', '99638b57e5bd116ca0af'),
+    work('งานนิคมพัฒนา 30 ท่าน', 'งานนิคมพัฒนา-30-ท่าน', 'b7b9bc92eba50aa6fd29'),
+    work('อาหารนานาชาติ', 'อาหารนานาชาติ', '1f9ece0cc01c3dcddfbd'),
   ],
   defaultPkg: 'buffet-standard',
   defaultLine: 'buffet',
@@ -167,10 +173,10 @@ const CHINESE: Brand = {
     ['2,000.-', 'เริ่มต้นต่อโต๊ะ (8 อย่าง)'],
   ],
   work: [
-    { file: 'catering2.jpg', label: 'รูปโต๊ะจีน' },
-    { file: 'chinese2.jpg', label: 'รูปอาหารโต๊ะจีน' },
-    { file: 'chinese3.jpg', label: 'รูปจัดโต๊ะ-ผ้าคลุม' },
-    { file: 'catering4.jpg', label: 'รูปทีมบริการ' },
+    work('โต๊ะจีน 70 โต๊ะ', 'โต๊ะจีน-70-โต๊ะ', '286b971d06cdafa22aa9'),
+    work('โต๊ะจีน 35 โต๊ะ โรงโป๊ะ', 'โต๊ะจีน-โรงโป๊ะ', '7d4caa85c1bccec981f9'),
+    work('โต๊ะจีนบางปะกง', 'โต๊ะจีนบางปะกง', 'e6a6baa0f26a8ae7a29c'),
+    work('โต๊ะจีนสวนไทย', 'โต๊ะจีนสวนไทย', '514aa33348e35fa9f24f'),
   ],
   defaultPkg: 'chinese-2300',
   defaultLine: 'chinese',

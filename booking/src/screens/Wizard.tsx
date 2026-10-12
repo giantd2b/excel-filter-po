@@ -4,6 +4,7 @@ import {
   DISH_COUNTS,
   LINES,
   MONK_OPTIONS,
+  MAX_ADDON_QTY,
   MONK_TRANSPORT_OPTIONS,
   PKGS,
   addonQuantity,
@@ -23,13 +24,14 @@ import {
   type PkgLine,
 } from '../data/packages';
 import { AddressFields, FloorField } from '../components/AddressFields';
+import AreaSearch from '../components/AreaSearch';
 import { calc, cateringUnit, finalizeForm, formForPackage, smallOrderFee, summary, tentRecommendation, type BookingForm } from '../lib/calc';
 import SmallOrderNotice from '../components/SmallOrderNotice';
-import { SITE_LINES } from '../lib/site';
+import { PRIVACY_URL, SITE_LINES } from '../lib/site';
 import { submitBooking } from '../lib/api';
-import { BackLink, CheckIcon, FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
+import { BackLink, CheckIcon, FieldLabel, Stepper, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
 import type { SavedBooking } from '../App';
-import { fmtThaiDate } from '../lib/date';
+import { daysUntil, fmtThaiDate, todayIso } from '../lib/date';
 
 interface Props {
   form: BookingForm;
@@ -38,13 +40,36 @@ interface Props {
   onDone: (saved: SavedBooking) => void;
   /** token from /booking/?ref=… (attributes the booking to a chat customer) */
   linkRef?: string | null;
-  /** open at a later step (quick booking → "ปรับแพ็กเกจเอง") */
-  initialStep?: number;
+  /** current step — owned by App so the phone's back button walks the steps (browser history) */
+  step: number;
+  /** go forward to a step (pushes a history entry) */
+  onStep: (step: number) => void;
+  /** in-app "ย้อนกลับ" from step 1+ — App pops the history entry the step pushed */
+  onBack: () => void;
 }
 
-export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, initialStep = 0 }: Props) {
-  const [step, setStep] = useState(initialStep);
-  const [err, setErr] = useState('');
+/** which field an error belongs to — the field is outlined red and scrolled into view */
+type ErrField = 'date' | 'area' | 'name' | 'phone' | 'billingName' | 'billingLine' | 'billingArea' | '';
+
+export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, step, onStep, onBack }: Props) {
+  const [err, setErrText] = useState('');
+  const [errField, setErrField] = useState<ErrField>('');
+  const setErr = (msg: string, field: ErrField = '') => {
+    setErrText(msg);
+    setErrField(msg ? field : '');
+    if (msg && field) {
+      // after the red outline renders, bring the field (not the button) into view
+      setTimeout(() => document.getElementById(`wf-${field}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+    }
+  };
+  /** red outline for the field the current error is about */
+  const bad = (field: ErrField) => (errField === field ? { borderColor: '#c0392b', boxShadow: '0 0 0 3px rgba(192,57,43,.15)' } : {});
+  const fieldError = (field: ErrField) =>
+    errField === field && err ? (
+      <div role="alert" style={{ fontSize: 13, color: '#a3341f', marginTop: 6, lineHeight: 1.5 }}>
+        {err}
+      </div>
+    ) : null;
   const [submitting, setSubmitting] = useState(false);
   const [expandedPkg, setExpandedPkg] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
@@ -79,18 +104,19 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
   const tentReason = tentRecommendation(f);
 
   const next = async () => {
-    if (step === 0 && !f.date) return setErr('กรุณาเลือกวันที่จัดงาน');
+    if (step === 0 && !f.date) return setErr('กรุณาเลือกวันที่จัดงาน', 'date');
+    if (step === 0 && f.date < todayIso()) return setErr('วันที่จัดงานผ่านมาแล้ว กรุณาเลือกวันที่ใหม่', 'date');
     if (step === 0 && (!f.tambon || !f.province)) {
-      if (f.areaQuery.trim()) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`);
-      return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของสถานที่จัดงานจากรายการค้นหา (พิมพ์ชื่อตำบลแล้วแตะเลือก)');
+      if (f.areaQuery.trim()) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`, 'area');
+      return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของสถานที่จัดงานจากรายการค้นหา (พิมพ์ชื่อตำบลแล้วแตะเลือก)', 'area');
     }
-    if (step === 0 && !isServiceProvince(f.province)) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`);
+    if (step === 0 && !isServiceProvince(f.province)) return setErr(`สถานที่จัดงานอยู่นอกพื้นที่บริการ — เรารับจัดงานใน ${SERVICE_AREA_TEXT} กรุณาเลือกตำบลจากรายการ หรือติดต่อทีมงานทาง LINE`, 'area');
     if (step === 4) {
-      if (!f.name.trim()) return setErr('กรุณากรอกชื่อผู้ติดต่อ');
-      if (!/[0-9]{9,}/.test(f.phone.replace(/[^0-9]/g, ''))) return setErr('กรุณากรอกเบอร์โทรให้ถูกต้อง');
-      if (!f.sameName && !f.billingName.trim()) return setErr('กรุณากรอกชื่อที่ต้องการให้ระบุในใบเสนอราคา');
-      if (!f.sameAddress && !f.billingLine.trim()) return setErr('กรุณากรอกที่อยู่สำหรับออกใบเสนอราคา (บ้านเลขที่ / หมู่ / ถนน)');
-      if (!f.sameAddress && (!f.billingTambon || !f.billingProvince)) return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของที่อยู่ออกใบเสนอราคาจากรายการค้นหา');
+      if (!f.name.trim()) return setErr('กรุณากรอกชื่อผู้ติดต่อ', 'name');
+      if (!/[0-9]{9,}/.test(f.phone.replace(/[^0-9]/g, ''))) return setErr('กรุณากรอกเบอร์โทรให้ถูกต้อง (9-10 หลัก)', 'phone');
+      if (!f.sameName && !f.billingName.trim()) return setErr('กรุณากรอกชื่อที่ต้องการให้ระบุในใบเสนอราคา', 'billingName');
+      if (!f.sameAddress && !f.billingLine.trim()) return setErr('กรุณากรอกที่อยู่สำหรับออกใบเสนอราคา (บ้านเลขที่ / หมู่ / ถนน)', 'billingLine');
+      if (!f.sameAddress && (!f.billingTambon || !f.billingProvince)) return setErr('กรุณาเลือกตำบล/อำเภอ/จังหวัด ของที่อยู่ออกใบเสนอราคาจากรายการค้นหา', 'billingArea');
       if (submitting) return;
       setSubmitting(true);
       try {
@@ -116,16 +142,16 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
       tentSuggested.current = true;
       setF('addons', [...f.addons, 'tent']);
     }
-    setStep(step + 1);
     setErr('');
-    window.scrollTo(0, 0);
+    onStep(step + 1);
   };
 
   const back = () => {
-    if (step === 0) return onExit();
-    setStep(step - 1);
     setErr('');
+    if (step === 0) return onExit();
+    onBack();
   };
+  const days = f.date ? daysUntil(f.date) : null;
 
   return (
     <div>
@@ -149,7 +175,8 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
         ))}
       </div>
 
-      <div style={{ padding: '20px 20px 24px' }}>
+      {/* step 0 leaves room below the ตำบล field so its suggestion list can scroll clear of the footer */}
+      <div style={{ padding: `20px 20px ${step === 0 ? 300 : 24}px` }}>
         <h1 style={{ ...charm, fontSize: 29, lineHeight: 1.45, margin: '0 0 6px', color: 'var(--color-accent-900)' }}>
           {steps[step].t}
         </h1>
@@ -172,8 +199,22 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
             </div>
             <div>
               <FieldLabel>วันที่จัดงาน</FieldLabel>
-              <input type="date" value={f.date} onChange={(e) => setF('date', e.target.value)} style={inputStyle} />
+              <input
+                id="wf-date"
+                type="date"
+                min={todayIso()}
+                value={f.date}
+                onChange={(e) => setF('date', e.target.value)}
+                aria-invalid={errField === 'date' || undefined}
+                style={{ ...inputStyle, ...bad('date') }}
+              />
               {f.date && <div style={{ fontSize: 12.5, color: 'var(--color-accent-700)', marginTop: 6 }}>วันที่เลือก: {fmtThaiDate(f.date)}</div>}
+              {days !== null && days >= 0 && days <= 3 && (
+                <div style={{ fontSize: 12.5, color: 'var(--color-accent-2-800)', background: 'var(--color-accent-2-200)', borderRadius: 12, padding: '8px 12px', marginTop: 8, lineHeight: 1.6 }}>
+                  งานอีก {days === 0 ? 'ไม่ถึง 1' : days} วัน — ส่งคำขอได้ตามปกติ แต่คิวพระและทีมงานอาจเต็ม แนะนำทัก LINE หรือโทรหาทีมงานเพื่อเช็คคิวด่วน
+                </div>
+              )}
+              {fieldError('date')}
             </div>
             <div>
               <FieldLabel>{isCatering ? 'ช่วงเวลาเสิร์ฟ' : 'ช่วงเวลาพิธี'}</FieldLabel>
@@ -190,17 +231,18 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 ))}
               </div>
             </div>
-            <AddressFields
-              form={f}
-              setForm={(nf) => {
-                setForm(nf);
-                setErr('');
-              }}
-              scope="event"
-              lineLabel="บ้านเลขที่ / หมู่ / ถนน หรือชื่อสถานที่จัดงาน"
-              linePlaceholder="เช่น 99/1 ม.5 ถ.สุขุมวิท หรือ ศาลาวัดใหญ่อินทาราม"
-            />
-            <FloorField value={f.floor} onChange={(v) => setF('floor', v)} />
+            {/* only the ตำบล here (service area + travel fee); house no. and floor come with the contact details */}
+            <div id="wf-area" style={{ borderRadius: 22, ...(errField === 'area' ? { outline: '2px solid #c0392b', outlineOffset: 4 } : {}) }}>
+              <AreaSearch
+                form={f}
+                setForm={(nf) => {
+                  setForm(nf);
+                  setErr('');
+                }}
+                scope="event"
+              />
+              {fieldError('area')}
+            </div>
           </div>
         )}
 
@@ -650,6 +692,30 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 ))}
               </div>
             </div>
+              <div>
+                <FieldLabel>การนิมนต์และรับ-ส่งพระ</FieldLabel>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {MONK_TRANSPORT_OPTIONS.map((o) => {
+                    const on = monkArrangementOf(f) === o.id;
+                    return (
+                      <div
+                        key={o.id}
+                        onClick={() => setForm({ ...f, selfInvite: o.selfInvite, selfTransport: o.selfTransport })}
+                        style={cardStyle(on, { display: 'flex', alignItems: 'center', gap: 13, padding: '14px 16px' })}
+                      >
+                        <div style={{ ...checkStyle(on, 'var(--color-accent-2-600)'), borderRadius: 999 }}>{on ? '✓' : ''}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{o.label}</div>
+                          <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>{o.sub}</div>
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-accent-2-700)', whiteSpace: 'nowrap' }}>
+                          {o.selfTransport ? `ลด ${baht(DISCOUNTS.selfTransport)}` : ''}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             {hasFood ? (
               <>
                 <div>
@@ -806,7 +872,19 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'var(--color-accent-2-500)', color: 'var(--color-on-accent)' }}>แนะนำ</span>
                           )}
                         </div>
-                        <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>{a.sub}</div>
+                        <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>{a.sub}{a.multi ? ` ${baht(a.price)} บาท` : ''}</div>
+                        {a.multi && on && (
+                          <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                            <Stepper
+                              label={`จำนวน${a.label}`}
+                              value={qty}
+                              onChange={(n) => setF('addonQty', { ...f.addonQty, [a.id]: n })}
+                              min={1}
+                              max={MAX_ADDON_QTY}
+                            />
+                            <span style={{ fontSize: 13, color: 'var(--color-neutral-700)' }}>หลัง</span>
+                          </div>
+                        )}
                         {a.id === 'tent' && tentReason && (
                           <div style={{ fontSize: 12, color: 'var(--color-accent-2-700)', marginTop: 4, lineHeight: 1.5 }}>{tentReason}</div>
                         )}
@@ -823,49 +901,13 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                             </div>
                           </span>
                         ) : (
-                          `+${baht(a.price)}`
+                          `+${baht(a.price * qty)}`
                         )}
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
-            {!isCatering && (
-              <div>
-                <FieldLabel>การนิมนต์และรับ-ส่งพระ</FieldLabel>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                  {MONK_TRANSPORT_OPTIONS.map((o) => {
-                    const on = monkArrangementOf(f) === o.id;
-                    return (
-                      <div
-                        key={o.id}
-                        onClick={() => setForm({ ...f, selfInvite: o.selfInvite, selfTransport: o.selfTransport })}
-                        style={cardStyle(on, { display: 'flex', alignItems: 'center', gap: 13, padding: '14px 16px' })}
-                      >
-                        <div style={{ ...checkStyle(on, 'var(--color-accent-2-600)'), borderRadius: 999 }}>{on ? '✓' : ''}</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)' }}>{o.label}</div>
-                          <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)' }}>{o.sub}</div>
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-accent-2-700)', whiteSpace: 'nowrap' }}>
-                          {o.selfTransport ? `ลด ${baht(DISCOUNTS.selfTransport)}` : ''}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            <div>
-              <FieldLabel>งบประมาณที่ตั้งไว้ (ไม่บังคับ)</FieldLabel>
-              <input
-                type="text"
-                placeholder="เช่น 30,000 บาท"
-                value={f.budget}
-                onChange={(e) => setF('budget', e.target.value)}
-                style={inputStyle}
-              />
             </div>
           </div>
         )}
@@ -876,23 +918,47 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
             <div>
               <FieldLabel>ชื่อผู้ติดต่อ</FieldLabel>
               <input
+                id="wf-name"
                 type="text"
+                autoComplete="name"
                 placeholder="ชื่อ - นามสกุล"
                 value={f.name}
                 onChange={(e) => setF('name', e.target.value)}
-                style={inputStyle}
+                aria-invalid={errField === 'name' || undefined}
+                style={{ ...inputStyle, ...bad('name') }}
               />
+              {fieldError('name')}
             </div>
             <div>
               <FieldLabel>เบอร์โทรติดต่อ</FieldLabel>
               <input
+                id="wf-phone"
                 type="tel"
+                autoComplete="tel"
+                inputMode="tel"
                 placeholder="08X-XXX-XXXX"
                 value={f.phone}
                 onChange={(e) => setF('phone', e.target.value)}
+                aria-invalid={errField === 'phone' || undefined}
+                style={{ ...inputStyle, ...bad('phone') }}
+              />
+              {fieldError('phone')}
+            </div>
+            <div>
+              <FieldLabel>บ้านเลขที่ / หมู่ / ถนน หรือชื่อสถานที่จัดงาน</FieldLabel>
+              <input
+                type="text"
+                autoComplete="address-line1"
+                placeholder="เช่น 99/1 ม.5 ถ.สุขุมวิท หรือ ศาลาวัดใหญ่อินทาราม"
+                value={f.venue}
+                onChange={(e) => setF('venue', e.target.value)}
                 style={inputStyle}
               />
+              <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)', marginTop: 6 }}>
+                {[f.tambon && `ต.${f.tambon}`, f.amphoe && `อ.${f.amphoe}`, f.province && `จ.${f.province}`, f.zip].filter(Boolean).join(' ')}
+              </div>
             </div>
+            <FloorField value={f.floor} onChange={(v) => setF('floor', v)} />
             <div
               onClick={() => setForm({ ...f, sameName: !f.sameName, wantVat: f.sameName ? true : f.wantVat })}
               style={cardStyle(f.sameName, { display: 'flex', alignItems: 'center', gap: 13, padding: '13px 16px' })}
@@ -908,12 +974,15 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 <div>
                   <FieldLabel>ชื่อบริษัท / ชื่อที่ต้องการให้ระบุในใบเสนอราคา</FieldLabel>
                   <input
+                    id="wf-billingName"
+                    aria-invalid={errField === 'billingName' || undefined}
                     type="text"
                     placeholder="เช่น บริษัท ตัวอย่าง จำกัด"
                     value={f.billingName}
                     onChange={(e) => setF('billingName', e.target.value)}
-                    style={inputStyle}
+                    style={{ ...inputStyle, ...bad('billingName') }}
                   />
+                  {fieldError('billingName')}
                 </div>
                 <div>
                   <FieldLabel>เลขประจำตัวผู้เสียภาษี (ไม่บังคับ)</FieldLabel>
@@ -951,6 +1020,10 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
               </div>
             </div>
             {!f.sameAddress && (
+              <div
+                id={errField === 'billingArea' ? 'wf-billingArea' : 'wf-billingLine'}
+                style={{ display: 'flex', flexDirection: 'column', gap: 18, borderRadius: 22, ...(errField === 'billingLine' || errField === 'billingArea' ? { outline: '2px solid #c0392b', outlineOffset: 4 } : {}) }}
+              >
               <AddressFields
                 form={f}
                 setForm={(nf) => {
@@ -961,7 +1034,20 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
                 lineLabel="ที่อยู่สำหรับออกใบเสนอราคา (บ้านเลขที่ / หมู่ / ถนน)"
                 linePlaceholder="เช่น 99/1 ม.5 ถ.สุขุมวิท"
               />
+              {fieldError('billingLine')}
+              {fieldError('billingArea')}
+              </div>
             )}
+            <div>
+              <FieldLabel>งบประมาณที่ตั้งไว้ (ไม่บังคับ)</FieldLabel>
+              <input
+                type="text"
+                placeholder="เช่น 30,000 บาท"
+                value={f.budget}
+                onChange={(e) => setF('budget', e.target.value)}
+                style={inputStyle}
+              />
+            </div>
             <div>
               <FieldLabel>รายละเอียดเพิ่มเติม (ไม่บังคับ)</FieldLabel>
               <textarea
@@ -1081,47 +1167,88 @@ export default function Wizard({ form: f, setForm, onExit, onDone, linkRef, init
         )}
       </div>
 
-      <div style={{ padding: '0 20px 40px', display: 'flex', gap: 10 }}>
-        {step > 0 && (
-          <div
-            onClick={back}
-            className="hoverable"
-            style={{
-              padding: '16px 22px',
-              borderRadius: 999,
-              border: '1.5px solid var(--color-neutral-300)',
-              color: 'var(--color-neutral-700)',
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            ก่อนหน้า
+      {/* PDPA: what the contact details are used for */}
+      {step === 4 && (
+        <div style={{ padding: '0 20px 16px', fontSize: 12.5, lineHeight: 1.7, color: 'var(--color-neutral-600)' }}>
+          ข้อมูลที่กรอกใช้เพื่อจัดทำใบเสนอราคา ติดต่อยืนยันคิว และให้บริการงานนี้เท่านั้น ไม่เปิดเผยแก่บุคคลอื่น การกด "ขอใบเสนอราคา" ถือว่ายินยอมตาม{' '}
+          <a href={PRIVACY_URL} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent-700)', textDecoration: 'underline' }}>
+            นโยบายความเป็นส่วนตัว
+          </a>
+        </div>
+      )}
+
+      {/* sticky footer: running estimate (steps 2–4) + navigation, always within thumb reach */}
+      <div
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          zIndex: 20,
+          padding: '10px 20px calc(12px + env(safe-area-inset-bottom))',
+          background: 'var(--color-header-bg)',
+          backdropFilter: 'blur(10px)',
+          borderTop: '1px solid var(--color-divider)',
+        }}
+      >
+        {err && !errField && (
+          <div role="alert" style={{ fontSize: 13.5, color: '#a3341f', textAlign: 'center', marginBottom: 8, lineHeight: 1.5 }}>
+            {err}
           </div>
         )}
-        <div
-          onClick={next}
-          className="hoverable"
-          style={{
-            flex: 1,
-            padding: 16,
-            borderRadius: 999,
-            textAlign: 'center',
-            fontSize: 17,
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: 'var(--shadow-md)',
-            background: 'var(--color-accent)',
-            color: 'var(--color-on-accent)',
-            opacity: submitting ? 0.6 : 1,
-          }}
-        >
-          {step === 4 ? (submitting ? 'กำลังส่งข้อมูล…' : 'ขอใบเสนอราคา') : 'ถัดไป'}
+        {step >= 1 && step <= 3 && (
+          <div aria-live="polite" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)', lineHeight: 1.4 }}>
+              ราคาประเมิน{f.wantVat ? ' (รวม VAT)' : ''}
+              <div style={{ fontSize: 12, color: 'var(--color-accent-2-700)', fontWeight: 600 }}>มัดจำ {baht(c.deposit)} บาท</div>
+            </div>
+            <div style={{ ...charm, fontSize: 24, color: 'var(--color-accent-700)', lineHeight: 1.2 }}>{baht(f.wantVat ? c.grandTotal : c.total)} บาท</div>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10 }}>
+          {step > 0 && (
+            <button
+              type="button"
+              onClick={back}
+              className="hoverable"
+              style={{
+                padding: '14px 22px',
+                borderRadius: 999,
+                border: '1.5px solid var(--color-neutral-300)',
+                background: 'transparent',
+                color: 'var(--color-neutral-700)',
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              ก่อนหน้า
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={next}
+            disabled={submitting}
+            className="hoverable"
+            style={{
+              flex: 1,
+              padding: 14,
+              borderRadius: 999,
+              border: 'none',
+              textAlign: 'center',
+              fontSize: 17,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              boxShadow: 'var(--shadow-md)',
+              background: 'var(--color-accent)',
+              color: 'var(--color-on-accent)',
+              opacity: submitting ? 0.6 : 1,
+            }}
+          >
+            {step === 4 ? (submitting ? 'กำลังส่งข้อมูล…' : 'ขอใบเสนอราคา') : 'ถัดไป'}
+          </button>
         </div>
       </div>
-      {err && (
-        <div style={{ margin: '-28px 20px 32px', fontSize: 13.5, color: '#a3341f', textAlign: 'center' }}>{err}</div>
-      )}
     </div>
   );
 }

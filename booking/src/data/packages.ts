@@ -363,14 +363,18 @@ export interface Addon {
   price: number;
   /** 'table' = price × number of tables (เครื่องดื่มโต๊ะจีน) */
   perUnit?: 'table';
+  /** customer picks how many (เต็นท์) — form.addonQty[id], 1..MAX_ADDON_QTY */
+  multi?: boolean;
   /** package lines that offer this add-on */
   lines: PkgLine[];
 }
 
+export const MAX_ADDON_QTY = 10;
+
 export const ADDONS: Addon[] = [
   { id: 'stage', label: 'เวทีพระ', sub: 'ขนาด 1.2 x 7.2 เมตร', price: 5000, lines: ['merit'] },
-  { id: 'tent', label: 'เต็นท์ใหญ่เพิ่ม 1 หลัง', sub: 'ขนาด 5x12 เมตร', price: 3000, lines: ['merit'] },
-  { id: 'tentSmall', label: 'เต็นท์เล็กเพิ่ม 1 หลัง', sub: 'ขนาด 3x3 เมตร', price: 500, lines: ['merit'] },
+  { id: 'tent', label: 'เต็นท์ใหญ่เพิ่ม', sub: 'ขนาด 5x12 เมตร · หลังละ', price: 3000, multi: true, lines: ['merit'] },
+  { id: 'tentSmall', label: 'เต็นท์เล็กเพิ่ม', sub: 'ขนาด 3x3 เมตร · หลังละ', price: 500, multi: true, lines: ['merit'] },
   { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', sub: 'ตกแต่งฉากหลังพิธี', price: 1000, lines: ['merit'] },
   { id: 'almsround', label: 'ชุดตักบาตร', sub: 'ชุดใส่บาตรพร้อมของถวาย', price: 500, lines: ['merit'] },
   {
@@ -531,23 +535,6 @@ export const FAQS: { q: string; a: string | (() => string); site?: 'merit' | 'ca
   },
 ];
 
-export const REVIEWS = [
-  {
-    stars: '★★★★★',
-    text: 'จัดงานทำบุญขึ้นบ้านใหม่ ทีมงานมาเซ็ตให้ตั้งแต่เย็นวันก่อนงาน เช้ามาทุกอย่างเรียบร้อยมาก ไม่ต้องห่วงอะไรเลย',
-    who: 'คุณอรพรรณ · ชลบุรี',
-  },
-  {
-    stars: '★★★★★',
-    text: 'ทำบุญบริษัท 10 โต๊ะจีน อาหารอร่อย พนักงานสุภาพ พระมาตรงเวลา ประทับใจการดูแลมากค่ะ',
-    who: 'คุณธนกฤต · ระยอง',
-  },
-  {
-    stars: '★★★★★',
-    text: 'ปรึกษาทาง LINE ตอบไว บอกงบมาให้เลือกแพ็กเกจได้เหมาะสม ไม่มีบวกเพิ่มทีหลัง',
-    who: 'คุณสุนีย์ · สมุทรปราการ',
-  },
-];
 
 /** งานบุญ: how the job runs from deposit to the ceremony (poster "ขั้นตอนการดำเนินงานแพคเกจพิธีสงฆ์") */
 export const MERIT_PROCESS: { title: string; detail: string; when: string }[] = [
@@ -590,6 +577,12 @@ export const CATERING_TIME_OPTS = [
 
 export function timeOptsFor(line: PkgLine) {
   return line === 'merit' ? TIME_OPTS : CATERING_TIME_OPTS;
+}
+
+/** customer-facing wording of a stored time slot ("เพล 10.00-10.30 น." → "ถวายเพล · พระถึง 10.00 น. · จบพิธีราว 12.00 น.") */
+export function timeLabel(v: string): string {
+  const o = [...TIME_OPTS, ...CATERING_TIME_OPTS].find((t) => t.v === v);
+  return o ? `${o.label} · ${o.sub}` : v;
 }
 
 export const PROVINCES = ['ชลบุรี', 'ระยอง', 'ฉะเชิงเทรา', 'สมุทรปราการ', 'กรุงเทพฯ'];
@@ -784,8 +777,10 @@ export function applicableAddons(pkgId: string): Addon[] {
 }
 
 /** quantity an add-on is charged for (drinks are per table) */
-export function addonQuantity(a: Addon, f: { tables: number }): number {
-  return a.perUnit === 'table' ? Math.max(0, f.tables) : 1;
+export function addonQuantity(a: Addon, f: { tables: number; addonQty?: Record<string, number> }): number {
+  if (a.perUnit === 'table') return Math.max(0, f.tables);
+  if (a.multi) return Math.min(MAX_ADDON_QTY, Math.max(1, Math.round(f.addonQty?.[a.id] ?? 1)));
+  return 1;
 }
 
 /** keep only add-ons the package can be sold with — used when the package changes or a preset arrives */

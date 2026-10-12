@@ -62,8 +62,13 @@ export default function AreaSearch({ form: f, setForm, scope = 'event', label = 
             setForm({ ...f, [k.query]: e.target.value, [k.tambon]: '', [k.amphoe]: '', [k.province]: '', [k.zip]: '' });
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
-          style={inputStyle}
+          onFocus={(e) => {
+            setOpen(true);
+            // lift the field to the top so the suggestion list isn't hidden behind the keyboard / sticky footer
+            const el = e.currentTarget;
+            setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250);
+          }}
+          style={{ ...inputStyle, scrollMarginTop: 90 }}
         />
         {q && !tambon && suggestions.length > 0 && (
           <div style={{ fontSize: 12, color: '#b45309', marginTop: 6, fontWeight: 600 }}>

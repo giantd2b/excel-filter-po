@@ -461,6 +461,7 @@ model Booking {
   selfInvite     Boolean       @default(false) @map("self_invite") // customer invites the monks; selfTransport = they drive them too
   selfTransport  Boolean       @default(false) @map("self_transport")
   addons         String[]      @default([])
+  addonQty       Json?         @map("addon_qty") // { addonId: n } for multi add-ons (เต็นท์) bought more than once; absent = 1
   budget         String?
 
   customerName   String        @map("customer_name")

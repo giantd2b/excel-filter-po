@@ -13,6 +13,7 @@ import { QuotationsService } from '../quotations/quotations.service';
 import { findThaiPhones, formatThaiPhone } from '../../common/utils/phone.utils';
 import { SlipDetectionService } from '../slips/slip-detection.service';
 import { FaqFollowupService } from './faq-followup';
+import { BookingCodeLinkService } from './booking-code-link';
 
 @Injectable()
 export class WebhookService {
@@ -26,6 +27,7 @@ export class WebhookService {
     private readonly inboxStats: InboxStatsService,
     private readonly quotations: QuotationsService,
     private readonly faqFollowup: FaqFollowupService,
+    private readonly bookingCodeLink: BookingCodeLinkService,
   ) {}
 
   async saveMarkAsReadToken(customerId: string, token: string) {
@@ -213,6 +215,8 @@ export class WebhookService {
       this.inboxStats.refreshAndBroadcast();
 
       this.logger.log(`Saved message for LINE user ${userId} on ${lineBot}`);
+      // "… เลขที่คำขอ TB-…" from the booking thank-you page attaches that web booking to this chat
+      this.bookingCodeLink.maybeLink(lineBot, proFile.userId, customerId, messageText);
     } catch (error: any) {
       this.logger.error(`Failed to process LINE text: ${error.message}`);
     }
@@ -502,6 +506,7 @@ export class WebhookService {
 
       // FAQ button taps get a booking-link follow-up after Business Suite's own answer
       this.faqFollowup.maybeFollowUp(fbbot, proFile.id, customerId, messageText);
+      this.bookingCodeLink.maybeLink(fbbot, proFile.id, customerId, messageText);
     } catch (error: any) {
       this.logger.error(`Failed to process Facebook text: ${error.message}`);
     }

@@ -1,46 +1,68 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { FAQS, LINES, PKGS, PROVINCES, baht, priceUnitLabel, startPrice, withMonks, type Pkg, type PkgLine } from '../data/packages';
-import { BRAND, SITE_FAMILY, SITE_LINES } from '../lib/site';
+import { BRAND, SITE_FAMILY, SITE_LINES, WORK_URL, type Work } from '../lib/site';
 import { SectionTitle, charm } from '../ui';
 import VideoCard from '../components/VideoCard';
 import { PKG_VIDEOS } from '../data/videos';
 
-const WORK_SLOTS = BRAND.work;
 const SITE_TABS = LINES.filter((l) => SITE_LINES.includes(l.id));
-const SITE_FAQS = FAQS.filter((q) => !q.site || q.site === SITE_FAMILY);
+/** asked most in real chats → shown first, the rest sit behind "ดูคำถามทั้งหมด" */
+const FAQ_TOP = [
+  'ขั้นต่ำแขกกี่ท่าน / แขกเพิ่มคิดยังไง?',
+  'มีแพ็กเกจแค่พิธีสงฆ์ ไม่มีแขกไหม?',
+  'มัดจำเท่าไหร่ / ชำระส่วนที่เหลือเมื่อไหร่?',
+  'ให้บริการพื้นที่ใดบ้าง / มีค่าเดินทางไหม?',
+  'ราคาที่แสดงรวมทุกอย่างแล้วหรือไม่?',
+];
+const faqRank = (q: string) => (SITE_FAMILY === 'merit' && FAQ_TOP.includes(q) ? FAQ_TOP.indexOf(q) : FAQ_TOP.length);
+const SITE_FAQS = FAQS.filter((q) => !q.site || q.site === SITE_FAMILY)
+  .map((q, i) => ({ q, i }))
+  .sort((a, b) => faqRank(a.q.q) - faqRank(b.q.q) || a.i - b.i)
+  .map((x) => x.q);
 /** merit packages that have a review clip, in catalog order */
 const VIDEO_PKGS = PKGS.filter((p) => PKG_VIDEOS[p.id]);
 
-function WorkImage({ file, label }: { file: string; label: string }) {
+/** a job from the portfolio on iristermboon.com — photo + title, opens the job page */
+function WorkCard({ w }: { w: Work }) {
   const [missing, setMissing] = useState(false);
-  if (missing) {
-    return (
+  return (
+    <a
+      href={w.href}
+      target="_blank"
+      rel="noreferrer"
+      style={{ display: 'block', position: 'relative', aspectRatio: '1/1', borderRadius: 20, overflow: 'hidden', background: 'var(--color-neutral-200)' }}
+    >
+      {!missing && (
+        <img
+          src={w.img}
+          alt={w.title}
+          loading="lazy"
+          onError={() => setMissing(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      )}
       <div
         style={{
-          width: '100%',
-          height: '100%',
-          borderRadius: 20,
-          background: 'var(--color-neutral-200)',
-          border: '1.5px dashed var(--color-neutral-400)',
-          display: 'grid',
-          placeItems: 'center',
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: '22px 12px 10px',
+          background: 'linear-gradient(transparent, rgba(0,0,0,.65))',
+          color: '#fff',
           fontSize: 13,
-          color: 'var(--color-neutral-600)',
+          fontWeight: 600,
+          lineHeight: 1.4,
         }}
       >
-        {label}
+        {w.title}
       </div>
-    );
-  }
-  return (
-    <img
-      src={`${import.meta.env.BASE_URL}img/${file}`}
-      alt={label}
-      onError={() => setMissing(true)}
-      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 20, display: 'block' }}
-    />
+    </a>
   );
 }
+
+/** how many FAQs show before "ดูคำถามทั้งหมด" */
+const FAQ_PREVIEW = 5;
 
 interface Props {
   /** product line tab (owned by App so the wizard and links can preselect it) */
@@ -69,6 +91,7 @@ const LINE_INTRO: Record<PkgLine, { title: string; sub: string }> = {
 
 export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, onBookPkg, monks }: Props) {
   const [openFaq, setOpenFaq] = useState(-1);
+  const [allFaqs, setAllFaqs] = useState(false);
   const shown = PKGS.filter((p) => p.line === line);
 
   const scrollPkgs = () => {
@@ -468,55 +491,52 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, on
         </div>
       </div>
 
-      {/* gallery */}
+      {/* gallery — real jobs from the portfolio on the main website */}
       <div style={{ background: 'var(--color-surface)', padding: '8px 20px 28px' }}>
         <SectionTitle style={{ margin: '0 0 14px' }}>ผลงานจริง</SectionTitle>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
-          {WORK_SLOTS.map((w) => (
-            <div key={w.file} style={{ aspectRatio: '1/1' }}>
-              <WorkImage file={w.file} label={w.label} />
-            </div>
+          {BRAND.work.map((w) => (
+            <WorkCard key={w.href} w={w} />
           ))}
         </div>
+        <a href={WORK_URL} target="_blank" rel="noreferrer" style={outlineBtn}>
+          ดูผลงานทั้งหมดบนเว็บไซต์ ↗
+        </a>
       </div>
 
-      {/* reviews */}
+      {/* reviews — the real ones live on the Facebook page */}
       <div style={{ background: 'var(--color-surface)', padding: '8px 20px 30px' }}>
-        <SectionTitle style={{ margin: '0 0 14px' }}>ลูกค้าพูดถึงเรา</SectionTitle>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {BRAND.reviews.map((r) => (
-            <div
-              key={r.who}
-              style={{
-                background: 'var(--color-neutral-100)',
-                borderRadius: 'var(--radius-md)',
-                padding: '16px 18px',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-            >
-              <div style={{ color: 'var(--color-accent-500)', fontSize: 14, letterSpacing: 2 }}>{r.stars}</div>
-              <div
-                style={{
-                  fontSize: 14.5,
-                  lineHeight: 1.7,
-                  color: 'var(--color-neutral-800)',
-                  marginTop: 6,
-                  textWrap: 'pretty',
-                }}
-              >
-                {r.text}
-              </div>
-              <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)', marginTop: 8 }}>{r.who}</div>
-            </div>
-          ))}
-        </div>
+        <SectionTitle style={{ margin: '0 0 14px' }}>รีวิวจากลูกค้าจริง</SectionTitle>
+        <a
+          href={BRAND.reviewsUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            background: 'var(--color-neutral-100)',
+            borderRadius: 'var(--radius-md)',
+            padding: '16px 18px',
+            boxShadow: 'var(--shadow-sm)',
+            color: 'inherit',
+          }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 999, background: '#1877f2', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 24, fontWeight: 700, flex: 'none' }}>f</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'var(--color-accent-500)', fontSize: 14, letterSpacing: 2 }}>★★★★★</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-neutral-800)', marginTop: 2 }}>อ่านรีวิวจากลูกค้าบนเพจ Facebook</div>
+            <div style={{ fontSize: 12.5, color: 'var(--color-neutral-600)', marginTop: 2 }}>รีวิวและคำแนะนำจากลูกค้าที่ใช้บริการจริง</div>
+          </div>
+          <div style={{ color: 'var(--color-accent-700)', fontSize: 18, flex: 'none' }}>↗</div>
+        </a>
       </div>
 
       {/* FAQ */}
       <div style={{ background: 'var(--color-surface)', padding: '8px 20px 40px' }}>
         <SectionTitle style={{ margin: '0 0 14px' }}>คำถามที่พบบ่อย</SectionTitle>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {SITE_FAQS.map((q, i) => (
+          {(allFaqs ? SITE_FAQS : SITE_FAQS.slice(0, FAQ_PREVIEW)).map((q, i) => (
             <div
               key={q.q}
               onClick={() => setOpenFaq(openFaq === i ? -1 : i)}
@@ -551,7 +571,24 @@ export default function Home({ line, onLineChange, onStartBooking, onOpenPkg, on
             </div>
           ))}
         </div>
+        {!allFaqs && SITE_FAQS.length > FAQ_PREVIEW && (
+          <div role="button" tabIndex={0} onClick={() => setAllFaqs(true)} style={{ ...outlineBtn, cursor: 'pointer' }}>
+            ดูคำถามทั้งหมด {SITE_FAQS.length} ข้อ +
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+const outlineBtn: CSSProperties = {
+  display: 'block',
+  marginTop: 14,
+  padding: '13px 16px',
+  borderRadius: 999,
+  border: '1.5px solid var(--color-accent-400)',
+  color: 'var(--color-accent-700)',
+  textAlign: 'center',
+  fontSize: 15,
+  fontWeight: 600,
+};

@@ -35,6 +35,7 @@ export interface BookingAlertInput {
   selfInvite?: boolean | null;
   selfTransport?: boolean | null;
   addons?: string[] | null;
+  addonQty?: unknown;
   customerName?: string | null;
   billingName?: string | null;
   taxId?: string | null;
@@ -90,7 +91,9 @@ const isCatering = (b: BookingAlertInput) => packageById(b.packageId || '')?.kin
 function addonLabel(id: string, b: BookingAlertInput): string {
   const a = BOOKING_ADDONS.find((x) => x.id === id);
   if (!a) return id;
-  return a.perUnit === 'table' ? `${a.label} × ${b.tables ?? 0} โต๊ะ` : a.label;
+  if (a.perUnit === 'table') return `${a.label} × ${b.tables ?? 0} โต๊ะ`;
+  const n = a.multi ? Number((b.addonQty as Record<string, number> | null)?.[id]) || 1 : 1;
+  return a.multi ? `${a.label} ${n} หลัง` : a.label;
 }
 
 const thb = (n?: number | null) => `${Number(n ?? 0).toLocaleString('th-TH')} บาท`;

@@ -90,14 +90,16 @@ export interface BookingAddon {
   price: number;
   /** 'table' = price × tables (เครื่องดื่มโต๊ะจีน); absent = flat, quantity 1 */
   perUnit?: 'table';
+  /** customer picks how many (เต็นท์): addonQty[id], 1..MAX_ADDON_QTY */
+  multi?: boolean;
   /** which package lines offer this add-on */
   lines: PackageLine[];
 }
 
 export const BOOKING_ADDONS: BookingAddon[] = [
   { id: 'stage', label: 'เวทีพระ', price: 5000, lines: ['merit'] },
-  { id: 'tent', label: 'เต็นท์ใหญ่เพิ่ม 1 หลัง (5x12 ม.)', price: 3000, lines: ['merit'] },
-  { id: 'tentSmall', label: 'เต็นท์เล็กเพิ่ม 1 หลัง (3x3 ม.)', price: 500, lines: ['merit'] },
+  { id: 'tent', label: 'เต็นท์ใหญ่เพิ่ม (5x12 ม.)', price: 3000, multi: true, lines: ['merit'] },
+  { id: 'tentSmall', label: 'เต็นท์เล็กเพิ่ม (3x3 ม.)', price: 500, multi: true, lines: ['merit'] },
   { id: 'drape', label: 'โยงผ้าประดับเพิ่ม', price: 1000, lines: ['merit'] },
   { id: 'almsround', label: 'ชุดตักบาตร', price: 500, lines: ['merit'] },
   { id: 'drinks', label: 'เครื่องดื่ม', price: 250, perUnit: 'table', lines: ['chinese'] },
@@ -120,8 +122,26 @@ export function applicableAddons(packageId: string): BookingAddon[] {
 }
 
 /** how many units of an add-on a booking buys (drinks are per table) */
-export function addonQuantity(a: BookingAddon, input: { tables: number }): number {
-  return a.perUnit === 'table' ? Math.max(0, Math.round(input.tables || 0)) : 1;
+export const MAX_ADDON_QTY = 10;
+
+/** how many units of an add-on a booking buys (drinks are per table, tents as many as chosen) */
+export function addonQuantity(a: BookingAddon, input: { tables: number; addonQty?: Record<string, number> | null }): number {
+  if (a.perUnit === 'table') return Math.max(0, Math.round(input.tables || 0));
+  if (a.multi) return Math.min(MAX_ADDON_QTY, Math.max(1, Math.round(Number(input.addonQty?.[a.id]) || 1)));
+  return 1;
+}
+
+/** keep quantities only for ticked multi add-ons, as integers 2..MAX (1 is the default and is dropped) */
+export function normalizeAddonQty(addons: string[], raw: unknown): Record<string, number> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const out: Record<string, number> = {};
+  for (const id of addons) {
+    const a = BOOKING_ADDONS.find((x) => x.id === id);
+    if (!a?.multi) continue;
+    const n = Math.min(MAX_ADDON_QTY, Math.max(1, Math.round(Number((raw as any)[id]) || 1)));
+    if (n > 1) out[id] = n;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /** keep only add-ons the package can actually be sold with (drops included ones and other lines') */
@@ -146,6 +166,8 @@ export interface BookingCalcInput {
   selfInvite?: boolean;
   selfTransport: boolean;
   addons: string[];
+  /** quantity per multi add-on (เต็นท์); absent/1 = one */
+  addonQty?: Record<string, number> | null;
   /** travel fee of the event venue's district (already resolved) — becomes its own line */
   travelFee?: number;
   travelArea?: string;
@@ -158,7 +180,8 @@ export interface BookingCalcInput {
  */
 export function normalizeBookingInput<T extends BookingCalcInput>(input: T): T {
   const pkg = packageById(input.packageId);
-  const out: T = { ...input, addons: normalizeAddons(input.packageId, input.addons) };
+  const addons = normalizeAddons(input.packageId, input.addons);
+  const out: T = { ...input, addons, addonQty: normalizeAddonQty(addons, input.addonQty) };
   if (pkg?.kind === 'catering') {
     out.foodMode = pkg.unit === 'table' ? 'table' : 'buffet';
     out.monks = 0;
@@ -1044,7 +1067,7 @@ export function buildFaItems(
     const qty = addonQuantity(a, input);
     if (qty <= 0) continue;
     const code = config.addons[a.id];
-    const plain = { description: a.label, unit: a.perUnit ? 'โต๊ะ' : 'ชุด', unitPrice: pricing.addons[a.id] ?? a.price };
+    const plain = { description: a.label, unit: a.perUnit ? 'โต๊ะ' : a.multi ? 'หลัง' : 'ชุด', unitPrice: pricing.addons[a.id] ?? a.price };
     items.push(
       code
         ? { productCode: code, quantity: qty, ...(a.perUnit ? { unit: 'โต๊ะ' } : {}), fallback: plain }

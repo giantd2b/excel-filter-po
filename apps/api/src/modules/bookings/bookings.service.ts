@@ -274,6 +274,7 @@ export class BookingsService {
         selfInvite: b.selfInvite,
         selfTransport: b.selfTransport,
         addons: b.addons,
+        addonQty: (b.addonQty as Record<string, number> | null) ?? null,
         travelFee: b.travelFee || 0,
         travelArea: b.travelArea || travelAreaLabel(b.amphoe, b.province) || undefined,
       },
@@ -473,6 +474,7 @@ export class BookingsService {
       selfInvite: dto.selfInvite,
       selfTransport: dto.selfTransport,
       addons: dto.addons,
+      addonQty: dto.addonQty ?? null,
       travelFee,
       travelArea: travelArea || undefined,
     });
@@ -512,6 +514,7 @@ export class BookingsService {
         selfInvite: !!input.selfInvite,
         selfTransport: input.selfTransport,
         addons: input.addons,
+        ...(input.addonQty ? { addonQty: input.addonQty } : {}),
         budget: dto.budget || null,
         customerName: dto.name.trim(),
         phone: phoneDigits,
@@ -1002,7 +1005,7 @@ export class BookingsService {
     const travelFee = travelFeeFor(next.amphoe, await this.getTravelFees());
     const travelArea = travelFee > 0 ? travelAreaLabel(next.amphoe, next.province) : null;
     const calc = calcEstimatedTotal(
-      { packageId: b.packageId, foodMode: b.foodMode, guests: b.guests, tables: b.tables, monks: b.monks, dishCount: b.dishCount, selfInvite: b.selfInvite, selfTransport: b.selfTransport, addons: b.addons, travelFee, travelArea: travelArea || undefined },
+      { packageId: b.packageId, foodMode: b.foodMode, guests: b.guests, tables: b.tables, monks: b.monks, dishCount: b.dishCount, selfInvite: b.selfInvite, selfTransport: b.selfTransport, addons: b.addons, addonQty: (b.addonQty as Record<string, number> | null) ?? null, travelFee, travelArea: travelArea || undefined },
       await this.getPricing(),
     );
     const estimatedTotal = calc?.total ?? b.estimatedTotal;

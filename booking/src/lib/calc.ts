@@ -11,12 +11,14 @@ import {
   occasionsFor,
   pkgById,
   stripIncludedAddons,
+  timeLabel,
   timeOptsFor,
   travelAreaLabel,
   travelFeeFor,
   type FoodMode,
   type Pkg,
 } from '../data/packages';
+import { fmtThaiDate } from './date';
 
 export interface BookingForm {
   occasion: string;
@@ -39,6 +41,8 @@ export interface BookingForm {
   selfInvite: boolean;
   selfTransport: boolean;
   addons: string[];
+  /** how many of a multi add-on (เต็นท์) — absent = 1 */
+  addonQty: Record<string, number>;
   budget: string;
   /** contact person */
   name: string;
@@ -82,6 +86,7 @@ export const initialForm: BookingForm = {
   selfInvite: false,
   selfTransport: false,
   addons: [],
+  addonQty: {},
   budget: '',
   name: '',
   phone: '',
@@ -266,7 +271,7 @@ export function calc(f: BookingForm, manualDeposit?: number | null): CalcResult 
     const qty = addonQuantity(a, f);
     if (qty <= 0) continue;
     addonsTotal += a.price * qty;
-    rows.push({ k: a.perUnit ? `${a.label} × ${qty} โต๊ะ` : a.label, v: '+' + baht(a.price * qty) });
+    rows.push({ k: a.perUnit ? `${a.label} × ${qty} โต๊ะ` : a.multi ? `${a.label} ${qty} หลัง` : a.label, v: '+' + baht(a.price * qty) });
   }
   total += addonsTotal;
   // catering deposit is based on the food + drinks (owner decision), merit on the guest food only
@@ -298,7 +303,7 @@ export function summary(f: BookingForm): { k: string; v: string }[] {
   const c = calc(f);
   const rows = [
     { k: 'ประเภทงาน', v: f.occasion },
-    { k: 'วันเวลา', v: (f.date || 'ยังไม่ระบุ') + ' · ' + f.time },
+    { k: 'วันเวลา', v: (f.date ? fmtThaiDate(f.date) : 'ยังไม่ระบุ') + ' · ' + timeLabel(f.time) },
     { k: 'สถานที่', v: `${addressLine(f)}${f.floor ? ` (${f.floor})` : ''}` },
     ...(c.travelFee ? [{ k: 'ค่าเดินทาง', v: `${c.travelArea} +${baht(c.travelFee)} บาท (รวมในราคาแล้ว)` }] : []),
     ...(f.billingName && f.billingName !== f.name ? [{ k: 'ออกใบเสนอราคาในนาม', v: f.billingName }] : []),

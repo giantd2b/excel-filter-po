@@ -127,3 +127,32 @@ export function PhoneIcon() {
     </svg>
   );
 }
+
+/** small − n + control (tent quantity) — real buttons so it works from the keyboard too */
+export function Stepper({ value, onChange, min, max, label }: { value: number; onChange: (n: number) => void; min: number; max: number; label: string }) {
+  const btn = (disabled: boolean): CSSProperties => ({
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    border: 'none',
+    background: disabled ? 'var(--color-neutral-200)' : 'var(--color-accent-200)',
+    color: disabled ? 'var(--color-neutral-500)' : 'var(--color-accent-800)',
+    fontSize: 20,
+    lineHeight: 1,
+    cursor: disabled ? 'default' : 'pointer',
+    fontFamily: 'inherit',
+  });
+  return (
+    <div role="group" aria-label={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+      <button type="button" aria-label="ลดจำนวน" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))} style={btn(value <= min)}>
+        −
+      </button>
+      <span aria-live="polite" style={{ minWidth: 18, textAlign: 'center', fontSize: 16, fontWeight: 700, color: 'var(--color-accent-800)' }}>
+        {value}
+      </span>
+      <button type="button" aria-label="เพิ่มจำนวน" disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))} style={btn(value >= max)}>
+        +
+      </button>
+    </div>
+  );
+}

@@ -29,6 +29,8 @@ export interface BookingPreset {
   selfInvite?: boolean | null;
   selfTransport: boolean;
   addons: string[];
+  /** quantity per multi add-on (เต็นท์) */
+  addonQty?: Record<string, number> | null;
   note?: string | null;
   /** true/false fixed by sales, null = customer decides */
   wantVat?: boolean | null;
@@ -79,6 +81,7 @@ export async function submitBooking(f: BookingForm, ref?: string | null): Promis
     selfInvite: f.selfInvite,
     selfTransport: f.selfTransport,
     addons: f.addons,
+    addonQty: Object.fromEntries(f.addons.filter((id) => (f.addonQty[id] ?? 1) > 1).map((id) => [id, f.addonQty[id]])),
     budget: f.budget || undefined,
     name: f.name,
     phone: f.phone,

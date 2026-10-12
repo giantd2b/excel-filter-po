@@ -5,7 +5,7 @@ import { submitBooking, type BookingLinkInfo } from '../lib/api';
 import { FieldLabel, cardStyle, charm, checkStyle, chipStyle, inputStyle } from '../ui';
 import { AddressFields, FloorField } from '../components/AddressFields';
 import type { SavedBooking } from '../App';
-import { fmtThaiDate } from '../lib/date';
+import { fmtThaiDate, todayIso } from '../lib/date';
 import SmallOrderNotice from '../components/SmallOrderNotice';
 
 interface Props {
@@ -286,7 +286,7 @@ export default function QuickBooking({ form: f, setForm, linkInfo, linkRef, onEd
         {needDate && (
           <div>
             <FieldLabel>วันที่จัดงาน</FieldLabel>
-            <input type="date" value={f.date} onChange={(e) => setF('date', e.target.value)} style={inputStyle} />
+            <input type="date" min={todayIso()} value={f.date} onChange={(e) => setF('date', e.target.value)} style={inputStyle} />
             {f.date && <div style={{ fontSize: 12.5, color: 'var(--color-accent-700)', marginTop: 6 }}>วันที่เลือก: {fmtThaiDate(f.date)}</div>}
           </div>
         )}

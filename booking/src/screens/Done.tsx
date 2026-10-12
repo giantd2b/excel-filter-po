@@ -11,8 +11,21 @@ interface Props {
   chatChannel?: string | null;
 }
 
+/**
+ * LINE "send a message to the OA" link with the text pre-typed. The webhook recognises the
+ * TB-… code in it and attaches this web booking to the customer's chat (and replies with the
+ * quotation link) — this is how bookings that did not start from a chat link reach the CRM.
+ */
+function lineMessageUrl(lineUrl: string, text: string): string {
+  const id = /@[\w.-]+/.exec(lineUrl)?.[0];
+  return id ? `https://line.me/R/oaMessage/${encodeURIComponent(id)}/?${encodeURIComponent(text)}` : lineUrl;
+}
+
 export default function Done({ saved, onHome, chatChannel }: Props) {
   const [copied, setCopied] = useState(false);
+  const lineText = [`ขอยืนยันคิว เลขที่คำขอ ${saved.code}`, saved.rows.find((r) => r.k === 'วันเวลา')?.v, `คุณ${saved.f.name} ${saved.f.phone}`]
+    .filter(Boolean)
+    .join('\n');
 
   const copySummary = () => {
     const txt = ['ขอใบเสนอราคา ' + saved.code]
@@ -137,7 +150,7 @@ export default function Done({ saved, onHome, chatChannel }: Props) {
           </a>
         )}
         <a
-          href={BRAND.lineUrl}
+          href={chatChannel ? BRAND.lineUrl : lineMessageUrl(BRAND.lineUrl, lineText)}
           target="_blank"
           rel="noreferrer"
           style={{
@@ -152,7 +165,10 @@ export default function Done({ saved, onHome, chatChannel }: Props) {
             display: 'block',
           }}
         >
-          ส่งรายละเอียดทาง {BRAND.lineLabel}
+          {chatChannel ? `แชตกับทีมงานทาง ${BRAND.lineLabel}` : `ส่งเลขที่คำขอเข้า ${BRAND.lineLabel}`}
+          {!chatChannel && (
+            <div style={{ fontSize: 12.5, fontWeight: 500, opacity: 0.9, marginTop: 2 }}>แตะแล้วกด "ส่ง" ในแชต — ทีมงานจะยืนยันคิวในแชตนี้</div>
+          )}
         </a>
         <div
           onClick={copySummary}

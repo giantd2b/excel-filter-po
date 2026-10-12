@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { findPkg, pkgById, type Pkg, type PkgLine } from './data/packages';
 import { formForPackage, initialForm, type BookingForm } from './lib/calc';
-import { BRAND, SITE_FAMILY, isSiteLine } from './lib/site';
+import { BRAND, SITE, SITE_FAMILY, isSiteLine } from './lib/site';
 import { getBookingLink, type BookingLinkInfo } from './lib/api';
 import { loadPricing } from './lib/pricing';
 import Home from './screens/Home';
@@ -22,21 +22,98 @@ export interface SavedBooking {
 
 type Screen = 'home' | 'detail' | 'book' | 'quick' | 'done';
 
+/**
+ * Browser history entry per screen / wizard step, so the phone's back button (and the in-app
+ * "ย้อนกลับ") walks back one step instead of leaving the page. depth = entries we pushed.
+ */
+interface NavState {
+  screen: Screen;
+  step: number;
+  pkgId?: string;
+  depth: number;
+}
+const navState = (): NavState | null => {
+  const st = window.history.state as NavState | null;
+  return st && typeof st.screen === 'string' ? st : null;
+};
+
+/** unsent wizard input survives a reload / a trip to LINE and back (this tab only) */
+const DRAFT_KEY = `booking-draft:${SITE}`;
+function loadDraft(): BookingForm | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? { ...initialForm, ...JSON.parse(raw) } : null;
+  } catch {
+    return null;
+  }
+}
+function saveDraft(f: BookingForm | null) {
+  try {
+    if (f) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(f));
+    else sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* storage blocked — the form still works, it just isn't restored */
+  }
+}
+
 /** default package when the wizard is entered from a line tab (same picks the wizard's line toggle makes) */
 const PKGS_FIRST: Record<PkgLine, string> = { merit: 'ceremony-prime', buffet: 'buffet-standard', chinese: 'chinese-2300' };
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('home');
-  const [pkgId, setPkgId] = useState(BRAND.defaultPkg);
+  // a reload keeps the history entry: reopen the same screen/step with the saved draft
+  const restored = useRef<NavState | null>(navState());
+  const draft = useRef<BookingForm | null>(restored.current && restored.current.screen !== 'done' ? loadDraft() : null);
+  const [screen, setScreen] = useState<Screen>(() =>
+    draft.current && restored.current && restored.current.screen !== 'quick' ? restored.current.screen : 'home',
+  );
+  const [pkgId, setPkgId] = useState(() => (draft.current && restored.current?.pkgId) || BRAND.defaultPkg);
   const [homeLine, setHomeLine] = useState<PkgLine>(BRAND.defaultLine);
-  const [form, setForm] = useState<BookingForm>(() => formForPackage(initialForm, BRAND.defaultPkg));
+  const [form, setForm] = useState<BookingForm>(() => draft.current || formForPackage(initialForm, BRAND.defaultPkg));
   // storefront theme + title (the same bundle serves /booking and /catering)
   useEffect(() => {
     document.documentElement.dataset.theme = SITE_FAMILY;
     document.title = BRAND.docTitle;
   }, []);
   const [saved, setSaved] = useState<SavedBooking | null>(null);
-  const [wizardStep, setWizardStep] = useState(0);
+  const [wizardStep, setWizardStep] = useState(() => (draft.current && restored.current?.step) || 0);
+  const savedRef = useRef<SavedBooking | null>(null);
+  savedRef.current = saved;
+
+  /** forward navigation: show the screen and push a history entry for it */
+  const navigate = (next: Screen, step = 0, pkg = pkgId) => {
+    setScreen(next);
+    setWizardStep(step);
+    const depth = (navState()?.depth ?? 0) + 1;
+    window.history.pushState({ screen: next, step, pkgId: pkg, depth } satisfies NavState, '');
+    window.scrollTo(0, 0);
+  };
+  /** in-app back: pop our own entry when there is one, else run the fallback in place */
+  const goBack = (fallback: () => void) => {
+    if ((navState()?.depth ?? 0) > 0) window.history.back();
+    else fallback();
+  };
+  useEffect(() => {
+    if (!navState()) window.history.replaceState({ screen, step: wizardStep, pkgId, depth: 0 } satisfies NavState, '');
+    const onPop = (e: PopStateEvent) => {
+      const st = (e.state as NavState | null) ?? { screen: 'home' as Screen, step: 0, depth: 0 };
+      // never walk back into the wizard of a request that was already sent
+      if (savedRef.current && (st.screen === 'book' || st.screen === 'quick')) {
+        setScreen('home');
+      } else {
+        setScreen(st.screen === 'done' && !savedRef.current ? 'home' : st.screen);
+        setWizardStep(st.step || 0);
+        if (st.pkgId) setPkgId(st.pkgId);
+      }
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // keep the unsent form for a reload; cleared once the request is sent
+  useEffect(() => {
+    if (screen === 'book' || screen === 'quick') saveDraft(form);
+  }, [form, screen]);
   // Live prices come from the CRM (edited in the dashboard); bump state to re-render once applied
   const [, setPricingVersion] = useState(0);
   useEffect(() => {
@@ -55,6 +132,7 @@ export default function App() {
     setPkgId(p.id);
     if (isSiteLine(p.line)) setHomeLine(p.line);
     setScreen('detail');
+    window.history.replaceState({ screen: 'detail', step: 0, pkgId: p.id, depth: 0 } satisfies NavState, '');
   }, []);
   const [linkInfo, setLinkInfo] = useState<BookingLinkInfo | null>(null);
   useEffect(() => {
@@ -98,13 +176,31 @@ export default function App() {
         if (isSiteLine(linkPkg.line)) setHomeLine(linkPkg.line);
       }
       // sales fixed the package: skip straight to the short confirmation form
-      if (p) setScreen('quick');
+      if (p) {
+        setScreen('quick');
+        window.history.replaceState({ screen: 'quick', step: 0, depth: 0 } satisfies NavState, '');
+      }
     });
   }, [linkRef]);
 
   const goHome = () => {
-    setScreen('home');
-    window.scrollTo(0, 0);
+    if (screen === 'done') {
+      // after sending: start over on a clean entry (back must not reopen the sent request)
+      setScreen('home');
+      window.history.replaceState({ screen: 'home', step: 0, depth: 0 } satisfies NavState, '');
+      window.scrollTo(0, 0);
+      return;
+    }
+    goBack(() => {
+      setScreen('home');
+      window.history.replaceState({ screen: 'home', step: 0, depth: 0 } satisfies NavState, '');
+      window.scrollTo(0, 0);
+    });
+  };
+  const finish = (s: SavedBooking) => {
+    setSaved(s);
+    saveDraft(null);
+    navigate('done');
   };
 
   const showBar = screen === 'home' || screen === 'detail';
@@ -189,19 +285,16 @@ export default function App() {
           onStartBooking={() => {
             // start the wizard on the line the customer was browsing
             if (pkgById(form.pkg).line !== homeLine) setForm(formForPackage(form, PKGS_FIRST[homeLine]));
-            setScreen('book');
-            window.scrollTo(0, 0);
+            navigate('book');
           }}
           onOpenPkg={(p: Pkg) => {
             setPkgId(p.id);
-            setScreen('detail');
-            window.scrollTo(0, 0);
+            navigate('detail', 0, p.id);
           }}
           onBookPkg={(p: Pkg) => {
             setPkgId(p.id);
             setForm(formForPackage(form, p.id));
-            setScreen('book');
-            window.scrollTo(0, 0);
+            navigate('book', 0, p.id);
           }}
         />
       )}
@@ -213,8 +306,7 @@ export default function App() {
           onBack={goHome}
           onBook={() => {
             setForm(formForPackage(form, pkgId));
-            setScreen('book');
-            window.scrollTo(0, 0);
+            navigate('book');
           }}
         />
       )}
@@ -225,16 +317,8 @@ export default function App() {
           setForm={setForm}
           linkInfo={linkInfo}
           linkRef={linkRef}
-          onEditPackage={() => {
-            setWizardStep(1);
-            setScreen('book');
-            window.scrollTo(0, 0);
-          }}
-          onDone={(s) => {
-            setSaved(s);
-            setScreen('done');
-            window.scrollTo(0, 0);
-          }}
+          onEditPackage={() => navigate('book', 1)}
+          onDone={finish}
         />
       )}
 
@@ -243,13 +327,23 @@ export default function App() {
           form={form}
           setForm={setForm}
           linkRef={linkRef}
-          initialStep={wizardStep}
-          onExit={linkInfo?.preset ? () => setScreen('quick') : goHome}
-          onDone={(s) => {
-            setSaved(s);
-            setScreen('done');
-            window.scrollTo(0, 0);
-          }}
+          step={wizardStep}
+          onStep={(n) => navigate('book', n)}
+          onBack={() =>
+            goBack(() => {
+              setWizardStep(Math.max(0, wizardStep - 1));
+              window.scrollTo(0, 0);
+            })
+          }
+          onExit={() =>
+            goBack(() => {
+              const to: Screen = linkInfo?.preset ? 'quick' : 'home';
+              setScreen(to);
+              window.history.replaceState({ screen: to, step: 0, depth: 0 } satisfies NavState, '');
+              window.scrollTo(0, 0);
+            })
+          }
+          onDone={finish}
         />
       )}
 

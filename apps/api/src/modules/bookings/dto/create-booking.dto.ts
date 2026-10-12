@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -90,6 +91,11 @@ export class CreateBookingDto {
   @IsArray()
   @IsString({ each: true })
   addons: string[];
+
+  /** quantity per multi add-on (เต็นท์), e.g. { tentSmall: 2 } — the service clamps it */
+  @IsOptional()
+  @IsObject()
+  addonQty?: Record<string, number>;
 
   @IsOptional()
   @IsString()
