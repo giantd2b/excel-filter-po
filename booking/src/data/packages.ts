@@ -566,8 +566,8 @@ export const MERIT_SCHEDULE: { title: string; rows: [string, string][] }[] = [
 ];
 
 export const TIME_OPTS = [
-  { label: 'ทำบุญเช้า', sub: 'พระถึง 07.00 น. · จบพิธีราว 09.00 น.', v: 'เช้า 07.00-07.30 น.' },
-  { label: 'ถวายเพล', sub: 'พระถึง 10.00 น. · จบพิธีราว 12.00 น.', v: 'เพล 10.00-10.30 น.' },
+  { label: 'ทำบุญเช้า', sub: 'พระถึงช่วง 07.00–07.30 น. · จบพิธีราว 09.00 น.', v: 'เช้า 07.00-07.30 น.' },
+  { label: 'ถวายเพล', sub: 'พระถึงช่วง 10.00–10.30 น. · จบพิธีราว 12.00 น.', v: 'เพล 10.00-10.30 น.' },
 ];
 
 export const CATERING_TIME_OPTS = [
@@ -579,7 +579,7 @@ export function timeOptsFor(line: PkgLine) {
   return line === 'merit' ? TIME_OPTS : CATERING_TIME_OPTS;
 }
 
-/** customer-facing wording of a stored time slot ("เพล 10.00-10.30 น." → "ถวายเพล · พระถึง 10.00 น. · จบพิธีราว 12.00 น.") */
+/** customer-facing wording of a stored time slot ("เพล 10.00-10.30 น." → "ถวายเพล · พระถึงช่วง 10.00–10.30 น. · จบพิธีราว 12.00 น.") */
 export function timeLabel(v: string): string {
   const o = [...TIME_OPTS, ...CATERING_TIME_OPTS].find((t) => t.v === v);
   return o ? `${o.label} · ${o.sub}` : v;
