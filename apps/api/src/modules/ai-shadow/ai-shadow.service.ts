@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../../common/providers/prisma.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { BookingsService } from '../bookings/bookings.service';
+import { QuotationsService, type QuotationRecord } from '../quotations/quotations.service';
 import { BOOKING_PACKAGES, BOOKING_ADDONS, DISH_COUNTS } from '../bookings/packages.config';
 import { AREA_FACTS, BOOKING_LINKS, CATERING_FACTS, MERIT_FACTS } from './ai-facts';
 
@@ -36,6 +37,28 @@ export const DEFAULT_AI_SHADOW_SETTINGS: AiShadowSettings = {
 
 const DEBOUNCE_MS = 30_000;
 const HISTORY = 30;
+/** messages before the recent window, sent condensed so details agreed early in a long chat aren't lost */
+const OLDER_HISTORY = 150;
+const OLDER_CHARS = 6000;
+const DAY_MS = 86400_000;
+
+/** customer stage — decides how the AI should answer */
+export type CustomerStage = 'new' | 'quoted' | 'booked' | 'past';
+const STAGE_TH: Record<CustomerStage, string> = {
+  new: 'ยังไม่จอง — ลูกค้าใหม่/กำลังสอบถาม',
+  quoted: 'มีใบเสนอราคาแล้ว แต่ยังไม่มัดจำ',
+  booked: 'จองแล้ว (มัดจำแล้ว) งานยังไม่ถึง',
+  past: 'ลูกค้าเก่า — เคยจัดงานกับเราแล้ว ตอนนี้ไม่มีงานที่รออยู่',
+};
+const OPEN_QUOTE = ['DRAFT', 'PENDING', 'APPROVED'];
+const DONE_QUOTE = /DEPOSIT|COMPLETE|INVOICE|PAID|BILL|RECEIPT|CLOSE/i;
+const QUOTE_STATUS_TH: Record<string, string> = {
+  DRAFT: 'ร่าง ยังไม่ส่ง',
+  PENDING: 'ส่งให้ลูกค้าแล้ว รอลูกค้าตัดสินใจ',
+  APPROVED: 'ลูกค้าตกลงแล้ว รอชำระมัดจำ',
+  DEPOSITED: 'ชำระมัดจำแล้ว',
+};
+const bkkDate = (d: Date) => new Date(d.getTime() + 7 * 3600_000).toISOString().slice(0, 10);
 /** admin messages that are not a human answer */
 export const NON_HUMAN_ADMINS = ['ตอบอัตโนมัติ'];
 /** a Business Suite message this soon after the customer is Meta's automated FAQ answer, not an admin */
@@ -84,7 +107,13 @@ const RULES = `คุณคือแอดมินแชทของธุร�
 6.1 ห้ามรับปาก "ได้ค่ะ" กับคำขอที่ไม่มีในข้อมูล (เช่น เช่าอุปกรณ์แยกชิ้น เพิ่มบริการพิเศษ) ให้ส่งต่อแอดมินแทน
 6.2 AI มองไม่เห็นรูปภาพ ถ้าคำถามอ้างถึงรูปที่ลูกค้าส่ง (เช่น "อันนี้ใช่ไหม" "ราคานี้ได้ไหม") และเดาจากบทสนทนาไม่ได้ ให้ส่งต่อแอดมิน
 7. ถ้าเหมาะสม แนบลิงก์หน้าจองที่ตรงกับงาน เพื่อให้ลูกค้าดูราคาและขอใบเสนอราคาเองได้ และถามข้อมูลที่ต้องใช้คำนวณราคา (วันที่ ช่วงเวลา อำเภอ จำนวนแขก/โต๊ะ)
-8. ถ้าลูกค้ามีการจองหรือใบเสนอราคาอยู่แล้ว (ดู "ข้อมูลลูกค้า") ให้ตอบโดยอ้างอิงงานนั้น
+8. ดู "สถานะลูกค้า" ก่อนตอบทุกครั้ง แล้วตอบให้เข้ากับสถานะ:
+   - ยังไม่จอง: ช่วยลูกค้าเลือก ถามข้อมูลที่ขาดทีละ 1–2 ข้อ (งานอะไร วันที่ อำเภอ จำนวนแขก) แนะนำแพ็กเกจที่ตรงความต้องการ ส่งลิงก์หน้าจองได้
+   - มีใบเสนอราคาแล้ว ยังไม่มัดจำ: ตอบโดยอิงใบเสนอราคาที่มีอยู่ (แพ็กเกจ ยอด ยอดมัดจำ) ห้ามเสนอแพ็กเกจใหม่หรือส่งลิงก์จองซ้ำ ถ้าลูกค้าพร้อม ให้บอกว่าชำระมัดจำตามใบเสนอราคาเพื่อล็อกคิว ถ้าขอแก้ใบเสนอราคา ให้ส่งต่อแอดมิน
+   - จองแล้ว: ลูกค้าคนนี้คือเจ้าภาพงานที่จองไว้ ห้ามขายแพ็กเกจ ห้ามส่งลิงก์หน้าจอง ห้ามอธิบายแพ็กเกจเหมือนลูกค้าใหม่ ให้ตอบเรื่องงานของเขา (ยืนยันรายละเอียดตามใบเสนอราคา/บทสนทนา กำหนดส่งเมนู 7 วันก่อนงาน การนัดจัดสถานที่ สิ่งที่ลูกค้าต้องเตรียม) คำขอเพิ่ม/ลด/เปลี่ยนรายการ หรือเรื่องเงิน ให้ส่งต่อแอดมิน
+   - ลูกค้าเก่า: ทักทายแบบคนที่เคยใช้บริการ ถ้าถามงานใหม่ให้ตอบแบบลูกค้าที่ยังไม่จอง
+   สถานะคำนวณจากระบบอาจคลาดได้ ถ้าบทสนทนาขัดกับสถานะ (เช่น แอดมินเพิ่งยืนยันคิวในแชท) ให้เชื่อบทสนทนา
+9. ข้อมูลที่ตกลงกันไว้ในบทสนทนาก่อนหน้า (จำนวนแขก วันงาน เมนู สถานที่) ให้ใช้ตามนั้น ไม่ต้องถามซ้ำ
 ตอบผ่านเครื่องมือ respond เท่านั้น`;
 
 const RESPOND_TOOL: Anthropic.Tool = {
@@ -121,6 +150,7 @@ export class AiShadowService {
     private readonly prisma: PrismaService,
     private readonly knowledge: KnowledgeService,
     private readonly bookings: BookingsService,
+    private readonly quotations: QuotationsService,
   ) {}
 
   // ── settings ──
@@ -267,37 +297,60 @@ export class AiShadowService {
    * Draft the answer to the customer turn that ends with `lastIn`, seeing the chat only up to that
    * moment (live: now; replay: a past turn). Skips a turn that already has a draft.
    */
-  private async generate(customerId: string, channel: string, lastIn: { id: string; timestamp: bigint }, mode: 'live' | 'replay', model: string) {
-    const exists = await this.prisma.aiShadowReply.findFirst({ where: { customerId, triggerMessageId: lastIn.id }, select: { id: true } });
+  private async generate(
+    customerId: string,
+    channel: string,
+    lastIn: { id: string; timestamp: bigint },
+    mode: 'live' | 'replay',
+    model: string,
+    run = 1,
+  ) {
+    const exists = await this.prisma.aiShadowReply.findFirst({ where: { customerId, triggerMessageId: lastIn.id, mode, run }, select: { id: true } });
     if (exists) return;
-    const history = (
-      await this.prisma.message.findMany({ where: { customerId, timestamp: { lte: lastIn.timestamp } }, orderBy: { timestamp: 'desc' }, take: HISTORY })
+    const at = new Date(Number(lastIn.timestamp));
+    const all = (
+      await this.prisma.message.findMany({
+        where: { customerId, timestamp: { lte: lastIn.timestamp } },
+        orderBy: { timestamp: 'desc' },
+        take: HISTORY + OLDER_HISTORY,
+      })
     ).reverse();
+    const history = all.slice(-HISTORY);
+    const older = all.slice(0, Math.max(0, all.length - HISTORY));
+    // images that were detected as transfer slips (slip id = message id)
+    const imageIds = all.filter((m) => m.mediaType === 'IMAGE').map((m) => m.id);
+    const slipById = new Map(
+      imageIds.length
+        ? (await this.prisma.slip.findMany({ where: { id: { in: imageIds } }, select: { id: true, amount: true } })).map((x) => [x.id, x.amount ? Number(x.amount) : null] as const)
+        : [],
+    );
+    const render = (m: (typeof all)[number]) => (slipById.has(m.id) ? `[รูปสลิปโอนเงิน${slipById.get(m.id) ? ` ${baht(slipById.get(m.id))} บาท` : ''}]` : this.render(m));
+    const who = (m: (typeof all)[number]) => (m.type === 'INCOMING' ? 'ลูกค้า' : `แอดมิน${m.adminName ? ` (${m.adminName})` : ''}`);
     const turn: string[] = [];
     for (let i = history.length - 1; i >= 0 && history[i].type === 'INCOMING'; i--) {
-      turn.unshift(this.render(history[i]));
+      turn.unshift(render(history[i]));
     }
 
-    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
-    const bookings = await this.prisma.booking.findMany({
-      // only what existed at the time of the question (matters for replays)
-      where: { customerId, createdAt: { lte: new Date(Number(lastIn.timestamp)) } },
-      orderBy: { createdAt: 'desc' },
-      take: 3,
-      select: { code: true, packageName: true, eventDate: true, timeSlot: true, guests: true, tables: true, foodMode: true, estimatedTotal: true, quotationDocNo: true, quotationPublicUrl: true, status: true },
-    });
-    const customerInfo = [
-      `ชื่อในแชท: ${customer?.nickname || customer?.displayName || '-'}`,
-      `ช่องทาง: ${channel} (${/เติมบุญ/.test(channel) ? 'เพจ/LINE เติมบุญ — ลูกค้าส่วนใหญ่ถามงานบุญ' : 'IRIS — ลูกค้าส่วนใหญ่ถามจัดเลี้ยง บุฟเฟต์ โต๊ะจีน'})`,
-      ...bookings.map(
-        (b) =>
-          `การจอง ${b.code}: ${b.packageName} วันที่ ${b.eventDate} ${b.timeSlot} ${b.foodMode === 'table' ? `${b.tables} โต๊ะ` : b.foodMode === 'buffet' ? `${b.guests} ท่าน` : ''} ราคาประเมิน ${baht(b.estimatedTotal)} สถานะ ${b.status}${b.quotationPublicUrl ? ` ใบเสนอราคา ${b.quotationPublicUrl}` : ''}`,
-      ),
-    ].join('\n');
-    const now = new Date(Number(lastIn.timestamp)).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+    const ctx = await this.customerContext(customerId, channel, at, mode);
+    const now = at.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
 
-    const conversation = history.map((m) => `${m.type === 'INCOMING' ? 'ลูกค้า' : `แอดมิน${m.adminName ? ` (${m.adminName})` : ''}`}: ${this.render(m)}`).join('\n');
-    const userContent = `ข้อมูลลูกค้า:\n${customerInfo}\n\nเวลาข้อความล่าสุด: ${now}\n\nบทสนทนา (เก่า → ใหม่):\n${conversation}\n\nร่างคำตอบสำหรับข้อความล่าสุดของลูกค้า:\n${turn.join('\n')}`;
+    // older part: text only, shortened, newest kept when over budget
+    let olderText = '';
+    if (older.length) {
+      const lines = older
+        .filter((m) => (m.text && m.text.trim()) || slipById.has(m.id))
+        .map((m) => `${who(m)}: ${render(m).replace(/\s+/g, ' ').slice(0, 200)}`);
+      const kept: string[] = [];
+      let size = 0;
+      for (let i = lines.length - 1; i >= 0 && size + lines[i].length < OLDER_CHARS; i--) {
+        kept.unshift(lines[i]);
+        size += lines[i].length + 1;
+      }
+      const firstAt = new Date(Number(older[0].timestamp)).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' });
+      olderText = `บทสนทนาช่วงก่อนหน้า (ย่อ ตั้งแต่ ${firstAt}${kept.length < lines.length ? ' — ตัดส่วนที่เก่ามากออก' : ''}):\n${kept.join('\n')}\n\n`;
+    }
+    const conversation = history.map((m) => `${who(m)}: ${render(m)}`).join('\n');
+    const userContent = `${ctx.text}\n\nเวลาข้อความล่าสุด: ${now}\n\n${olderText}บทสนทนาล่าสุด (เก่า → ใหม่):\n${conversation}\n\nร่างคำตอบสำหรับข้อความล่าสุดของลูกค้า:\n${turn.join('\n')}`;
 
     const knowledge = await this.knowledgeText();
     const started = Date.now();
@@ -309,6 +362,9 @@ export class AiShadowService {
       question: turn.join('\n').slice(0, 4000),
       model,
       mode,
+      run,
+      stage: ctx.stage,
+      customerContext: ctx.text.slice(0, 4000),
     };
     try {
       const anthropic = new Anthropic();
@@ -356,6 +412,102 @@ export class AiShadowService {
     }
   }
 
+  /**
+   * Who this customer is right now: quotations, deposit slips, web bookings, IRIS Jobs and tags →
+   * a stage (new / quoted / booked / past) the rules answer by. For a replay only what existed at
+   * `at` is used: tags and the IRIS Jobs link only show the current state, so they're live-only, and
+   * a quotation that is deposited today counts as deposited then only if a slip had already come.
+   */
+  private async customerContext(customerId: string, channel: string, at: Date, mode: 'live' | 'replay'): Promise<{ stage: CustomerStage; text: string }> {
+    const live = mode === 'live';
+    const atIso = bkkDate(at);
+    const [customer, slips, webBookings, tags, allQuotes] = await Promise.all([
+      this.prisma.customer.findUnique({ where: { id: customerId } }),
+      this.prisma.slip.findMany({
+        where: { customerId, createdAt: { lte: at } },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { amount: true, createdAt: true, matchedDocNo: true },
+      }),
+      this.prisma.booking.findMany({
+        where: { customerId, createdAt: { lte: at } },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+        select: { code: true, packageName: true, eventDate: true, timeSlot: true, guests: true, tables: true, foodMode: true, estimatedTotal: true, quotationDocNo: true, quotationPublicUrl: true, status: true },
+      }),
+      live ? this.prisma.customerTag.findMany({ where: { customerId }, include: { tag: true } }) : Promise.resolve([]),
+      this.quotations.forCustomer(customerId).catch((): QuotationRecord[] => []),
+    ]);
+
+    const recentSlip = slips.find((x) => at.getTime() - x.createdAt.getTime() < 120 * DAY_MS);
+    const quotes = allQuotes
+      .filter((q) => q.date && q.date <= atIso)
+      .map((q) => {
+        let status = q.status;
+        if (!live && DONE_QUOTE.test(status) && !slips.some((x) => x.matchedDocNo === q.docNo) && !recentSlip) status = 'PENDING';
+        // documents from the booking page write the event date as YYYY-MM-DD in the project line
+        const jobDate = q.jobDate || (q.project || '').match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1] || null;
+        return { ...q, status, jobDate };
+      })
+      .filter((q) => OPEN_QUOTE.includes(q.status) || DONE_QUOTE.test(q.status))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      .slice(0, 4);
+
+    const upcoming = (q: { jobDate?: string | null; date: string }) =>
+      q.jobDate ? q.jobDate >= atIso : at.getTime() - new Date(q.date).getTime() < 120 * DAY_MS;
+    const depositedUpcoming = quotes.find((q) => DONE_QUOTE.test(q.status) && upcoming(q));
+    const openQuote = quotes.find((q) => OPEN_QUOTE.includes(q.status) && at.getTime() - new Date(q.date).getTime() < 90 * DAY_MS);
+    const webConfirmed = webBookings.find((b) => b.status === 'CONFIRMED' && b.eventDate >= atIso);
+    const webOpen = webBookings.find((b) => (b.status === 'NEW' || b.status === 'CONTACTED') && b.eventDate >= atIso);
+    const liveJob = live && customer?.nextJobDate && customer.nextJobDate.getTime() >= at.getTime() - DAY_MS;
+    const tagNames = tags.map((t) => t.tag.name);
+
+    let stage: CustomerStage = 'new';
+    const why: string[] = [];
+    if (depositedUpcoming || webConfirmed || liveJob || (recentSlip && !openQuote)) {
+      stage = 'booked';
+      if (depositedUpcoming) why.push(`ใบเสนอราคา ${depositedUpcoming.docNo} ชำระมัดจำแล้ว`);
+      if (webConfirmed) why.push(`การจองออนไลน์ ${webConfirmed.code} ยืนยันแล้ว`);
+      if (liveJob) why.push(`มีงานในระบบงาน ${customer?.nextJobNo || ''}`.trim());
+      if (recentSlip && !depositedUpcoming) why.push(`ลูกค้าส่งสลิปโอนเงินมาแล้ว${recentSlip.amount ? ` ${baht(Number(recentSlip.amount))} บาท` : ''}`);
+    } else if (openQuote || webOpen || (recentSlip && openQuote)) {
+      stage = 'quoted';
+      if (openQuote) why.push(`ใบเสนอราคา ${openQuote.docNo} ${QUOTE_STATUS_TH[openQuote.status] || openQuote.status}`);
+      if (webOpen) why.push(`ขอใบเสนอราคาผ่านหน้าจอง ${webOpen.code}`);
+    } else if (quotes.some((q) => DONE_QUOTE.test(q.status)) || slips.length || tagNames.includes('ลูกค้าเก่า') || tagNames.includes('ลูกค้าจองงานแล้ว')) {
+      stage = 'past';
+      why.push('เคยมีงาน/ชำระเงินกับเรามาก่อน');
+    }
+    if (recentSlip && openQuote && stage === 'quoted') why.push(`ลูกค้าส่งสลิป${recentSlip.amount ? ` ${baht(Number(recentSlip.amount))} บาท` : ''} มาแล้ว (อาจเป็นมัดจำที่แอดมินยังไม่ได้ปรับสถานะ)`);
+
+    const lines = [
+      `สถานะลูกค้า: ${STAGE_TH[stage]}${why.length ? ` (${why.join(' · ')})` : ''}`,
+      `ชื่อในแชท: ${customer?.nickname || customer?.displayName || '-'}`,
+      `ช่องทาง: ${channel} (${/เติมบุญ/.test(channel) ? 'เพจ/LINE เติมบุญ — ลูกค้าส่วนใหญ่ถามงานบุญ' : 'IRIS — ลูกค้าส่วนใหญ่ถามจัดเลี้ยง บุฟเฟต์ โต๊ะจีน'})`,
+    ];
+    for (const q of quotes) {
+      lines.push(
+        `ใบเสนอราคา ${q.docNo} (ออกวันที่ ${q.date}): ${q.project || '-'} · ยอดรวม ${baht(q.grandTotal)} บาท${q.depositAmount ? ` · มัดจำ ${baht(q.depositAmount)} บาท` : ''} · สถานะ ${QUOTE_STATUS_TH[q.status] || q.status}${q.jobDate ? ` · วันงาน ${q.jobDate}` : ''}${q.publicUrl ? ` · ลิงก์ ${q.publicUrl}` : ''}`,
+      );
+    }
+    for (const b of webBookings) {
+      lines.push(
+        `การจองออนไลน์ ${b.code}: ${b.packageName} วันที่ ${b.eventDate} ${b.timeSlot} ${b.foodMode === 'table' ? `${b.tables} โต๊ะ` : b.foodMode === 'buffet' ? `${b.guests} ท่าน` : ''} ราคาประเมิน ${baht(b.estimatedTotal)} สถานะ ${b.status}${b.quotationPublicUrl ? ` ใบเสนอราคา ${b.quotationPublicUrl}` : ''}`,
+      );
+    }
+    if (slips.length) {
+      const counts = new Map<string, number>();
+      for (const x of slips) {
+        const k = `${bkkDate(x.createdAt)}${x.amount ? ` ${baht(Number(x.amount))} บาท` : ''}${x.matchedDocNo ? ` (มัดจำ ${x.matchedDocNo})` : ''}`;
+        counts.set(k, (counts.get(k) || 0) + 1);
+      }
+      lines.push(`สลิปโอนเงินที่ลูกค้าเคยส่ง: ${[...counts].map(([k, n]) => (n > 1 ? `${k} ×${n}` : k)).join(' · ')}`);
+    }
+    if (liveJob) lines.push(`งานในระบบงาน: ${customer?.nextJobNo || ''} ${customer?.nextJobTitle || ''} วันที่ ${customer?.nextJobDate ? bkkDate(customer.nextJobDate) : '-'}`.trim());
+    if (tagNames.length) lines.push(`แท็ก: ${tagNames.join(', ')}`);
+    return { stage, text: lines.join('\n') };
+  }
+
   private render(m: { text: string | null; mediaType: string | null }): string {
     if (m.text && m.text.trim()) return m.text.trim().slice(0, 1500);
     return m.mediaType ? `[${m.mediaType === 'IMAGE' ? 'รูปภาพ' : m.mediaType === 'VIDEO' ? 'วิดีโอ' : m.mediaType === 'STICKER' ? 'สติกเกอร์' : 'ไฟล์'}]` : '[ข้อความว่าง]';
@@ -363,9 +515,11 @@ export class AiShadowService {
 
   // ── dashboard ──
 
-  async list(q: { channel?: string; action?: string; rating?: string; mode?: string; page?: number; pageSize?: number }) {
+  async list(q: { channel?: string; action?: string; rating?: string; mode?: string; run?: number; stage?: string; page?: number; pageSize?: number }) {
     const where: any = {};
     if (q.mode) where.mode = q.mode;
+    if (q.run) where.run = q.run;
+    if (q.stage) where.stage = q.stage;
     if (q.channel) where.channel = q.channel;
     if (q.action) where.action = q.action;
     if (q.rating === 'unrated') where.rating = null;
@@ -381,6 +535,14 @@ export class AiShadowService {
       select: { id: true, displayName: true, nickname: true, pictureUrl: true },
     });
     const byId = new Map(customers.map((c) => [c.id, c]));
+    // the same question in the previous round, to see what changed
+    const prevRows =
+      q.mode === 'replay' && rows.some((r) => r.run > 1)
+        ? await this.prisma.aiShadowReply.findMany({
+            where: { mode: 'replay', triggerMessageId: { in: rows.map((r) => r.triggerMessageId) } },
+            select: { triggerMessageId: true, run: true, action: true, aiReply: true, rating: true, ratingNote: true, stage: true },
+          })
+        : [];
     const items = await Promise.all(
       rows.map(async (r) => {
         const admin = await this.adminAnswer(r.customerId, r.triggerAt);
@@ -389,6 +551,10 @@ export class AiShadowService {
           ...r,
           triggerAt: Number(r.triggerAt),
           customerName: c?.nickname || c?.displayName || r.customerId,
+          previous:
+            prevRows
+              .filter((p) => p.triggerMessageId === r.triggerMessageId && p.run < r.run)
+              .sort((a, b) => b.run - a.run)[0] || null,
           pictureUrl: c?.pictureUrl || null,
           adminReplies: admin.map((m) => ({ text: m.text, adminName: m.adminName, timestamp: Number(m.timestamp), mediaType: m.mediaType })),
           adminDelaySec: admin.length ? Math.round((Number(admin[0].timestamp) - Number(r.triggerAt)) / 1000) : null,
@@ -448,9 +614,71 @@ export class AiShadowService {
     return this.replayJob;
   }
 
-  private async runReplay(channels: string[], count: number, days: number) {
+  /** replay rounds that exist, newest first */
+  async replayRuns() {
+    const rows = await this.prisma.aiShadowReply.groupBy({ by: ['run'], where: { mode: 'replay' }, _count: { _all: true }, _min: { createdAt: true } });
+    return rows
+      .map((r) => ({ run: r.run, count: r._count._all, startedAt: r._min.createdAt }))
+      .sort((a, b) => b.run - a.run);
+  }
+
+  /** Answer the questions of round `fromRun` again as a new round (after changing rules or data). */
+  async startRerun(fromRun?: number): Promise<ReplayJob> {
+    if (this.replayJob.running) return this.replayJob;
+    const runs = await this.replayRuns();
+    if (!runs.length) throw new Error('ยังไม่มีชุดทดลอง');
+    const source = fromRun && runs.some((r) => r.run === fromRun) ? fromRun : runs[runs.length - 1].run;
+    const next = runs[0].run + 1;
+    const rows = await this.prisma.aiShadowReply.findMany({
+      where: { mode: 'replay', run: source },
+      select: { customerId: true, channel: true, triggerMessageId: true, triggerAt: true },
+    });
+    this.replayJob = {
+      running: true,
+      startedAt: Date.now(),
+      finishedAt: null,
+      channels: [...new Set(rows.map((r) => r.channel))],
+      target: rows.length,
+      found: rows.length,
+      done: 0,
+      errors: 0,
+      message: `รอบ ${next}: ตอบชุดคำถามเดิมของรอบ ${source} อีกครั้ง…`,
+    };
+    const picked = rows.map((r) => ({ customerId: r.customerId, channel: r.channel, lastIn: { id: r.triggerMessageId, timestamp: r.triggerAt } }));
+    this.answerAll(picked, next)
+      .catch((e: any) => {
+        this.replayJob.message = `หยุดเพราะผิดพลาด: ${e?.message || e}`;
+        this.logger.error(`rerun failed: ${e?.message || e}`);
+      })
+      .finally(() => {
+        this.replayJob.running = false;
+        this.replayJob.finishedAt = Date.now();
+      });
+    return this.replayJob;
+  }
+
+  private async answerAll(picked: { customerId: string; channel: string; lastIn: { id: string; timestamp: bigint } }[], run: number) {
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not set');
     const settings = await this.getSettings(true);
+    // 3 at a time
+    let i = 0;
+    const worker = async () => {
+      while (i < picked.length) {
+        const job = picked[i++];
+        try {
+          await this.generate(job.customerId, job.channel, job.lastIn, 'replay', settings.model, run);
+        } catch {
+          this.replayJob.errors++;
+        }
+        this.replayJob.done++;
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    this.replayJob.message = `เสร็จแล้ว รอบ ${run}: ${this.replayJob.done - this.replayJob.errors} คำถาม${this.replayJob.errors ? ` (ผิดพลาด ${this.replayJob.errors})` : ''}`;
+  }
+
+  private async runReplay(channels: string[], count: number, days: number) {
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not set');
     const since = new Date(Date.now() - days * 86400_000);
     // candidate customer messages that look like typed questions, newest customers spread out
     const candidates = await this.prisma.$queryRawUnsafe<{ id: string; customer_id: string; channel: string; timestamp: bigint; text: string }[]>(
@@ -493,35 +721,27 @@ export class AiShadowService {
     }
     this.replayJob.found = picked.length;
     this.replayJob.message = picked.length ? 'AI กำลังตอบ…' : 'ไม่พบคำถามที่เข้าเงื่อนไข';
-    // 3 at a time
-    let i = 0;
-    const worker = async () => {
-      while (i < picked.length) {
-        const job = picked[i++];
-        try {
-          await this.generate(job.customerId, job.channel, job.lastIn, 'replay', settings.model);
-        } catch {
-          this.replayJob.errors++;
-        }
-        this.replayJob.done++;
-      }
-    };
-    await Promise.all([worker(), worker(), worker()]);
-    this.replayJob.message = `เสร็จแล้ว ${this.replayJob.done - this.replayJob.errors} คำถาม${this.replayJob.errors ? ` (ผิดพลาด ${this.replayJob.errors})` : ''}`;
+    if (!picked.length) return;
+    // a fresh sample is a new round
+    const runs = await this.replayRuns();
+    await this.answerAll(picked, (runs[0]?.run || 0) + 1);
   }
 
-  async stats(channel?: string, mode?: string) {
+  async stats(channel?: string, mode?: string, run?: number) {
     const where: any = channel ? { channel } : {};
     if (mode) where.mode = mode;
-    const [byAction, byRating, agg] = await Promise.all([
+    if (run) where.run = run;
+    const [byAction, byRating, agg, byStage] = await Promise.all([
       this.prisma.aiShadowReply.groupBy({ by: ['action'], where, _count: { _all: true } }),
       this.prisma.aiShadowReply.groupBy({ by: ['rating'], where, _count: { _all: true } }),
       this.prisma.aiShadowReply.aggregate({ where, _avg: { latencyMs: true, confidence: true }, _sum: { inputTokens: true, outputTokens: true, cacheReadTokens: true }, _count: { _all: true } }),
+      this.prisma.aiShadowReply.groupBy({ by: ['stage'], where, _count: { _all: true } }),
     ]);
     return {
       total: agg._count._all,
       byAction: Object.fromEntries(byAction.map((x) => [x.action, x._count._all])),
       byRating: Object.fromEntries(byRating.map((x) => [x.rating ?? 'unrated', x._count._all])),
+      byStage: Object.fromEntries(byStage.map((x) => [x.stage ?? 'unknown', x._count._all])),
       avgLatencyMs: Math.round(agg._avg.latencyMs || 0),
       avgConfidence: agg._avg.confidence,
       tokens: { input: agg._sum.inputTokens || 0, output: agg._sum.outputTokens || 0, cacheRead: agg._sum.cacheReadTokens || 0 },

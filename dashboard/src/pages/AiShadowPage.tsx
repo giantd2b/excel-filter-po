@@ -33,6 +33,17 @@ interface ShadowItem {
   ratedBy: string | null;
   adminReplies: AdminReply[];
   adminDelaySec: number | null;
+  run: number;
+  stage: Stage | null;
+  customerContext: string | null;
+  /** the same question in the previous replay round */
+  previous: { run: number; action: string; aiReply: string | null; rating: string | null; ratingNote: string | null; stage: Stage | null } | null;
+}
+type Stage = "new" | "quoted" | "booked" | "past";
+interface RunInfo {
+  run: number;
+  count: number;
+  startedAt: string;
 }
 interface ListRes {
   total: number;
@@ -48,6 +59,7 @@ interface Stats {
   avgLatencyMs: number;
   avgConfidence: number | null;
   tokens: { input: number; output: number; cacheRead: number };
+  byStage?: Record<string, number>;
 }
 interface ReplayJob {
   running: boolean;
@@ -67,6 +79,12 @@ interface Settings {
   model: string;
 }
 
+const STAGE_LABEL: Record<Stage, { label: string; cls: string }> = {
+  new: { label: "ยังไม่จอง", cls: "bg-sky-50 text-sky-700 ring-sky-200" },
+  quoted: { label: "มีใบเสนอราคา ยังไม่มัดจำ", cls: "bg-amber-50 text-amber-700 ring-amber-200" },
+  booked: { label: "จองแล้ว", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  past: { label: "ลูกค้าเก่า", cls: "bg-slate-100 text-slate-600 ring-slate-200" },
+};
 const ACTION_LABEL: Record<string, { label: string; cls: string }> = {
   reply: { label: "AI ตอบเองได้", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
   handoff: { label: "ส่งต่อแอดมิน", cls: "bg-amber-50 text-amber-700 ring-amber-200" },
@@ -99,6 +117,10 @@ export default function AiShadowPage() {
   const [replayChannels, setReplayChannels] = useState<string[]>(["FB_เติมบุญ", "Line_เติมบุญ"]);
   const [replayCount, setReplayCount] = useState(100);
   const [replayDays, setReplayDays] = useState(90);
+  const [runs, setRuns] = useState<RunInfo[]>([]);
+  /** replay round shown; 0 = newest */
+  const [run, setRun] = useState(0);
+  const [stage, setStage] = useState("");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [allChannels, setAllChannels] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
@@ -113,8 +135,14 @@ export default function AiShadowPage() {
     if (rating) qs.set("rating", rating);
     qs.set("mode", mode);
     qs.set("page", String(page));
+    if (stage) qs.set("stage", stage);
     const sq = new URLSearchParams({ mode });
     if (channel) sq.set("channel", channel);
+    const shownRun = mode === "replay" ? run || runs[0]?.run || 0 : 0;
+    if (shownRun) {
+      qs.set("run", String(shownRun));
+      sq.set("run", String(shownRun));
+    }
     try {
       const [l, s] = await Promise.all([api.get<ListRes>(`/ai-shadow?${qs}`), api.get<Stats>(`/ai-shadow/stats?${sq}`)]);
       setData(l);
@@ -122,7 +150,8 @@ export default function AiShadowPage() {
     } finally {
       setLoading(false);
     }
-  }, [channel, action, rating, mode, page]);
+  }, [channel, action, rating, mode, page, stage, run, runs]);
+  const loadRuns = useCallback(() => api.get<RunInfo[]>("/ai-shadow/replay/runs").then(setRuns), []);
 
   useEffect(() => {
     load();
@@ -133,23 +162,39 @@ export default function AiShadowPage() {
       setAllChannels(r.channels);
     });
     api.get<ReplayJob>("/ai-shadow/replay").then(setJob);
-  }, []);
+    loadRuns();
+  }, [loadRuns]);
   // follow a running replay; refresh the list as answers come in
   useEffect(() => {
     if (!job?.running) return;
     const t = setInterval(async () => {
       const j = await api.get<ReplayJob>("/ai-shadow/replay");
       setJob(j);
-      if (mode === "replay") load();
+      if (mode === "replay") {
+        loadRuns();
+        load();
+      }
     }, 5000);
     return () => clearInterval(t);
-  }, [job?.running, mode, load]);
+  }, [job?.running, mode, load, loadRuns]);
 
   const startReplay = async () => {
     const j = await api.post<ReplayJob>("/ai-shadow/replay", { channels: replayChannels, count: replayCount, days: replayDays });
     setJob(j);
     setMode("replay");
+    setRun(0);
     setPage(1);
+    loadRuns();
+  };
+
+  /** answer the same questions again (after a rules/data change) as a new round */
+  const rerun = async () => {
+    const from = run || runs[runs.length - 1]?.run;
+    const j = await api.post<ReplayJob>("/ai-shadow/replay/rerun", { fromRun: from });
+    setJob(j);
+    setRun(0);
+    setPage(1);
+    loadRuns();
   };
 
   const saveSettings = async (patch: Partial<Settings>) => {
@@ -165,6 +210,8 @@ export default function AiShadowPage() {
     setData((d) => (d ? { ...d, items: d.items.map((x) => (x.id === item.id ? { ...x, ...res } : x)) } : d));
     const sq = new URLSearchParams({ mode });
     if (channel) sq.set("channel", channel);
+    const shownRun = mode === "replay" ? run || runs[0]?.run || 0 : 0;
+    if (shownRun) sq.set("run", String(shownRun));
     api.get<Stats>(`/ai-shadow/stats?${sq}`).then(setStats);
   };
 
@@ -304,6 +351,31 @@ export default function AiShadowPage() {
             </button>
             <span className="text-xs text-slate-500">ค่า AI ประมาณ 1 บาท/คำถาม</span>
           </div>
+          {runs.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-sm pt-2 border-t border-slate-100">
+              <span className="text-slate-500">รอบที่แสดง</span>
+              {runs.map((r) => {
+                const on = (run || runs[0].run) === r.run;
+                return (
+                  <button
+                    key={r.run}
+                    onClick={() => { setRun(r.run); setPage(1); }}
+                    className={`text-xs px-2.5 py-1 rounded-full border ${on ? "bg-slate-800 text-white border-slate-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    รอบ {r.run} · {r.count} ข้อ · {new Date(r.startedAt).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}
+                  </button>
+                );
+              })}
+              <button
+                onClick={rerun}
+                disabled={!!job?.running}
+                className="ml-auto px-3 py-1.5 rounded-lg border border-violet-300 text-violet-700 font-medium hover:bg-violet-50 disabled:opacity-50"
+                title="หลังปรับกติกาหรือข้อมูล ให้ AI ตอบคำถามชุดเดิมอีกครั้ง เพื่อเทียบก่อน–หลัง"
+              >
+                ตอบชุดคำถามของรอบ {run || runs[runs.length - 1].run} อีกครั้ง (รอบใหม่)
+              </button>
+            </div>
+          )}
           {job && (job.running || job.finishedAt) && (
             <div className="text-sm">
               <div className="flex justify-between text-slate-600 mb-1">
@@ -338,6 +410,11 @@ export default function AiShadowPage() {
         <Select value={channel} onChange={(v) => { setChannel(v); setPage(1); }} options={[["", "ทุกช่องทาง"], ...allChannels.map((c) => [c, c] as [string, string])]} />
         <Select value={action} onChange={(v) => { setAction(v); setPage(1); }} options={[["", "ทุกประเภท"], ["reply", "AI ตอบเองได้"], ["handoff", "ส่งต่อแอดมิน"], ["no_reply", "ไม่ต้องตอบ"], ["error", "ผิดพลาด"]]} />
         <Select value={rating} onChange={(v) => { setRating(v); setPage(1); }} options={[["", "ทุกคะแนน"], ["unrated", "ยังไม่ให้คะแนน"], ["good", "ใช้ได้"], ["partial", "พอใช้"], ["bad", "ผิด"]]} />
+        <Select
+          value={stage}
+          onChange={(v) => { setStage(v); setPage(1); }}
+          options={[["", "ทุกสถานะลูกค้า"], ...(Object.entries(STAGE_LABEL) as [Stage, { label: string }][]).map(([k, v]) => [k, `${v.label}${stats?.byStage?.[k] ? ` (${stats.byStage[k]})` : ""}`] as [string, string])]}
+        />
         {data && <span className="self-center text-slate-500">{data.total.toLocaleString()} รายการ</span>}
       </div>
 
@@ -422,10 +499,17 @@ function ShadowCard({ it, onRate }: { it: ShadowItem; onRate: (it: ShadowItem, r
             <span>· {it.channel}</span>
             <span>· {fmtTime(it.triggerAt)}</span>
             {it.intent && <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{it.intent}</span>}
+            {it.stage && <span className={`px-1.5 py-0.5 rounded ring-1 ${STAGE_LABEL[it.stage].cls}`}>{STAGE_LABEL[it.stage].label}</span>}
           </div>
           <div className="mt-1.5 inline-block max-w-full bg-slate-100 rounded-2xl rounded-tl-sm px-3 py-2 text-sm text-slate-800 whitespace-pre-wrap break-words">
             {it.question}
           </div>
+          {it.customerContext && (
+            <details className="mt-2 text-xs text-slate-500">
+              <summary className="cursor-pointer select-none hover:text-slate-700">ข้อมูลลูกค้าที่ AI เห็น</summary>
+              <pre className="mt-1 whitespace-pre-wrap font-sans bg-slate-50 rounded-lg p-2 text-slate-600">{it.customerContext}</pre>
+            </details>
+          )}
         </div>
       </div>
 
@@ -446,6 +530,16 @@ function ShadowCard({ it, onRate }: { it: ShadowItem; onRate: (it: ShadowItem, r
           )}
           {it.handoffReason && <div className="text-xs text-amber-700 mt-2">เหตุผลส่งต่อ: {it.handoffReason}</div>}
           {it.sources?.length > 0 && <div className="text-[11px] text-slate-400 mt-2">อ้างอิง: {it.sources.join(" · ")}</div>}
+          {it.previous && (
+            <details className="mt-3 text-xs">
+              <summary className="cursor-pointer select-none text-slate-500 hover:text-slate-700">
+                รอบ {it.previous.run} ตอบว่า ({ACTION_LABEL[it.previous.action]?.label || it.previous.action}
+                {it.previous.rating ? ` · ${RATINGS.find((r) => r.id === it.previous!.rating)?.label}` : ""})
+              </summary>
+              <div className="mt-1 bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-600 whitespace-pre-wrap break-words">{it.previous.aiReply || "—"}</div>
+              {it.previous.ratingNote && <div className="text-[11px] text-slate-500 mt-1">หมายเหตุ: {it.previous.ratingNote}</div>}
+            </details>
+          )}
         </div>
         <div className="p-4">
           <div className="flex items-center gap-2 mb-2">

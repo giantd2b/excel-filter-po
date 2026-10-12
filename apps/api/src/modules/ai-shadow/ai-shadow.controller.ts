@@ -15,15 +15,33 @@ export class AiShadowController {
     @Query('action') action?: string,
     @Query('rating') rating?: string,
     @Query('mode') mode?: string,
+    @Query('run') run?: string,
+    @Query('stage') stage?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
-    return this.shadow.list({ channel, action, rating, mode, page: Number(page) || 1, pageSize: Number(pageSize) || 30 });
+    return this.shadow.list({ channel, action, rating, mode, run: Number(run) || undefined, stage, page: Number(page) || 1, pageSize: Number(pageSize) || 30 });
   }
 
   @Get('stats')
-  stats(@Query('channel') channel?: string, @Query('mode') mode?: string) {
-    return this.shadow.stats(channel, mode);
+  stats(@Query('channel') channel?: string, @Query('mode') mode?: string, @Query('run') run?: string) {
+    return this.shadow.stats(channel, mode, Number(run) || undefined);
+  }
+
+  @Get('replay/runs')
+  runs() {
+    return this.shadow.replayRuns();
+  }
+
+  /** answer the same questions again as a new round (compare before/after a change) */
+  @Post('replay/rerun')
+  async rerun(@Body() body: { fromRun?: number }, @Req() req: any) {
+    if (!canManage(req)) throw new ForbiddenException('เฉพาะ ADMIN / SUPER_ADMIN');
+    try {
+      return await this.shadow.startRerun(Number(body?.fromRun) || undefined);
+    } catch (e: any) {
+      throw new BadRequestException(e?.message || 'เริ่มไม่สำเร็จ');
+    }
   }
 
   /** experiment: re-answer past real questions and compare with the admin's answer */

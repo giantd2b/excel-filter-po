@@ -551,6 +551,9 @@ model AiShadowReply {
   triggerAt        BigInt    @map("trigger_at") // its timestamp (ms) — admin replies after this are the comparison
   question         String // customer messages of this turn, oldest first
   mode             String    @default("live") // live = drafted as the chat happened · replay = past question re-answered for the experiment
+  run              Int       @default(1) // replay round: re-running the same questions after a change makes round 2, 3… so they can be compared
+  stage            String? // customer stage the AI was told: new | quoted | booked | past
+  customerContext  String?   @map("customer_context") // the customer status block the AI saw (shown on the dashboard)
   action           String // reply | handoff | no_reply
   aiReply          String?   @map("ai_reply")
   handoffReason    String?   @map("handoff_reason")
@@ -573,5 +576,6 @@ model AiShadowReply {
   @@index([createdAt])
   @@index([channel, createdAt])
   @@index([mode, createdAt])
+  @@index([mode, run])
   @@map("ai_shadow_replies")
 }

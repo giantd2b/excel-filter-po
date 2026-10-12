@@ -61,7 +61,7 @@ function parseThaiJobDate(text: string): string | null {
   return null;
 }
 
-interface QuotationRecord {
+export interface QuotationRecord {
   docNo: string;
   date: string;
   customer: string;
@@ -366,6 +366,13 @@ export class QuotationsService {
   private syncPromise: Promise<any> | null = null;
 
   /** Concurrent callers share one in-flight sync instead of getting an empty cache (cold start race). */
+  /** documents linked to one chat customer (attribution or phone match), from the synced cache */
+  async forCustomer(customerId: string): Promise<QuotationRecord[]> {
+    if (!this.cache) await this.syncFromFlowAccount().catch(() => null);
+    else if (Date.now() - this.cache.updatedAt > this.CACHE_TTL && !this.syncing) this.syncFromFlowAccount().catch(() => {});
+    return (this.cache?.data || []).filter((q) => q.crmCustomerId === customerId || q.faCrmCustomerId === customerId);
+  }
+
   async syncFromFlowAccount() {
     if (this.syncPromise) return this.syncPromise;
     this.syncPromise = this.doSync().finally(() => { this.syncPromise = null; });
