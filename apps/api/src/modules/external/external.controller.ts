@@ -1,5 +1,6 @@
-import { Controller, Get, Param, Query, UseGuards, Headers, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Headers, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/providers/prisma.service';
+import { MessagesService } from '../messages/messages.service';
 
 /**
  * External API — for third-party apps to query customer data.
@@ -7,7 +8,10 @@ import { PrismaService } from '../../common/providers/prisma.service';
  */
 @Controller('external')
 export class ExternalController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly messages: MessagesService,
+  ) {}
 
   private async validateApiKey(apiKey: string | undefined) {
     if (!apiKey) {
@@ -310,5 +314,53 @@ export class ExternalController {
       })),
       total: customers.length,
     };
+  }
+
+  /**
+   * POST /api/external/customers/:id/messages
+   * Send a text message to a customer through their own channel (LINE/FB).
+   * Saved like an admin reply so it shows in the dashboard chat; delivery is
+   * async — poll GET /external/messages/:id for the final status.
+   */
+  @Post('customers/:id/messages')
+  async sendToCustomer(
+    @Headers('x-api-key') apiKey: string,
+    @Param('id') id: string,
+    @Body() body: { text?: string; senderName?: string },
+  ) {
+    await this.validateApiKey(apiKey);
+    const text = body?.text?.trim();
+    if (!text) throw new BadRequestException('text is required');
+
+    const customer = await this.prisma.customer.findUnique({
+      where: { id },
+      select: { id: true, platformUserId: true, channel: true },
+    });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const result = await this.messages.sendMessage({
+      oduserId: customer.platformUserId,
+      docId: customer.id,
+      channel: customer.channel,
+      text,
+      adminName: body.senderName?.trim() || 'แจ้งอัตโนมัติ',
+      tag: 'CONFIRMED_EVENT_UPDATE',
+    });
+    return { messageId: result.messageId, status: result.status };
+  }
+
+  /**
+   * GET /api/external/messages/:id
+   * Delivery status of a message sent through the endpoint above.
+   */
+  @Get('messages/:id')
+  async getMessageStatus(@Headers('x-api-key') apiKey: string, @Param('id') id: string) {
+    await this.validateApiKey(apiKey);
+    const msg = await this.prisma.message.findUnique({
+      where: { id },
+      select: { id: true, status: true, customerId: true },
+    });
+    if (!msg) throw new NotFoundException('Message not found');
+    return { messageId: msg.id, customerId: msg.customerId, status: msg.status };
   }
 }
