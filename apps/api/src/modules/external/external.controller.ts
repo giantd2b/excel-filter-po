@@ -350,6 +350,48 @@ export class ExternalController {
   }
 
   /**
+   * GET /api/external/customers/:id/slips?since=ISO
+   * Payment slips the AI detected in this customer's chat (newest first).
+   * Read from the picture only — NOT verified with the bank — so callers must
+   * treat them as "received, pending review", never as paid.
+   */
+  @Get('customers/:id/slips')
+  async getCustomerSlips(
+    @Headers('x-api-key') apiKey: string,
+    @Param('id') id: string,
+    @Query('since') since?: string,
+  ) {
+    await this.validateApiKey(apiKey);
+    const sinceDate = since ? new Date(since) : null;
+    // Slips are keyed by Customer.id ("{userId}__{channel}"); very old rows used the bare user id
+    const ids = [...new Set([id, id.split('__')[0]])];
+    const rows = await this.prisma.slip.findMany({
+      where: {
+        customerId: { in: ids },
+        ...(sinceDate && !isNaN(sinceDate.getTime()) ? { detectedAt: { gte: sinceDate } } : {}),
+      },
+      orderBy: { detectedAt: 'desc' },
+      take: 20,
+      select: {
+        id: true, imageUrl: true, amount: true, dateTime: true, bankName: true,
+        referenceNumber: true, matchedDocNo: true, detectedAt: true,
+      },
+    });
+    return {
+      slips: rows.map((s) => ({
+        id: s.id,
+        imageUrl: s.imageUrl,
+        amount: s.amount != null ? Number(s.amount) : null,
+        dateTime: s.dateTime,
+        bankName: s.bankName,
+        referenceNumber: s.referenceNumber,
+        matchedDocNo: s.matchedDocNo,
+        detectedAt: s.detectedAt.toISOString(),
+      })),
+    };
+  }
+
+  /**
    * GET /api/external/messages/:id
    * Delivery status of a message sent through the endpoint above.
    */
